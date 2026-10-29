@@ -3,3 +3,6 @@
 load_settings            # free play always: the settings as the EEPROM has them, then the coins' set to it
 credit_display_update    # no FREE PLAY line: the console has no coins
 send_sound_requests      # the right seat's sounds only while it plays: one sound for both speakers
+check_game_start         # the console's menus, and the games they start
+coin_prompt_message_update  # TURN THE IGNITION KEY / INSERT COIN(S): none, PRESS START is the console's
+ignition_key_prompt_update  # the ignition key's picture: none either

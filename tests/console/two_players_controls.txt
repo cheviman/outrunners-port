@@ -1,0 +1,38 @@
+# Both seats through car select (START every 60 frames), then the gas down (with two_players.txt's actions)
+520 press start1
+540 press start2
+580 press start1
+600 press start2
+640 press start1
+660 press start2
+700 press start1
+720 press start2
+760 press start1
+780 press start2
+820 press start1
+840 press start2
+880 press start1
+900 press start2
+940 press start1
+960 press start2
+1000 press start1
+1020 press start2
+1060 press start1
+1080 press start2
+1120 press start1
+1140 press start2
+1180 press start1
+1200 press start2
+1240 press start1
+1260 press start2
+1300 press start1
+1320 press start2
+1360 press start1
+1380 press start2
+1420 press start1
+1440 press start2
+1480 press start1
+1500 press start2
+1500 gas 1 255
+1500 gas 2 255
+3000 end

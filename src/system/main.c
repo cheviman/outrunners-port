@@ -423,7 +423,7 @@ void second_task(uint32_t entry_point)
    bit 6) takes the credit (not with free play; and clears the bytes at 20E0A2 and 20E0AA, after each
    seat's coin units), turns the lamp off and starts a game: game mode 6 at step 0, link_event 1, the
    race record's car part cleared (race_record_clear) and race entry_request = FF. Returns the game mode. */
-uint32_t check_game_start(uint32_t mode, uint32_t seat_credits)
+uint32_t CONSOLE_ORIGINAL(check_game_start)(uint32_t mode, uint32_t seat_credits)
 {
 	uint8_t lamp_blink = 0;
 	uint32_t index = 0, play_mode = 0;

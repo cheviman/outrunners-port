@@ -1,0 +1,22 @@
+# The console's menus: PRESS START on the title, the menu, OPTIONS and its pages, back, then ARCADE
+300 start
+360 down
+380 down
+400 down
+420 accept
+600 down
+620 right
+640 right
+660 down
+680 accept
+720 down
+740 right
+800 back
+840 down
+880 accept
+960 back
+1000 back
+1060 up
+1080 up
+1100 up
+1120 accept

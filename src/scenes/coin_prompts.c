@@ -144,7 +144,7 @@ void coin_prompt_car_drive(void)
    COIN(S) (message 0; 1 when coins are in, animation coin_prompt_message_animations) in the colour of
    the round's car (coin_prompt_message_palettes by car_colour), animating in for 22 frames over the one
    before, then a layer back for 30 frames, and ends; ends at once when the prompt's message changes. */
-void coin_prompt_message_update(void)
+void CONSOLE_ORIGINAL(coin_prompt_message_update)(void)
 {
 	uint32_t animation = 0;
 	uint8_t frames = 0, frames_2 = 0, frames_3 = 0;
@@ -243,7 +243,7 @@ uint32_t coin_prompt_start_key_prompt(uint32_t piece_count, uint8_t first_piece)
    record at 01A95B (animation, palette, width_scale, height_scale, x, y, depth_layer, frames_left): 0
    the words TURN THE IGNITION KEY, 1 the START / IGNITION key with its arrow; animates until frames_left
    runs out (24 or 30 frames) and ends. */
-void ignition_key_prompt_update(void)
+void CONSOLE_ORIGINAL(ignition_key_prompt_update)(void)
 {
 	uint32_t animation = 0, piece = 0;
 	uint16_t frames_left = 0;

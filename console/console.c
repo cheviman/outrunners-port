@@ -10,15 +10,18 @@
  *    license:BSD-3-Clause
  *    The console build runs the arcade game's program with these in place of the game's own (whose
  *    definitions tools/decompile.py writes as CONSOLE_ORIGINAL(name): original_name here, for these to call):
- *    one player on the left seat's screen, free play, one sound for both speakers.
+ *    one player on the left seat's screen, free play, one sound for both speakers, and the title's menu
+ *    (menu.c) in place of the start button.
  */
 #include "console.h"
+#include "console_internal.h"
 
 #include "game.h"
 
 #define COIN_SETTINGS       0x1Au    /* the test mode's COIN/CREDIT SETTING: 26 */
-#define GAME_MODE_PLAY      6u
-#define LEFT_SEAT           0u       /* screen index: the left seat's screen (screen 1), the right one's 1 */
+#define START_BUTTON        0x40u    /* screen buttons_pressed: START */
+
+console_state console;
 
 /* ---- the coins ---- */
 
@@ -51,6 +54,21 @@ void credit_display_update(void)
 	OBJECT(current_object)->flags_high = 0u;
 }
 
+/* The prompt's message (INSERT COIN(S), TURN THE IGNITION KEY) and the ignition key's picture, which the
+   prompt starts every 30 frames: ended at once, unseen; PRESS START is the console's (menu.c). The little
+   car that crosses the prompt still does */
+void coin_prompt_message_update(void)
+{
+	OBJECT(current_object)->flags = 0u;
+	OBJECT(current_object)->flags_high = 0u;
+}
+
+void ignition_key_prompt_update(void)
+{
+	OBJECT(current_object)->flags = 0u;
+	OBJECT(current_object)->flags_high = 0u;
+}
+
 /* ---- the sound ---- */
 
 /* A screen's sound requests, in the vertical blank: the left seat's always; the right one's only while it
@@ -64,6 +82,49 @@ void send_sound_requests(void)
 		return;
 	}
 	original_send_sound_requests();
+}
+
+/* ---- starting games ---- */
+
+/* The game's own start (check_game_start) on the screen running, as if its START had just been pressed:
+   with free play it starts a game there (game mode 6), or joins the race being entered from game mode 7 */
+static uint32_t press_start(uint32_t mode, uint32_t seat_credits)
+{
+	SCREEN(screen)->buttons_pressed |= START_BUTTON;
+	return original_check_game_start(mode, seat_credits);
+}
+
+/* Each screen's frame before its game mode's code. The right seat starts only to join a 2 PLAYERS race (its
+   START is let alone otherwise); the left one's START opens the title's menu, whose ARCADE and 2 PLAYERS
+   start the game as the arcade's START does (menu.c) */
+uint32_t check_game_start(uint32_t mode, uint32_t seat_credits)
+{
+	if (SCREEN(screen)->index != LEFT_SEAT)
+	{
+		if (console.join_right && mode == GAME_MODE_ENTRY_INVITATION)
+		{
+			console.join_right = false;
+			return press_start(mode, seat_credits);
+		}
+		return mode;
+	}
+	if (console.two_players && mode != GAME_MODE_PLAY && SCREEN(SCREEN_2)->game_mode != GAME_MODE_PLAY
+		&& SCREEN(SCREEN_2)->game_mode != GAME_MODE_ENTRY_INVITATION && !console.join_right)
+		console.two_players = false;    /* (the race of both is over) */
+	switch (console_menu_frame(mode))
+	{
+		case MENU_START_ONE:
+			return press_start(mode, seat_credits);
+		case MENU_START_TWO:
+			console.two_players = true;
+			console.join_right = true;
+			return press_start(mode, seat_credits);
+		case MENU_TITLE:
+			AS32(SCREEN(screen)->game_mode) = GAME_MODE_RESTART;
+			return GAME_MODE_RESTART;
+		default:
+			return mode;
+	}
 }
 
 /* ---- the port ---- */
@@ -82,5 +143,15 @@ void console_attach(void)
 
 bool console_both_screens(void)
 {
-	return false;
+	return console.two_players;
+}
+
+void console_actions(uint32_t pressed)
+{
+	console.pressed |= pressed;
+}
+
+bool console_quit_requested(void)
+{
+	return console.quit;
 }

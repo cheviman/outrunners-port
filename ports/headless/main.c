@@ -256,10 +256,58 @@ static void on_frame_done(void)
 		program_stop();
 }
 
+#ifdef ORUNNERS_CONSOLE
+/* --actions: the console's menu actions, a line each: the frame, then up, down, left, right, accept, back or
+   start ('#' starts a comment) */
+#define MAX_ACTIONS 4096
+
+static struct
+{
+	uint64_t frame;
+	uint32_t action;
+} actions[MAX_ACTIONS];
+static size_t action_count;
+
+static const char *load_actions(const char *path)
+{
+	static const char *const names[ACTIONS] = { "up", "down", "left", "right", "accept", "back", "start" };
+	char line[256], name[32];
+	unsigned long long frame;
+	FILE *input = fopen(path, "r");
+
+	if (!input)
+		return "The actions file cannot be read.";
+	while (fgets(line, sizeof(line), input) && action_count < MAX_ACTIONS)
+	{
+		int action;
+
+		if (line[0] == '#' || sscanf(line, "%llu %31s", &frame, name) != 2)
+			continue;
+		for (action = 0; action < ACTIONS && strcmp(name, names[action]) != 0; action++)
+			;
+		if (action == ACTIONS)
+		{
+			fclose(input);
+			return "An action is not one of up, down, left, right, accept, back, start.";
+		}
+		actions[action_count].frame = frame;
+		actions[action_count].action = ACTION_BIT(action);
+		action_count++;
+	}
+	fclose(input);
+	return NULL;
+}
+#endif
+
 static void on_controls_update(void)
 {
 	/* VBLANK of the board's frame is starting */
 	s32_script_apply(script, s32_board.frame);
+#ifdef ORUNNERS_CONSOLE
+	for (size_t index = 0; index < action_count; index++)
+		if (actions[index].frame == s32_board.frame)
+			console_actions(actions[index].action);
+#endif
 }
 
 #ifndef ORUNNERS_SCAFFOLD
@@ -330,6 +378,18 @@ int main(int argc, char **argv)
 			memory_census_path = argv[++index];
 		else if (strcmp(argv[index], "--assets") == 0 && index + 1 < argc)
 			assets_path = argv[++index];
+#ifdef ORUNNERS_CONSOLE
+		else if (strcmp(argv[index], "--actions") == 0 && index + 1 < argc)
+		{
+			const char *problem = load_actions(argv[++index]);
+
+			if (problem)
+			{
+				fprintf(stderr, "%s\n", problem);
+				return 1;
+			}
+		}
+#endif
 		else
 		{
 			fprintf(stderr, USAGE);

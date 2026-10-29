@@ -187,10 +187,19 @@ if(ORUNNERS_DECOMPILED AND ORUNNERS_SOUND_DECOMPILED)
 		target_link_libraries(orunners PRIVATE orunners_game orunners_sound ${ORUNNERS_SDL2})
 		set_target_properties(orunners PROPERTIES OUTPUT_NAME "OutRunners Arcade"
 			MACOSX_BUNDLE_BUNDLE_NAME "OutRunners Arcade" MACOSX_BUNDLE_GUI_IDENTIFIER io.github.cheviman.outrunners-arcade)
-		add_executable(outrunners WIN32 MACOSX_BUNDLE ports/sdl2/main.c)
+		# (OutRunners draws its CONTROLS page's keys and buttons with Kenney's Input Prompts Pixel, a picture
+		# beside it, in the .app's Resources on macOS)
+		add_executable(outrunners WIN32 MACOSX_BUNDLE ports/sdl2/main.c ports/sdl2/controls.c
+			ports/sdl2/prompts/input_prompts.bmp)
 		target_link_libraries(outrunners PRIVATE orunners_game_console orunners_sound ${ORUNNERS_SDL2})
 		set_target_properties(outrunners PROPERTIES OUTPUT_NAME "OutRunners"
 			MACOSX_BUNDLE_BUNDLE_NAME "OutRunners" MACOSX_BUNDLE_GUI_IDENTIFIER io.github.cheviman.outrunners)
+		set_source_files_properties(ports/sdl2/prompts/input_prompts.bmp PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+		if(NOT APPLE)
+			add_custom_command(TARGET outrunners POST_BUILD
+				COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_SOURCE_DIR}/ports/sdl2/prompts/input_prompts.bmp
+					$<TARGET_FILE_DIR:outrunners>)
+		endif()
 		if(WIN32 AND NOT ORUNNERS_STATIC_SDL2)
 			add_custom_command(TARGET orunners POST_BUILD
 				COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:SDL2::SDL2> $<TARGET_FILE_DIR:orunners>)
