@@ -25,7 +25,9 @@
  *
  *    The game's data is its assets (game/assets.h), the files extract_assets.py writes from the player's
  *    ROM set: --assets, or the folder 'assets' beside the executable, beside the .app on macOS, in the
- *    folder of what the game keeps, or in the current folder.
+ *    folder of what the game keeps, or in the current folder. Where there is none, the first run takes them
+ *    out of the ROM set itself into the folder of what the game keeps (first_run.c, runtime/src/extract.c):
+ *    orunners.zip or rom/ beside the game or in that folder, or a set dropped on its window.
  *
  *    --script plays a control script (runtime/include/s32/script.h) instead of the keyboard, to its end,
  *    from a blank EEPROM and sound RAM that it does not keep; --fast runs it without waiting for the frames'
@@ -53,6 +55,7 @@
 #include "s32/video.h"
 #include "sound/chips.h"
 #include "game/assets.h"
+#include "first_run.h"
 #ifdef ORUNNERS_CONSOLE
 #include "console.h"
 #include "controls.h"
@@ -1111,7 +1114,8 @@ int main(int argc, char **argv)
 #endif
 	{
 		/* the folder of the game's assets: --assets, else beside the executable, beside the .app on macOS, in
-		   the folder of what the game keeps, or in the current folder */
+		   the folder of what the game keeps, or in the current folder; with none, the first run's, in the
+		   folder of what the game keeps */
 		char beside_app[1024], folder[1100], layout[1200];
 		const char *places[4];
 		const char *found = assets_path;
@@ -1137,7 +1141,18 @@ int main(int argc, char **argv)
 			}
 		}
 		if (!found)
-			return fail("The game's assets are missing.", "No folder 'assets' beside the game.");
+		{
+			snprintf(folder, sizeof(folder), "%sassets", saves ? saves : (base ? base : ""));
+			if (!first_run(TITLE, base, saves, folder))
+			{
+				/* (the window closed before a ROM set came) */
+				SDL_free(base);
+				SDL_free(saves);
+				SDL_Quit();
+				return 0;
+			}
+			found = folder;
+		}
 		if ((problem = assets_load(found)) != NULL)
 			return fail("The game's assets cannot be read.", problem);
 	}

@@ -68,10 +68,11 @@ endif()
 # The game's data: no executable carries the ROM or anything from it. The game loads its assets when it
 # starts (runtime/src/assets.c): the files extract_assets.py takes out of the player's ROM set (rom/, its
 # files or its .zip; ORUNNERS_ROM picks another) into assets/, in formats the usual tools open, where it
-# looks for them (beside the executable, or the current folder's). The reference and the scaffold run the
-# original code, so they read the ROM set themselves when they start (runtime/src/rom_set.c). The ROM never
-# goes into the repository. Without a ROM set (a build for another machine) nothing of the game's is made,
-# only the executables
+# looks for them (beside the executable, or the current folder's); or, where it finds none, the ones its
+# first run takes out of the ROM set itself. The reference and the scaffold run the original code, so they
+# read the ROM set themselves when they start (runtime/src/rom_set.c). The ROM never goes into the
+# repository. Without a ROM set (a build for another machine) nothing of the game's is made, only the
+# executables
 find_package(Python3 COMPONENTS Interpreter)
 set(ORUNNERS_ROM ${CMAKE_SOURCE_DIR}/rom CACHE PATH "The ROM set the assets are taken out of")
 set(ORUNNERS_ROM_FILES "")
@@ -82,6 +83,11 @@ elseif(EXISTS ${ORUNNERS_ROM})
 endif()
 add_library(orunners_data STATIC runtime/src/game_data.c runtime/src/rom_set.c runtime/src/inflate.c)
 target_include_directories(orunners_data PUBLIC runtime/include)
+# The game's first run, in the window ports: the assets out of the player's ROM set, in C (extract.c), into
+# files that load as extract_assets.py's do; the pieces of the programs' data as extract_layout.c lists them,
+# in positions and names only (tools/extract_layout.py writes it from the layouts extract_assets.py writes)
+add_library(orunners_extract STATIC runtime/src/extract.c runtime/src/extract_layout.c)
+target_link_libraries(orunners_extract PUBLIC orunners_data)
 if(ORUNNERS_ROM_FILES AND Python3_FOUND)
 	set(ORUNNERS_ASSETS_STAMP ${CMAKE_SOURCE_DIR}/assets/.extracted)
 	add_custom_command(OUTPUT ${ORUNNERS_ASSETS_STAMP}
@@ -182,23 +188,32 @@ if(ORUNNERS_DECOMPILED AND ORUNNERS_SOUND_DECOMPILED)
 	endif()
 	if(SDL2_FOUND)
 		# (an .app on macOS: SDL_GetBasePath is its Resources folder): the arcade game, "OutRunners Arcade" its
-		# executable, .app and window, and the console one beside it, OutRunners
-		add_executable(orunners WIN32 MACOSX_BUNDLE ports/sdl2/main.c)
-		target_link_libraries(orunners PRIVATE orunners_game orunners_sound ${ORUNNERS_SDL2})
+		# executable, .app and window, and the console one beside it, OutRunners. Both make their assets on
+		# their first run from the player's ROM set (ports/sdl2/first_run.c), its window written with Kenney
+		# Mini (CC0), a picture beside them, in the .app's Resources on macOS
+		add_executable(orunners WIN32 MACOSX_BUNDLE ports/sdl2/main.c ports/sdl2/first_run.c ports/sdl2/letters.c
+			ports/sdl2/font/font.bmp)
+		target_link_libraries(orunners PRIVATE orunners_game orunners_sound orunners_extract ${ORUNNERS_SDL2})
 		set_target_properties(orunners PROPERTIES OUTPUT_NAME "OutRunners Arcade"
 			MACOSX_BUNDLE_BUNDLE_NAME "OutRunners Arcade" MACOSX_BUNDLE_GUI_IDENTIFIER io.github.cheviman.outrunners-arcade)
 		# (OutRunners draws its CONTROLS page's keys and buttons with Kenney's Input Prompts Pixel, a picture
 		# beside it, in the .app's Resources on macOS)
-		add_executable(outrunners WIN32 MACOSX_BUNDLE ports/sdl2/main.c ports/sdl2/controls.c
-			ports/sdl2/prompts/input_prompts.bmp)
-		target_link_libraries(outrunners PRIVATE orunners_game_console orunners_sound ${ORUNNERS_SDL2})
+		add_executable(outrunners WIN32 MACOSX_BUNDLE ports/sdl2/main.c ports/sdl2/controls.c ports/sdl2/first_run.c
+			ports/sdl2/letters.c ports/sdl2/prompts/input_prompts.bmp ports/sdl2/font/font.bmp)
+		target_link_libraries(outrunners PRIVATE orunners_game_console orunners_sound orunners_extract ${ORUNNERS_SDL2})
 		set_target_properties(outrunners PROPERTIES OUTPUT_NAME "OutRunners"
 			MACOSX_BUNDLE_BUNDLE_NAME "OutRunners" MACOSX_BUNDLE_GUI_IDENTIFIER io.github.cheviman.outrunners)
-		set_source_files_properties(ports/sdl2/prompts/input_prompts.bmp PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+		set_source_files_properties(ports/sdl2/prompts/input_prompts.bmp ports/sdl2/font/font.bmp PROPERTIES
+			MACOSX_PACKAGE_LOCATION Resources)
 		if(NOT APPLE)
 			add_custom_command(TARGET outrunners POST_BUILD
 				COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_SOURCE_DIR}/ports/sdl2/prompts/input_prompts.bmp
+					$<TARGET_FILE_DIR:outrunners>
+				COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_SOURCE_DIR}/ports/sdl2/font/font.bmp
 					$<TARGET_FILE_DIR:outrunners>)
+			add_custom_command(TARGET orunners POST_BUILD
+				COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_SOURCE_DIR}/ports/sdl2/font/font.bmp
+					$<TARGET_FILE_DIR:orunners>)
 		endif()
 		if(WIN32 AND NOT ORUNNERS_STATIC_SDL2)
 			add_custom_command(TARGET orunners POST_BUILD
@@ -237,4 +252,12 @@ if(ORUNNERS_REFERENCE_TOOLS)
 	# pcmcheck), with OutRunners' data library
 	set(S32_GAME_DATA orunners_data)
 	include(${CMAKE_SOURCE_DIR}/tools/core/system32/reference/reference.cmake)
+
+	# the acceptance check of the first run (ports/headless/assets_check.c): two folders of assets compared
+	# as the game loads them, and the assets out of a ROM set as the first run takes them. A development tool
+	# too, so the players' packages (built without these) do not carry it
+	if(TARGET orunners_game AND TARGET orunners_sound)
+		add_executable(orunners_assets_check ports/headless/assets_check.c)
+		target_link_libraries(orunners_assets_check PRIVATE orunners_game orunners_sound orunners_extract)
+	endif()
 endif()

@@ -1,11 +1,11 @@
 # Name:        build.yml
 # Description: builds the game on clean machines with no ROM set (Linux with GCC, macOS with Clang,
 #              Windows with MSVC), SDL2 inside the executables, and packs what a player runs: the window
-#              port, which loads the player's assets (the folder extract_assets.py writes), with its
-#              licenses
+#              ports, OutRunners Arcade and OutRunners, which take their assets out of the player's ROM set
+#              on their first run, with their licenses
 # Version:     0.1.0
 # Created:     27-10-2026
-# Modified:    27-10-2026
+# Modified:    29-10-2026
 # Author:      Sebastian Toyos
 name: build
 
@@ -65,7 +65,8 @@ jobs:
 
       # what a player runs (no headless runs, no build leftovers), in an archive of our own: the artifacts'
       # zip loses the executables' permissions. With it, the terms the executable comes with: the project's,
-      # MAME's and ymfm's (BSD-3: the board's libraries follow their behavior and tables) and SDL2's (zlib).
+      # MAME's and ymfm's (BSD-3: the board's libraries follow their behavior and tables), SDL2's (zlib) and
+      # Kenney's (CC0: the letters of the first run's window, the controls' pictures).
       # The .app is signed ad hoc (no certificate): macOS then offers to open it anyway, where a bundle
       # signed in part is "damaged"
       - name: Pack
@@ -82,6 +83,8 @@ jobs:
           cp tools/core/system32/reference/mame/LICENSE dist/outrunners/licenses/MAME.txt
           cp tools/core/system32/reference/ymfm/LICENSE dist/outrunners/licenses/ymfm.txt
           cp build/cmake/_deps/sdl2-src/LICENSE.txt dist/outrunners/licenses/SDL2.txt
+          cp ports/sdl2/font/License.txt dist/outrunners/licenses/Kenney-Mini.txt
+          cp ports/sdl2/prompts/License.txt dist/outrunners/licenses/Kenney-Input-Prompts.txt
           if [ "$RUNNER_OS" = macOS ]; then
             for app in dist/outrunners/*.app; do
               codesign --force --deep --sign - "$app"

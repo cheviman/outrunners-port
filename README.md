@@ -435,9 +435,11 @@ git clone --recursive https://github.com/cheviman/outrunners-decomp
    executable on Windows, and on Linux and macOS in the user's folder for it (`~/.local/share/OutRunners`,
    `~/Library/Application Support/OutRunners`), as the executable's may not be written. It loads its
    assets from the folder `assets` beside the executable (beside the .app on macOS), in that folder of the
-   user's, or in the current one (`--assets FOLDER` picks another). The packages the CI makes hold the
-   window port alone: until the game can take the assets out of a ROM set itself, the folder comes from
-   `extract_assets.py`.
+   user's, or in the current one (`--assets FOLDER` picks another). With none, its first run takes them
+   out of the ROM set itself (`orunners.zip` or a folder `rom` beside the game or in that folder of the
+   user's, or the set dropped on its window) into that folder of the user's, the same files
+   `extract_assets.py` writes (`orunners_assets_check` compares two folders as the game loads them). The
+   packages the CI makes hold the window port alone.
 
 ## The assets
 
