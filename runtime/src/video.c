@@ -97,7 +97,7 @@ typedef struct sprite_drawing
 {
 	uint16_t *row;
 	uint8_t *extra_row;         /* the extra palette's marks of the row (s32_video_use_extra_palette) */
-	bool extra;                 /* this sprite's pixels take the extra palette */
+	uint8_t extra;              /* this sprite's marks: EXTRA_COLOURS, EXTRA_GHOST */
 	const area *inside;         /* the clip it draws in */
 	const area *outside;        /* the clip it leaves alone, on the rows it covers */
 	bool outside_row;
@@ -124,7 +124,7 @@ static struct
 	bool extra_used;                        /* s32_video_use_extra_palette */
 	uint16_t extra_palette[S32_SCREENS][S32_PALETTE_ENTRIES];
 	bool extra_set[S32_SCREENS][S32_PALETTE_ENTRIES];    /* the entries s32_video_extra_colour set */
-	uint8_t extra_pixels[S32_SCREENS][2][HEIGHT][WIDTH];    /* the sprite buffers' pixels that take it */
+	uint8_t extra_pixels[S32_SCREENS][2][HEIGHT][WIDTH];    /* the sprite buffers' pixels' marks */
 	layer layers[LAYERS];                   /* the sprites' entry is unused: they have their own buffers */
 	uint16_t sprites[S32_SCREENS][2][HEIGHT][WIDTH];    /* each screen's frame buffers: one is shown, the
 	                                                       list draws into the other */
@@ -134,6 +134,10 @@ static struct
 } video;
 
 static const uint16_t transparent_row[WIDTH] = { 0 };
+
+/* A sprite pixel's marks (the extra palette's plane) */
+#define EXTRA_COLOURS 1    /* its colour from the extra palette, where one is set */
+#define EXTRA_GHOST   2    /* half its colour, half the colour under it */
 
 /* ---- the board's memories ---- */
 
@@ -853,7 +857,8 @@ static int draw_sprite(uint32_t entry, int x_offset, int y_offset, const area *i
 
 	sprite.inside = inside;
 	sprite.outside = outside;
-	sprite.extra = video.extra_used && (size & S32_SPRITE_EXTRA_PALETTE) != 0;
+	sprite.extra = (uint8_t)(!video.extra_used ? 0
+		: ((size & S32_SPRITE_EXTRA_PALETTE) ? EXTRA_COLOURS : 0) | ((sprite_word(entry + 7) & S32_SPRITE_GHOST) ? EXTRA_GHOST : 0));
 	sprite.extra_row = NULL;
 	sprite.indirect = bit(flags, 13);
 	sprite.shadow = bit(flags, 11) && bit(latched[5], 0);
@@ -1253,8 +1258,10 @@ static void mix(int screen, int drawn)
 				shadow_pen, &pixel, &shadow);
 			uint16_t color = palette_color(screen, first, pixel);
 
-			if (video.extra_used && first->index == LAYER_SPRITES
-				&& video.extra_pixels[screen][video.shown_sprites][sprite_y][sprite_x])
+			const uint8_t marks = video.extra_used && first->index == LAYER_SPRITES
+				? video.extra_pixels[screen][video.shown_sprites][sprite_y][sprite_x] : 0;
+
+			if (marks & EXTRA_COLOURS)
 			{
 				const int index = (first->palette_base + ((pixel >> first->shift) & 0xfff0) + (pixel & 0x0f)) & 0x3fff;
 
@@ -1278,6 +1285,19 @@ static void mix(int screen, int drawn)
 					green = shift_down(green * (7 - blend_factor) + (((color >> 5) & 0x1f) + offsets[second->offsets][1]) * (blend_factor + 1), 3);
 					blue = shift_down(blue * (7 - blend_factor) + (((color >> 10) & 0x1f) + offsets[second->offsets][2]) * (blend_factor + 1), 3);
 				}
+			}
+			if (marks & EXTRA_GHOST)
+			{
+				/* a ghost: half its colour, half the colour of the layer under it */
+				int below;
+				int ignored_shadow = 0;
+				const mix_layer *second = top_layer(first + 1, rows, x, sprite_pixel, shadow_mask, sprite_bits,
+					shadow_pen, &below, &ignored_shadow);
+				const uint16_t under = palette_color(screen, second, below);
+
+				red = (red + (under & 0x1f) + offsets[second->offsets][0]) / 2;
+				green = (green + ((under >> 5) & 0x1f) + offsets[second->offsets][1]) / 2;
+				blue = (blue + ((under >> 10) & 0x1f) + offsets[second->offsets][2]) / 2;
 			}
 			if (shadow)
 			{

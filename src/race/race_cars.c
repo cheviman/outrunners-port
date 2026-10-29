@@ -14,7 +14,7 @@
 /* Starts the race's cars: for each player of the race, a race_car with its race record and the tables of
    its model (body, driver_places, passenger_places, sprays, tag), the two race_car_occupant objects and
    two rider_gesture objects that follow it; then ends. */
-void race_cars_start(void)
+void CONSOLE_ORIGINAL(race_cars_start)(void)
 {
 	uint8_t rider = 0;
 	uint32_t car_number = 0, cars_left = 0, driver_occupant = 0, model = 0, object = 0, occupant = 0, player = 0, race = 0, record = 0, rider_places = 0;

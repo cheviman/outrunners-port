@@ -171,7 +171,10 @@ uint32_t check_game_start(uint32_t mode, uint32_t seat_credits)
 		/* TIME ATTACK: the race's time left kept at 99 seconds (the race's time is the HUD's lap and its
 		   end's); over with the game */
 		if (mode == GAME_MODE_PLAY)
+		{
 			RACE(SCREEN(screen)->race)->time_left = TIME_ATTACK_TIME_LEFT;
+			console_ghost_frame();
+		}
 		else
 			console.time_attack = false;
 	}
@@ -189,6 +192,7 @@ uint32_t check_game_start(uint32_t mode, uint32_t seat_credits)
 			return press_start(mode, seat_credits);
 		case MENU_TIME_ATTACK:
 			console.time_attack = true;
+			console_ghost_start();
 			return press_start(mode, seat_credits);
 		case MENU_REVERSE:
 			console_reverse_start(console_menu_reverse_goal());
@@ -216,6 +220,9 @@ static bool console_code(uint32_t address)
 			return true;
 		case CONSOLE_CODE_START_LINE:
 			presentation_start_line_update();
+			return true;
+		case CONSOLE_CODE_GHOST:
+			ghost_object_update();
 			return true;
 		default:
 			return false;

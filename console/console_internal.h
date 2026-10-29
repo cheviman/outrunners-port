@@ -51,10 +51,16 @@ extern console_state console;
 #define CONSOLE_CODE_PRESENTATION_LOGO  0xFE0000u
 #define CONSOLE_CODE_PRESENTATION_CAR   0xFE0001u
 #define CONSOLE_CODE_START_LINE         0xFE0002u    /* REVERSE's start line (reverse.c) */
+#define CONSOLE_CODE_GHOST              0xFE0003u    /* TIME ATTACK's ghost's objects (ghost.c) */
 
 void presentation_logo_update(void);
 void presentation_car_update(void);
 void presentation_start_line_update(void);
+void ghost_object_update(void);
+
+/* TIME ATTACK's ghost (ghost.c): a game starts; the left seat's frame during it */
+void console_ghost_start(void);
+void console_ghost_frame(void);
 
 /* The SEGA presentation (presentation.c) on the left seat's frame at power-on, with the actions pressed:
    true while it lasts (the game mode's code waits), false once it is over */

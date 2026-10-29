@@ -1105,6 +1105,7 @@ int main(int argc, char **argv)
 
 		snprintf(controls_path, sizeof(controls_path), "%scontrols.ini", saves ? saves : "");
 		controls_open(controls_path);
+		console_ghost_folder(saves ? saves : "");
 		load_prompts(base ? base : "");    /* (the pictures come with the game, beside it) */
 	}
 #endif

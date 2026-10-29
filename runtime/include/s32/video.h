@@ -81,6 +81,11 @@ int s32_video_side(void);
 void s32_video_use_extra_palette(bool used);
 void s32_video_extra_colour(int screen, uint32_t index, uint16_t colour);
 
+/* Ghosts (a port's console build, with the extra palette on): sprites whose colour word (the eighth) has
+   S32_SPRITE_GHOST set, a bit the board does not read, are drawn see-through: each pixel half its own colour
+   and half the colour of what is under it */
+#define S32_SPRITE_GHOST 0x8000
+
 /* For tools that look at what the sprites are drawn with (the asset extractor's census): called for every
    sprite the list draws, before it is drawn, with the screen it goes to, its graphics' place in the sprite
    ROM (32-bit words, bank << 20 | offset), its size in words and rows, whether it is 8 bits a pen, whether it

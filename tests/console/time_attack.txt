@@ -1,0 +1,6 @@
+# & KNUCKLES > TIME ATTACK (with time_attack_controls.txt and --autopilot): the race to a goal, its ghost kept
+600 start
+660 down
+680 down
+700 accept
+760 accept

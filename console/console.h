@@ -114,4 +114,7 @@ bool console_wide_now(void);
    others by ear) */
 void console_jingle_program(int program, int layer, int transpose);
 
+/* The folder TIME ATTACK keeps its ghosts in (ghost_0.bin to ghost_9.bin, a goal each), with its separator */
+void console_ghost_folder(const char *folder);
+
 #endif

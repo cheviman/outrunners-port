@@ -577,6 +577,7 @@ void player_car_crash_step(void);
 
 /* race/race_cars.c: the cars of the race drawn as the screen's view sees them: the body, the spray, the pieces */
 void race_cars_start(void);
+void CONSOLE_ORIGINAL(race_cars_start)(void);
 void race_car_draw(void);
 void race_car_draw_behind(uint32_t sprite_entry, uint32_t race);
 void race_car_draw_link(uint32_t depth_layer, uint32_t sprite_entry);

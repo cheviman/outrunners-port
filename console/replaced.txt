@@ -14,3 +14,4 @@ route_map_update            # REVERSE: no route map (it draws the forward route)
 course_record_beaten        # REVERSE: no course record (by goal; REVERSE finishes at the start)
 course_records_update       # (the same)
 stage_indicator_draw        # REVERSE: the STAGE label by the stage's own level
+race_cars_start             # TIME ATTACK: the ghost's car and riders beside the race's cars

@@ -1,0 +1,14 @@
+# TIME ATTACK's race: START through car select, then the gas down (the wheel: --autopilot)
+1000 press start1
+1060 press start1
+1120 press start1
+1180 press start1
+1240 press start1
+1300 press start1
+1360 press start1
+1420 press start1
+1480 press start1
+1540 press start1
+1600 press start1
+1700 gas 1 255
+40000 end

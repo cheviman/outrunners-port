@@ -418,6 +418,8 @@ int main(int argc, char **argv)
 			console_window_settings.wide = true;    /* (OPTIONS > VIDEO > WIDE) */
 		else if (strcmp(argv[index], "--autopilot") == 0)
 			autopilot = true;
+		else if (strcmp(argv[index], "--ghost-folder") == 0 && index + 1 < argc)
+			console_ghost_folder(argv[++index]);    /* (TIME ATTACK's ghosts: the current folder else) */
 		else if (strcmp(argv[index], "--actions") == 0 && index + 1 < argc)
 		{
 			const char *problem = load_actions(argv[++index]);
