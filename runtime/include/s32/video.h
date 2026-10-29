@@ -4,7 +4,7 @@
  *                 as the hardware does
  *    Version:     0.1.0
  *    Created:     13-10-2026
- *    Modified:    21-10-2026
+ *    Modified:    29-10-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
@@ -61,6 +61,17 @@ const uint32_t *s32_video_frame(int screen, int *width);
 /* FNV-1a hash of the last frames' visible pixels (red, green, blue bytes), the left screen's then the
    right one's, as tools/core/system32/reference/s32ref writes it */
 uint64_t s32_video_frame_hash(void);
+
+/* WIDE (a port's console build): frames of 416 pixels while the board shows 320, the game's picture in the
+   middle and S32_VIDEO_WIDE_SIDE more of it at each side: the tilemaps and the bitmap go on, the sprites
+   are drawn where they are (the game places them well past its edges), the text layer stays where it is
+   (and is clear at the sides), the clip windows that cover the screen cover the wider one. Off, the
+   default, the frames are the board's */
+#define S32_VIDEO_WIDE_SIDE 48
+void s32_video_set_wide(bool wide);
+
+/* This frame's: S32_VIDEO_WIDE_SIDE with WIDE, else 0 */
+int s32_video_side(void);
 
 /* For tools that look at what the sprites are drawn with (the asset extractor's census): called for every
    sprite the list draws, before it is drawn, with the screen it goes to, its graphics' place in the sprite

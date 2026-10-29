@@ -50,7 +50,8 @@
 
 #define USAGE "Usage: orunners_headless [--frames N] [--hashes FILE] [--script FILE] [--dump-frame N --dump-dir DIR]" \
 	" [--video-hashes FILE] [--video-dump N ... --video-dir DIR] [--sound-hashes FILE]" \
-	" [--sprite-census FILE] [--tile-census FILE] [--memory-census FILE] [--assets FOLDER]\n"
+	" [--sprite-census FILE] [--tile-census FILE] [--memory-census FILE] [--assets FOLDER] [--sound-wav FILE]" \
+	" (orunners_console_headless: [--actions FILE] [--wide] [--jingle PROGRAM LAYER TRANSPOSE])\n"
 #define MAX_VIDEO_DUMPS 64
 #define CENSUS_SLOTS (1u << 22)     /* open addressing for the censuses' hashes */
 #define TILE_CENSUS_EVERY 30        /* the tilemaps are looked at every this many frames */
@@ -65,6 +66,8 @@ static uint64_t video_dumps[MAX_VIDEO_DUMPS];
 static int video_dump_count;
 static const char *video_dir;
 static FILE *sound_hashes;
+static FILE *sound_wav;            /* --sound-wav: the mix the window plays, 16-bit stereo */
+static uint32_t sound_wav_bytes;
 static FILE *sprite_census;
 static FILE *tile_census;
 static uint64_t *census_seen;       /* hashes of what the censuses wrote (0 = free) */
@@ -235,14 +238,23 @@ static void on_frame_done(void)
 		dump_state();
 	if (video_hashes)
 		fprintf(video_hashes, "%" PRIu64 " %016" PRIx64 "\n", program_frames() - 1, s32_video_frame_hash());
-	if (sound_hashes)
+	if (sound_hashes || sound_wav)
 	{
 		/* the sound board up to the frame's end, then the samples that start before it */
 		if (s32_board.time_passes)
 			s32_board.time_passes(s32_board.cycles);
 		sound_chips_end_frame(s32_board.cycles);
-		fprintf(sound_hashes, "%" PRIu64 " %016" PRIx64 " %016" PRIx64 "\n", program_frames() - 1,
-			sound_chips_frame_hash(), sound_board_state_hash());
+		if (sound_hashes)
+			fprintf(sound_hashes, "%" PRIu64 " %016" PRIx64 " %016" PRIx64 "\n", program_frames() - 1,
+				sound_chips_frame_hash(), sound_board_state_hash());
+		if (sound_wav)
+		{
+			size_t count;
+			const int16_t *mix = sound_chips_frame_mix(&count);
+
+			if (mix && count)
+				sound_wav_bytes += (uint32_t)fwrite(mix, sizeof(int16_t) * 2, count, sound_wav) * 4u;
+		}
 	}
 	for (int index = 0; index < video_dump_count && video_dir; index++)
 		if (video_dumps[index] == program_frames() - 1)
@@ -307,6 +319,7 @@ static void on_controls_update(void)
 	for (size_t index = 0; index < action_count; index++)
 		if (actions[index].frame == s32_board.frame)
 			console_actions(actions[index].action);
+	s32_video_set_wide(console_wide_now());
 #endif
 }
 
@@ -370,6 +383,16 @@ int main(int argc, char **argv)
 			video_dir = argv[++index];
 		else if (strcmp(argv[index], "--sound-hashes") == 0 && index + 1 < argc)
 			sound_hashes_path = argv[++index];
+		else if (strcmp(argv[index], "--sound-wav") == 0 && index + 1 < argc)
+		{
+			sound_wav = fopen(argv[++index], "wb");
+			if (!sound_wav)
+			{
+				fprintf(stderr, "%s: cannot write\n", argv[index]);
+				return 1;
+			}
+			fseek(sound_wav, 44, SEEK_SET);    /* (the header once the size is known) */
+		}
 		else if (strcmp(argv[index], "--sprite-census") == 0 && index + 1 < argc)
 			sprite_census_path = argv[++index];
 		else if (strcmp(argv[index], "--tile-census") == 0 && index + 1 < argc)
@@ -379,6 +402,17 @@ int main(int argc, char **argv)
 		else if (strcmp(argv[index], "--assets") == 0 && index + 1 < argc)
 			assets_path = argv[++index];
 #ifdef ORUNNERS_CONSOLE
+		else if (strcmp(argv[index], "--jingle") == 0 && index + 3 < argc)
+		{
+			/* the jingle's program, layer (-1: none) and transpose, as outrunners.ini's */
+			const int program = (int)strtol(argv[index + 1], NULL, 0);
+			const int layer = (int)strtol(argv[index + 2], NULL, 0);
+
+			console_jingle_program(program, layer, (int)strtol(argv[index + 3], NULL, 0));
+			index += 3;
+		}
+		else if (strcmp(argv[index], "--wide") == 0)
+			console_window_settings.wide = true;    /* (OPTIONS > VIDEO > WIDE) */
 		else if (strcmp(argv[index], "--actions") == 0 && index + 1 < argc)
 		{
 			const char *problem = load_actions(argv[++index]);
@@ -473,7 +507,7 @@ int main(int argc, char **argv)
 #else
 		s32_video_init_graphics(assets_graphics());
 #endif
-	if (sound_hashes_path)
+	if (sound_hashes_path || sound_wav)
 	{
 #ifdef ORUNNERS_SCAFFOLD
 		s32_board.sound_rom = game_sound;
@@ -484,7 +518,8 @@ int main(int argc, char **argv)
 #endif
 		sound_chips_attach();
 		sound_cpu_attach();
-		sound_hashes = fopen(sound_hashes_path, "w");
+		if (sound_hashes_path)
+			sound_hashes = fopen(sound_hashes_path, "w");
 	}
 #ifdef ORUNNERS_CONSOLE
 	sound_chips_join_sides(true);
@@ -501,6 +536,23 @@ int main(int argc, char **argv)
 		fclose(video_hashes);
 	if (sound_hashes)
 		fclose(sound_hashes);
+	if (sound_wav)
+	{
+		/* a WAV header: PCM, 2 channels, 16 bits, at the mix's rate */
+		const uint32_t rate = sound_chips_mix_rate();
+		const uint32_t fields[] = { 0x46464952u, 36u + sound_wav_bytes, 0x45564157u, 0x20746D66u, 16u,
+			0x00020001u, rate, rate * 4u, 0x00100004u, 0x61746164u, sound_wav_bytes };
+
+		fseek(sound_wav, 0, SEEK_SET);
+		for (size_t field = 0; field < sizeof(fields) / sizeof(fields[0]); field++)
+		{
+			const uint8_t bytes[4] = { (uint8_t)fields[field], (uint8_t)(fields[field] >> 8),
+				(uint8_t)(fields[field] >> 16), (uint8_t)(fields[field] >> 24) };
+
+			fwrite(bytes, 1, 4, sound_wav);
+		}
+		fclose(sound_wav);
+	}
 	if (sprite_census)
 		fclose(sprite_census);
 	if (tile_census)

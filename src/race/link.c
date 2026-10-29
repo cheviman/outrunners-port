@@ -386,7 +386,7 @@ void link_lost(void)
 /* Sets the machine up alone: link_off, one machine and two players (machine_count, player_count), car
    numbers 0 and 1 for the two screens (screen and race car_number), then network_check_result as machine
    1. */
-void network_check_stand_alone(void)
+void CONSOLE_ORIGINAL(network_check_stand_alone)(void)
 {
 	uint32_t machine = 0;
 

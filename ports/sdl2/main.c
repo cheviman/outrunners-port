@@ -200,9 +200,21 @@ static bool screens_stacked(void)
 }
 
 /* The window's picture, in the game's pixels: its screens side by side, or one over the other */
+/* A screen's picture, in the game's pixels: 320, or 16:9 with the console's WIDE */
+#define WIDE_WIDTH 398    /* 16:9 at 224 rows: the video's 416 less 9 at each side */
+
+static int screen_width(void)
+{
+#ifdef ORUNNERS_CONSOLE
+	if (console_window_settings.wide)
+		return WIDE_WIDTH;
+#endif
+	return 320;
+}
+
 static void picture_size(int *width, int *height)
 {
-	*width = (screens_stacked() ? 1 : screens_shown()) * 320;
+	*width = (screens_stacked() ? 1 : screens_shown()) * screen_width();
 	*height = (screens_stacked() ? 2 : 1) * S32_VIDEO_HEIGHT;
 }
 
@@ -454,11 +466,18 @@ static void on_frame_shown(void)
 	const bool stacked = screens_stacked();
 
 	s32_video_draw_frame();
-	/* each screen into the texture: the left one at its top left, the right one beside it or under it */
+	/* each screen into the texture: the left one at its top left, the right one beside it or under it; with
+	   WIDE a frame of 416 pixels loses 9 at each side, one of 320 sits between black bars */
 	for (int screen = 0; screen < shown; screen++)
 	{
+		static uint32_t bars[S32_VIDEO_MAX_WIDTH * S32_VIDEO_HEIGHT];    /* (black) */
 		int width = 0;
 		const uint32_t *pixels = s32_video_frame(screen, &width);
+#ifdef ORUNNERS_CONSOLE
+		const int cell = screen_width();
+#else
+		const int cell = width;    /* (the arcade: the board's frame as it is, 320 or 416) */
+#endif
 		SDL_Rect place;
 
 #ifdef ORUNNERS_CONSOLE
@@ -468,12 +487,20 @@ static void on_frame_shown(void)
 			pixels = with_controls(pixels);    /* (OPTIONS > CONTROLS: the keys' and buttons' pictures) */
 #endif
 
-		place.x = stacked ? 0 : screen * width;
+		place.x = stacked ? 0 : screen * cell;
 		place.y = stacked ? screen * S32_VIDEO_HEIGHT : 0;
-		place.w = width;
+		place.w = cell;
 		place.h = S32_VIDEO_HEIGHT;
+		if (width > cell)
+			pixels += (width - cell) / 2;    /* (the middle of a wider frame) */
+		else if (width < cell)
+		{
+			SDL_UpdateTexture(texture, &place, bars, S32_VIDEO_MAX_WIDTH * (int)sizeof(uint32_t));
+			place.x += (cell - width) / 2;
+			place.w = width;
+		}
 		SDL_UpdateTexture(texture, &place, pixels, S32_VIDEO_MAX_WIDTH * (int)sizeof(uint32_t));
-		source.w = stacked ? width : source.w + width;
+		source.w = stacked ? cell : source.w + cell;
 		source.h = stacked ? source.h + S32_VIDEO_HEIGHT : S32_VIDEO_HEIGHT;
 	}
 	present(source);
@@ -507,6 +534,7 @@ static char settings_path[1024];
 static int window_width, window_height;    /* the picture the window was last sized for */
 
 static const char *const pixel_names[PIXELS_KINDS] = { "sharp", "smooth", "bilinear", "crt" };
+static int jingle_program = 0x15, jingle_layer = -1, jingle_transpose = 12;    /* (SEGA's jingle: jingle.c) */
 
 static void save_window_settings(void)
 {
@@ -518,9 +546,10 @@ static void save_window_settings(void)
 	output = fopen(settings_path, "w");
 	if (!output)
 		return;
-	fprintf(output, "window_scale=%d\nfull_screen=%d\npixels=%s\nwide=%d\ntwo_players=%s\nvolume=%d\n",
+	fprintf(output, "window_scale=%d\nfull_screen=%d\npixels=%s\nwide=%d\ntwo_players=%s\nvolume=%d\n"
+		"jingle_program=0x%02X\njingle_layer=%d\njingle_transpose=%d\n",
 		settings->window_scale, settings->full_screen, pixel_names[settings->pixels], settings->wide,
-		settings->vertical ? "vertical" : "horizontal", settings->volume);
+		settings->vertical ? "vertical" : "horizontal", settings->volume, jingle_program, jingle_layer, jingle_transpose);
 	fclose(output);
 }
 
@@ -551,8 +580,15 @@ static void load_window_settings(void)
 		}
 		else if (sscanf(line, "two_players=%31s", text) == 1)
 			settings->vertical = strcmp(text, "vertical") == 0;
+		else if (sscanf(line, "jingle_program=%i", &number) == 1)
+			jingle_program = number;
+		else if (sscanf(line, "jingle_layer=%i", &number) == 1)
+			jingle_layer = number;
+		else if (sscanf(line, "jingle_transpose=%i", &number) == 1)
+			jingle_transpose = number;
 	}
 	fclose(input);
+	console_jingle_program(jingle_program, jingle_layer, jingle_transpose);
 }
 
 /* The window as the settings say: full screen or not, and out of it the picture times window_scale (the
@@ -760,6 +796,8 @@ static void on_controls_update(void)
 	{
 		/* the menus' actions newly pressed; EXIT; the settings OPTIONS changed */
 		const uint32_t held = read_actions(keys);
+
+		s32_video_set_wide(console_wide_now());    /* (before VBLANK's sprites and the frame) */
 
 		if (!actions_taken)
 			console_actions(held & ~actions_held);

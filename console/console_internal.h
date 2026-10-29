@@ -23,6 +23,7 @@
 #define GAME_MODE_RANKING           5u
 #define GAME_MODE_PLAY              6u
 #define GAME_MODE_ENTRY_INVITATION  7u
+#define GAME_MODE_CONSOLE_SCENE     9u    /* none of the game's: its code runs nothing (the console's scene) */
 
 /* What the menus ask of the left seat's frame (console_menu_frame) */
 enum
@@ -30,6 +31,7 @@ enum
 	MENU_NOTHING,
 	MENU_START_ONE,     /* a game of one player (ARCADE) */
 	MENU_START_TWO,     /* a game of both seats (2 PLAYERS) */
+	MENU_TIME_ATTACK,   /* a game of one player without the time limit (DELUXE > TIME ATTACK) */
 	MENU_TITLE          /* the title from its start (game mode 1) */
 };
 
@@ -39,9 +41,29 @@ typedef struct
 	bool quit;
 	bool two_players;       /* 2 PLAYERS: both screens shown, the right seat in the race */
 	bool join_right;        /* the right seat's START, pressed once it is in the entry (game mode 7) */
+	bool time_attack;       /* DELUXE > TIME ATTACK: the left seat's race has no time limit */
 } console_state;
 
 extern console_state console;
+
+/* The console's own objects' code, at addresses the program has none at (console_code) */
+#define CONSOLE_CODE_PRESENTATION_LOGO  0xFE0000u
+#define CONSOLE_CODE_PRESENTATION_CAR   0xFE0001u
+
+void presentation_logo_update(void);
+void presentation_car_update(void);
+
+/* The SEGA presentation (presentation.c) on the left seat's frame at power-on, with the actions pressed:
+   true while it lasts (the game mode's code waits), false once it is over */
+bool console_presentation_frame(uint32_t pressed);
+
+/* SEGA's jingle (jingle.c): started, then stepped once a frame of the left seat's */
+void console_jingle_start(void);
+void console_jingle_frame(void);
+void console_jingle_stop(void);    /* (its notes off at once: the scene skipped or over) */
+
+/* DIFFICULTY and TIME, as OPTIONS leaves them, into the race records (console.c) */
+void console_settings_to_race(void);
 
 /* The menus on the left seat's frame, before its game mode's code ('mode'): what it asks for (MENU_*) */
 int console_menu_frame(uint32_t mode);

@@ -1,4 +1,4 @@
 # 2 PLAYERS from the title's menu: both seats in one race, the window both screens
-300 start
-360 down
-400 accept
+600 start
+660 down
+700 accept

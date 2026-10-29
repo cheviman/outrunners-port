@@ -112,6 +112,24 @@ merged here; this repository adds console/, the ports and their documents.
    2 PLAYERS, side by side only; WIDE on the Switch and Android, not on Anbernic's handhelds (4:3).
 10. **Network**: up to 8 players, each on a device of their own: the game's own link of four cabinets.
 
+## Done (29-10-2026)
+
+- The build: CONSOLE_ORIGINAL in the core (arcade-decomp, its console-original branch), console/, `OutRunners`
+  and `OutRunners Arcade`, orunners_console_headless with `--actions` (tests/console/). The arcade build is
+  the same as the reference in the scenarios.
+- One screen (the left seat's; both in 2 PLAYERS), one sound (sound_chips_join_sides; the right seat's
+  requests dropped while it is not in a game), free play (load_settings), no credits line, no coin or
+  operator's switches.
+- The SEGA presentation (presentation.c): the title's SEGA four times its size on black, dark under a
+  shadow that the three cars racing across it take away, the engine (sound 21), the fades; START skips it.
+  The boot goes straight to it: no NETWORK CHECK on the screens (network_check_stand_alone).
+- PRESS START in the attract mode (the prompt's message and ignition key end at once); the title's menu
+  under the logo; OPTIONS over the title's opening, darkened: CONTROLS (two columns, Kenney's Input
+  Prompts Pixel drawn by the window, controls.ini), DIFFICULTY by name, TIME by stage, VIDEO, VOLUME, SOUND
+  TEST. DIFFICULTY and TIME reach the races at once (console_settings_to_race) and the EEPROM.
+- 2 PLAYERS: both seats in one race, the window's two screens side by side or one over the other.
+- PIXELS: sharp, smooth, bilinear, CRT.
+
 ## Order
 
 1. The build: CONSOLE_ORIGINAL in the core, console/, the two executables, the headless console build.
@@ -121,5 +139,7 @@ merged here; this repository adds console/, the ports and their documents.
 5. 2 PLAYERS with its two layouts.
 6. DELUXE: TIME ATTACK, FULL, REVERSE.
 7. WIDE.
-8. The CI's packages, the Switch, Android and Anbernic.
+8. The first run without Python: the game takes its assets out of the player's orunners.zip itself (a C
+   extractor that writes the folder extract_assets.py writes), as SegaSonic's does; then the CI's packages,
+   the Switch, Android and Anbernic.
 9. The network.

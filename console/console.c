@@ -20,6 +20,7 @@
 
 #define COIN_SETTINGS       0x1Au    /* the test mode's COIN/CREDIT SETTING: 26 */
 #define START_BUTTON        0x40u    /* screen buttons_pressed: START */
+#define TIME_ATTACK_TIME_LEFT (99u * 30u)    /* race time_left, in 30ths of a second */
 
 console_state console;
 
@@ -69,6 +70,57 @@ void ignition_key_prompt_update(void)
 	OBJECT(current_object)->flags_high = 0u;
 }
 
+/* ---- the machine ---- */
+
+/* The settings OPTIONS changes, into the first race record's master fields as network_check_result puts
+   them at boot (the races read the copies the link makes of them) */
+void console_settings_to_race(void)
+{
+	const uint32_t race = RACE_1;
+
+	RACE(race)->master_game_difficulty = game_difficulty;
+	RACE(race)->master_time_difficulty_0 = time_difficulty[0];
+	RACE(race)->master_time_difficulty_1 = (uint8_t)time_difficulty[1];
+	RACE(race)->master_time_difficulty_2_5 = (uint8_t)time_difficulty[2] | ((uint32_t)(uint8_t)time_difficulty[3] << 8u)
+		| ((uint32_t)(uint8_t)time_difficulty[4] << 16u) | ((uint32_t)(uint8_t)time_difficulty[5] << 24u);
+}
+
+/* The machine alone (stand alone, or the link failed), as the game's network_check_stand_alone and
+   network_check_result set it up as machine 1, without NETWORK CHECK and its result on the screens for
+   128 frames: the SEGA presentation is the first thing seen */
+void network_check_stand_alone(void)
+{
+	const uint32_t race = RACE_1;
+
+	link_off = 1u;
+	player_count = 2u;
+	machine_count = 1u;
+	SCREEN(SCREEN_1)->car_number = 0u;
+	RACE(RACE_1)->car_number = 0u;
+	SCREEN(SCREEN_2)->car_number = 1u;
+	RACE(RACE_2)->car_number = 1u;
+	RACE(RACE_1)->machine = 1u;
+	RACE(RACE_2)->machine = 1u;
+	RACE(RACE_1)->player = 0u;
+	RACE(RACE_2)->player = 1u;
+	SCREEN(SCREEN_1)->player = 0u;
+	SCREEN(SCREEN_2)->player = 1u;
+	SCREEN(SCREEN_1)->race_copy = race_copy_offsets[0] + GAME_VARIABLES;
+	SCREEN(SCREEN_2)->race_copy = race_copy_offsets[1] + GAME_VARIABLES;
+	SCREEN(SCREEN_1)->race = RACE_1;
+	SCREEN(SCREEN_2)->race = RACE_2;
+	RACE(race)->master_advertise_sound = advertise_sound;
+	RACE(race)->master_steering_wheel_reaction = steering_wheel_reaction;
+	RACE(race)->master_coins_per_credit = coins_per_credit;
+	RACE(race)->master_first_chute_multiplier = first_chute_multiplier;
+	RACE(race)->master_bonus_adder = bonus_adder;
+	RACE(race)->master_coin_setting = coin_setting;
+	RACE(race)->master_free_play = free_play;
+	console_settings_to_race();
+	move_halfwords(race + 0x30u, BOOKKEEPING_COURSE_RECORDS_ADDRESS, 0x1Eu);
+	clear_text_layer();
+}
+
 /* ---- the sound ---- */
 
 /* A screen's sound requests, in the vertical blank: the left seat's always; the right one's only while it
@@ -108,6 +160,20 @@ uint32_t check_game_start(uint32_t mode, uint32_t seat_credits)
 		}
 		return mode;
 	}
+	if (mode == GAME_MODE_POWER_ON && console_presentation_frame(console.pressed))
+	{
+		console.pressed = 0;
+		return GAME_MODE_CONSOLE_SCENE;    /* (the SEGA presentation first) */
+	}
+	if (console.time_attack)
+	{
+		/* TIME ATTACK: the race's time left kept at 99 seconds (the race's time is the HUD's lap and its
+		   end's); over with the game */
+		if (mode == GAME_MODE_PLAY)
+			RACE(SCREEN(screen)->race)->time_left = TIME_ATTACK_TIME_LEFT;
+		else
+			console.time_attack = false;
+	}
 	if (console.two_players && mode != GAME_MODE_PLAY && SCREEN(SCREEN_2)->game_mode != GAME_MODE_PLAY
 		&& SCREEN(SCREEN_2)->game_mode != GAME_MODE_ENTRY_INVITATION && !console.join_right)
 		console.two_players = false;    /* (the race of both is over) */
@@ -119,6 +185,9 @@ uint32_t check_game_start(uint32_t mode, uint32_t seat_credits)
 			console.two_players = true;
 			console.join_right = true;
 			return press_start(mode, seat_credits);
+		case MENU_TIME_ATTACK:
+			console.time_attack = true;
+			return press_start(mode, seat_credits);
 		case MENU_TITLE:
 			AS32(SCREEN(screen)->game_mode) = GAME_MODE_RESTART;
 			return GAME_MODE_RESTART;
@@ -129,16 +198,42 @@ uint32_t check_game_start(uint32_t mode, uint32_t seat_credits)
 
 /* ---- the port ---- */
 
-/* The console's own objects' code, at addresses the program has none at: none yet */
+/* The console's own objects' code, at addresses the program has none at */
 static bool console_code(uint32_t address)
 {
-	(void)address;
-	return false;
+	switch (address)
+	{
+		case CONSOLE_CODE_PRESENTATION_LOGO:
+			presentation_logo_update();
+			return true;
+		case CONSOLE_CODE_PRESENTATION_CAR:
+			presentation_car_update();
+			return true;
+		default:
+			return false;
+	}
 }
 
 void console_attach(void)
 {
 	call_code_elsewhere = console_code;
+}
+
+/* The steps of game mode 6 (and of the demo's race, game mode 4) from the race's set-up to its fade out
+   (game_mode_play): the race on the screen */
+static bool racing(uint32_t screen_block)
+{
+	const uint8_t mode = SCREEN(screen_block)->game_mode;
+	const uint8_t step = SCREEN(screen_block)->game_step;
+
+	if (mode != GAME_MODE_PLAY && mode != GAME_MODE_DEMO_RACE)
+		return false;
+	return step == 5u || step == 6u || step == 7u || step == 8u || step == 11u || (step >= 23u && step <= 27u);
+}
+
+bool console_wide_now(void)
+{
+	return console_window_settings.wide && racing(SCREEN_1);
 }
 
 bool console_both_screens(void)

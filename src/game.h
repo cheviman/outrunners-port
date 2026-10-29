@@ -491,6 +491,7 @@ void network_check_join(void);
 void network_check_isdn(void);
 void link_lost(void);
 void network_check_stand_alone(void);
+void CONSOLE_ORIGINAL(network_check_stand_alone)(void);
 void network_check_result(uint32_t machine);
 uint32_t network_check_board_memory(uint32_t left_caller);
 uint8_t network_check_memory_test(uint32_t count, uint32_t memory);

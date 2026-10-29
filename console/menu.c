@@ -51,7 +51,7 @@ enum
 	PAGE_CONTROLS
 };
 
-static const char *const menu_items[] = { "ARCADE", "2 PLAYERS", "DELUXE", "OPTIONS", "EXIT" };
+static const char *const menu_items[] = { "ARCADE", "2 PLAYERS", "& KNUCKLES", "OPTIONS", "EXIT" };
 static const char *const deluxe_items[] = { "TIME ATTACK", "FULL", "REVERSE", "BACK" };
 static const char *const options_items[] = { "CONTROLS", "DIFFICULTY", "TIME", "VIDEO", "VOLUME", "SOUND TEST",
 	"BACK" };
@@ -67,6 +67,7 @@ static const char *const difficulties[DIFFICULTIES] = { "VERY EASY", "EASIER", "
 #define COUNT(list) ((int)(sizeof(list) / sizeof((list)[0])))
 
 enum { MENU_ARCADE, MENU_TWO_PLAYERS, MENU_DELUXE, MENU_OPTIONS, MENU_EXIT };
+enum { DELUXE_TIME_ATTACK, DELUXE_FULL, DELUXE_REVERSE, DELUXE_BACK };
 enum { OPTIONS_CONTROLS, OPTIONS_DIFFICULTY, OPTIONS_TIME, OPTIONS_VIDEO, OPTIONS_VOLUME, OPTIONS_SOUND_TEST,
 	OPTIONS_BACK };
 enum { VIDEO_WINDOW, VIDEO_FULL_SCREEN, VIDEO_PIXELS, VIDEO_WIDE, VIDEO_TWO_PLAYERS, VIDEO_BACK, VIDEO_ITEMS };
@@ -196,6 +197,7 @@ static void save_game_settings(void)
 	if (!menu.settings_changed)
 		return;
 	menu.settings_changed = false;
+	console_settings_to_race();
 	save_settings();
 }
 
@@ -610,10 +612,15 @@ int console_menu_frame(uint32_t mode)
 		case PAGE_DELUXE:
 			hold_title(false);
 			if ((pressed & ACTION_BIT(ACTION_BACK))
-				|| ((pressed & ACTION_BIT(ACTION_ACCEPT)) && menu.choice == COUNT(deluxe_items) - 1))
+				|| ((pressed & ACTION_BIT(ACTION_ACCEPT)) && menu.choice == DELUXE_BACK))
 			{
 				open_page(PAGE_MENU, MENU_DELUXE);
 				return MENU_NOTHING;
+			}
+			if ((pressed & (ACTION_BIT(ACTION_ACCEPT) | ACTION_BIT(ACTION_START))) && menu.choice == DELUXE_TIME_ATTACK)
+			{
+				open_page(PAGE_NONE, 0);
+				return MENU_TIME_ATTACK;
 			}
 			list_frame(deluxe_items, COUNT(deluxe_items));
 			return MENU_NOTHING;

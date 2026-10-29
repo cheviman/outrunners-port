@@ -100,4 +100,13 @@ typedef struct
 
 extern console_window console_window_settings;
 
+/* WIDE draws this frame wider (s32_video_set_wide): a race is run on the left seat's screen (a game's or the
+   attract mode's demo); the other screens' pictures end at their 320 pixels, so they keep them, between
+   black bars */
+bool console_wide_now(void);
+
+/* SEGA's jingle: the program of its chords (the sound program's, 0-FF), of the layer an octave under them (-1:
+   none) and the semitones both go up (outrunners.ini: jingle_program, jingle_layer, jingle_transpose) */
+void console_jingle_program(int program, int layer, int transpose);
+
 #endif

@@ -1,9 +1,9 @@
 # OPTIONS > CONTROLS: the page, player 2's, back
-300 start
-330 down
-350 down
-370 down
-400 accept
-600 accept
-700 right
-800 left
+600 start
+630 down
+650 down
+670 down
+700 accept
+900 accept
+1000 right
+1100 left
