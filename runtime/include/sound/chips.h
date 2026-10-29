@@ -3,7 +3,7 @@
  *    Description: the sound board's chips and the Z80 program on the board's time (sound_chips.c, sound_cpu.c)
  *    Version:     0.1.0
  *    Created:     13-10-2026
- *    Modified:    21-10-2026
+ *    Modified:    29-10-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
@@ -45,6 +45,11 @@ const int32_t *sound_chips_frame_samples(int chip, size_t *count);
 /* The frame's sound, mixed as tools/core/system32/reference/sound mixes it: stereo at the YM3438's rate */
 const int16_t *sound_chips_frame_mix(size_t *frames);
 uint32_t sound_chips_mix_rate(void);
+
+/* The mix's speakers: apart (each chip's second output to the left speaker, its first to the right one,
+   as the cabinet's sides have them: the arcade's), or together (both outputs to both speakers: one sound
+   for the two sides, a port's console build) */
+void sound_chips_join_sides(bool together);
 
 /* FNV-1a hashes, as tools/core/system32/reference/s32ref writes them: the frame's samples of the two chips, and the
    sound board's memory (the shared RAM but the Z80's stack, FD00-FDFF) */

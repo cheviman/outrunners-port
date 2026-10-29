@@ -2,7 +2,7 @@
 # Description: build of the OutRunners runtime and its development tools
 # Version:     0.1.0
 # Created:     11-10-2026
-# Modified:    27-10-2026
+# Modified:    29-10-2026
 # Author:      Sebastian Toyos
 cmake_minimum_required(VERSION 3.20)
 project(outrunners C CXX)
@@ -138,6 +138,23 @@ if(ORUNNERS_DECOMPILED AND ORUNNERS_SOUND_DECOMPILED)
 	add_executable(orunners_game_headless ports/headless/main.c)
 	target_link_libraries(orunners_game_headless PRIVATE orunners_game orunners_sound)
 
+	# The console build: the same game with the console's own versions of the functions console/replaced.txt
+	# lists (console/*.c, ORUNNERS_CONSOLE), in OutRunners and a headless build for scripted checks
+	file(GLOB ORUNNERS_CONSOLE_SOURCES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/console/*.c)
+	add_library(orunners_game_console STATIC runtime/src/game.c runtime/src/assets.c runtime/src/assets_media.c
+		runtime/src/assets_midi.c runtime/src/json.c runtime/src/png.c runtime/src/inflate.c ${ORUNNERS_DECOMPILED}
+		${ORUNNERS_CONSOLE_SOURCES})
+	target_include_directories(orunners_game_console PUBLIC runtime/include ${ORUNNERS_DECOMPILED_DIR} console)
+	target_compile_definitions(orunners_game_console PUBLIC ORUNNERS_CONSOLE)
+	target_link_libraries(orunners_game_console PUBLIC s32runtime)
+	if(MSVC)
+		target_compile_options(orunners_game_console PRIVATE /bigobj)
+	else()
+		target_compile_options(orunners_game_console PRIVATE -fno-strict-aliasing)
+	endif()
+	add_executable(orunners_console_headless ports/headless/main.c)
+	target_link_libraries(orunners_console_headless PRIVATE orunners_game_console orunners_sound)
+
 	# The game in a window (ports/sdl2): SDL2 from the system, or on Windows the development package
 	# unpacked in build/downloads/sdl2 (SDL2_DIR picks another), a library beside the executable; or, with
 	# ORUNNERS_STATIC_SDL2, SDL2 built from its own source into the executable
@@ -164,17 +181,22 @@ if(ORUNNERS_DECOMPILED AND ORUNNERS_SOUND_DECOMPILED)
 		list(APPEND ORUNNERS_SDL2 SDL2::SDL2main)
 	endif()
 	if(SDL2_FOUND)
-		# (an .app on macOS: SDL_GetBasePath is its Resources folder)
+		# (an .app on macOS: SDL_GetBasePath is its Resources folder): the arcade game, "OutRunners Arcade" its
+		# executable, .app and window, and the console one beside it, OutRunners
 		add_executable(orunners WIN32 MACOSX_BUNDLE ports/sdl2/main.c)
 		target_link_libraries(orunners PRIVATE orunners_game orunners_sound ${ORUNNERS_SDL2})
-		set_target_properties(orunners PROPERTIES MACOSX_BUNDLE_BUNDLE_NAME "OutRunners"
-			MACOSX_BUNDLE_GUI_IDENTIFIER io.github.cheviman.outrunners-decomp)
+		set_target_properties(orunners PROPERTIES OUTPUT_NAME "OutRunners Arcade"
+			MACOSX_BUNDLE_BUNDLE_NAME "OutRunners Arcade" MACOSX_BUNDLE_GUI_IDENTIFIER io.github.cheviman.outrunners-arcade)
+		add_executable(outrunners WIN32 MACOSX_BUNDLE ports/sdl2/main.c)
+		target_link_libraries(outrunners PRIVATE orunners_game_console orunners_sound ${ORUNNERS_SDL2})
+		set_target_properties(outrunners PROPERTIES OUTPUT_NAME "OutRunners"
+			MACOSX_BUNDLE_BUNDLE_NAME "OutRunners" MACOSX_BUNDLE_GUI_IDENTIFIER io.github.cheviman.outrunners)
 		if(WIN32 AND NOT ORUNNERS_STATIC_SDL2)
 			add_custom_command(TARGET orunners POST_BUILD
 				COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:SDL2::SDL2> $<TARGET_FILE_DIR:orunners>)
 		endif()
 	else()
-		message(STATUS "No SDL2: the window port (orunners) is not built")
+		message(STATUS "No SDL2: the window ports (OutRunners, OutRunners Arcade) are not built")
 	endif()
 else()
 	message(STATUS "No game C in ${ORUNNERS_DECOMPILED_DIR}")

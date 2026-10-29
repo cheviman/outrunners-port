@@ -18,7 +18,7 @@
    their backup, each checked with its crc16); with the same program a bad copy (or a backup unlike the
    settings) is rewritten from the other, both bad the defaults. Every repair but rewriting a copy also
    resets the backup RAM's data (bookkeeping_reset); each one saves the result (eeprom_write_settings). */
-void load_settings(uint32_t checksum)
+void CONSOLE_ORIGINAL(load_settings)(uint32_t checksum)
 {
 	uint16_t new_checksum = 0, write_count = 0;
 	uint32_t settings = 0, settings_length = 0;

@@ -5,7 +5,7 @@
  *                 and searches
  *    Version:     0.1.0
  *    Created:     11-10-2026
- *    Modified:    27-10-2026
+ *    Modified:    29-10-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
@@ -45,6 +45,15 @@ extern "C" {
 /* A game function the board puts its own in place of (runtime/replaced.txt): tools/decompile.py writes
    its definition as BOARD_ORIGINAL(name), which keeps the original as original_name */
 #define BOARD_ORIGINAL(name) original_##name
+
+/* A game function the console build (console/, ORUNNERS_CONSOLE) puts its own in place of
+   (console/replaced.txt): tools/decompile.py writes its definition as CONSOLE_ORIGINAL(name), which is
+   original_name there, for the console's to call, and the game's own name in every other build */
+#ifdef ORUNNERS_CONSOLE
+#define CONSOLE_ORIGINAL(name) original_##name
+#else
+#define CONSOLE_ORIGINAL(name) name
+#endif
 
 /* a structure pointer that is not in work RAM: in the program ROM (a link left at 0 in an object a
    scenario crafted), the bus reads the ROM there and drops writes, so it gets a copy of the ROM to read
@@ -245,6 +254,9 @@ void game_entry(void);                          /* the code at the reset vector 
 
 void call_code(uint32_t address);
 GAME_NORETURN void unknown_code(uint32_t address);    /* a jump or call to an address no code was found at */
+/* Code the program does not have, at addresses a port's console build gives its own (its objects' handlers):
+   call_code runs it there, true once run; NULL elsewhere */
+extern bool (*call_code_elsewhere)(uint32_t address);
 /* the default of a switch on a jump table's index: the original checks nothing, and an index past the table
    would jump to 'address', which no case handles */
 GAME_NORETURN void invalid_jump(uint32_t address);

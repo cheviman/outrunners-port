@@ -1,25 +1,27 @@
 /**
  *    Name:        main.c
- *    Description: the game in a window: SDL2 shows its two screens, plays its sound, reads the controls and
+ *    Description: the game in a window: SDL2 shows its screens, plays its sound, reads the controls and
  *                 keeps the pace, around the same game and board the headless runs check
  *    Version:     0.1.0
  *    Created:     21-10-2026
- *    Modified:    28-10-2026
+ *    Modified:    29-10-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
- *    Usage: orunners [--script FILE [--fast]] [--hashes FILE] [--video-hashes FILE] [--sound-hashes FILE]
- *                    [--assets FOLDER]
+ *    Usage: "OutRunners Arcade" or OutRunners [--script FILE [--fast]] [--hashes FILE] [--video-hashes FILE]
+ *                    [--sound-hashes FILE] [--assets FOLDER]
  *
  *    The game (src/) and the board (runtime/) run as they are: this file only wraps them. Where the board
  *    has its hooks, the port does its part: when VBLANK starts the video draws both screens and the port
- *    puts them in the window, the left screen beside the right; when the board reads the controls the port
- *    hands it the keyboard and the game controllers; when the game finishes a frame the port queues the
- *    frame's sound and waits for the frame's time (60 a second) to pass. What the board keeps with the power
- *    off is kept in two files, beside the executable on Windows and in the user's folder for the game
- *    elsewhere (saves_folder): orunners.eeprom the EEPROM (the settings and their copy), orunners.bookkeeping
- *    the part of the sound board's RAM the game keeps on the battery (the bookkeeping, the ten course records
- *    and the credits among it, its checksum and its copy).
+ *    puts them in the window, the left screen beside the right (the console version, OutRunners: the left
+ *    one alone, both in 2 PLAYERS); when the board reads the controls the port hands it the keyboard and
+ *    the game controllers; when the game finishes a frame the port queues the frame's sound and waits for
+ *    the frame's time (60 a second) to pass. What the board keeps with the power off is kept in two files,
+ *    beside the executable on Windows and in the user's folder for the game elsewhere (saves_folder):
+ *    orunners.eeprom the EEPROM (the settings and their copy), orunners.bookkeeping the part of the sound
+ *    board's RAM the game keeps on the battery (the bookkeeping, the ten course records and the credits
+ *    among it, its checksum and its copy); the console version's are outrunners.eeprom and
+ *    outrunners.bookkeeping.
  *
  *    The game's data is its assets (game/assets.h), the files extract_assets.py writes from the player's
  *    ROM set: --assets, or the folder 'assets' beside the executable, beside the .app on macOS, in the
@@ -51,6 +53,9 @@
 #include "s32/video.h"
 #include "sound/chips.h"
 #include "game/assets.h"
+#ifdef ORUNNERS_CONSOLE
+#include "console.h"
+#endif
 
 #include <SDL.h>
 
@@ -59,7 +64,16 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* The console version (console/, OutRunners) shows the left seat's screen alone, both in 2 PLAYERS, and
+   plays both sides' sound on both speakers; the arcade one (OutRunners Arcade) both screens, each side's
+   sound on its own speaker. Each keeps its own files */
+#ifdef ORUNNERS_CONSOLE
 #define TITLE               "OutRunners"
+#define FILE_NAME           "outrunners"
+#else
+#define TITLE               "OutRunners Arcade"
+#define FILE_NAME           "orunners"
+#endif
 #define PLAYERS             2
 #define WINDOW_SCALE        2
 #define QUEUE_FRAMES_MAX    6          /* sound queued beyond this many frames is dropped */
@@ -162,13 +176,25 @@ static void load_backup_ram(void)
 
 /* ---- the picture ---- */
 
+/* The screens the window shows, from the left one: the arcade's two; the console's left one, both in
+   2 PLAYERS */
+static int screens_shown(void)
+{
+#ifdef ORUNNERS_CONSOLE
+	return console_both_screens() ? 2 : 1;
+#else
+	return 2;
+#endif
+}
+
 static void on_frame_shown(void)
 {
-	int widths[2];
+	int widths[2] = { 0, 0 };
 	int left = 0;
+	const int shown = screens_shown();
 
 	s32_video_draw_frame();
-	for (int screen = 0; screen < 2; screen++)
+	for (int screen = 0; screen < shown; screen++)
 	{
 		const uint32_t *pixels = s32_video_frame(screen, &widths[screen]);
 		SDL_Rect place;
@@ -181,7 +207,7 @@ static void on_frame_shown(void)
 	}
 	SDL_RenderSetLogicalSize(renderer, widths[0] + widths[1], S32_VIDEO_HEIGHT);
 	SDL_RenderClear(renderer);
-	for (int screen = 0; screen < 2; screen++)
+	for (int screen = 0; screen < shown; screen++)
 	{
 		SDL_Rect source, target;
 
@@ -345,6 +371,20 @@ static void on_controls_update(void)
 		coin[player] |= SDL_GameControllerGetButton(pad, SDL_CONTROLLER_BUTTON_BACK) != 0;
 	}
 
+#ifdef ORUNNERS_CONSOLE
+	/* the console: no coins, no operator's switches; a seat whose screen is not shown is let alone */
+	for (int player = 0; player < PLAYERS; player++)
+	{
+		coin[player] = false;
+		if (player >= screens_shown())
+		{
+			shift_up[player] = shift_down[player] = music[player] = previous[player] = next[player] = false;
+			start[player] = false;
+			wheels[player] = WHEEL_CENTRE;
+			gases[player] = brakes[player] = 0;
+		}
+	}
+#endif
 	/* each player's 315-5296 (chip 0 player 1, chip 1 player 2); its ports are active low: a cleared bit
 	   is a pressed button */
 	for (int player = 0; player < PLAYERS; player++)
@@ -354,10 +394,12 @@ static void on_controls_update(void)
 			& ~(next[player] ? 0x04 : 0));
 		input->port_e[player] = (uint8_t)(0xff & ~(coin[player] ? 0x04 : 0) & ~(start[player] ? 0x10 : 0));
 	}
+#ifndef ORUNNERS_CONSOLE
 	if (keys[SDL_SCANCODE_9])
 		input->port_e[0] &= (uint8_t)~0x01;
 	if (keys[SDL_SCANCODE_F2])
 		input->port_e[0] &= (uint8_t)~0x02;
+#endif
 	input->analog[0] = (uint8_t)wheels[0];
 	input->analog[1] = (uint8_t)gases[0];
 	input->analog[2] = (uint8_t)brakes[0];
@@ -526,8 +568,8 @@ int main(int argc, char **argv)
 
 	base = SDL_GetBasePath();
 	saves = saves_folder();
-	snprintf(eeprom_path, sizeof(eeprom_path), "%sorunners.eeprom", saves ? saves : "");
-	snprintf(backup_ram_path, sizeof(backup_ram_path), "%sorunners.bookkeeping", saves ? saves : "");
+	snprintf(eeprom_path, sizeof(eeprom_path), "%s" FILE_NAME ".eeprom", saves ? saves : "");
+	snprintf(backup_ram_path, sizeof(backup_ram_path), "%s" FILE_NAME ".bookkeeping", saves ? saves : "");
 	{
 		/* the folder of the game's assets: --assets, else beside the executable, beside the .app on macOS, in
 		   the folder of what the game keeps, or in the current folder */
@@ -564,7 +606,7 @@ int main(int argc, char **argv)
 	SDL_free(saves);
 
 	window = SDL_CreateWindow(TITLE, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-		2 * 320 * WINDOW_SCALE, S32_VIDEO_HEIGHT * WINDOW_SCALE, SDL_WINDOW_RESIZABLE);
+		screens_shown() * 320 * WINDOW_SCALE, S32_VIDEO_HEIGHT * WINDOW_SCALE, SDL_WINDOW_RESIZABLE);
 	renderer = window ? SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED) : NULL;
 	if (window && !renderer)
 		renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
@@ -598,6 +640,10 @@ int main(int argc, char **argv)
 	s32_board.pcm_at = assets_pcm_byte;
 	sound_chips_attach();
 	sound_cpu_attach();
+#ifdef ORUNNERS_CONSOLE
+	sound_chips_join_sides(true);
+	console_attach();
+#endif
 	if (!script)
 	{
 		load_eeprom();

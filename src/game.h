@@ -648,6 +648,7 @@ void coin_prompt_message_update(void);
 uint32_t coin_prompt_start_key_prompt(uint32_t piece_count, uint8_t first_piece);
 void ignition_key_prompt_update(void);
 void credit_display_update(void);
+void CONSOLE_ORIGINAL(credit_display_update)(void);
 void credit_display_digit(void);
 
 /* scenes/game_modes.c: the game modes: the title, the power on, the car presentation, the demo race, the ranking and the game itself */
@@ -774,6 +775,7 @@ void int_default(void);
 void int_vector_02(void);
 void check_test_button(void);
 void send_sound_requests(void);
+void CONSOLE_ORIGINAL(send_sound_requests)(void);
 void count_total_time(void);
 void update_lamps(void);
 void update_button_lamps(uint32_t screen_block, uint32_t port_g);
@@ -813,6 +815,7 @@ void reset(void);
 
 /* system/settings.c: the settings in the EEPROM: loading, checking and saving them, and the EEPROM's serial lines */
 void load_settings(uint32_t checksum);
+void CONSOLE_ORIGINAL(load_settings)(uint32_t checksum);
 void count_eeprom_write(void);
 void eeprom_lock(void);
 void eeprom_read_one_word(uint8_t command);

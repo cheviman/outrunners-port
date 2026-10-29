@@ -4,7 +4,7 @@
  *                 frame by frame
  *    Version:     0.1.0
  *    Created:     13-10-2026
- *    Modified:    21-10-2026
+ *    Modified:    29-10-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
@@ -58,6 +58,8 @@ static struct
 	size_t mix_capacity;
 	size_t mix_frames;
 } sound = { .override = NO_TIMER };
+
+static bool sides_together;    /* sound_chips_join_sides */
 
 static uint64_t now(void)
 {
@@ -229,7 +231,8 @@ static int16_t clamp16(double value)
 }
 
 /* The mix at the YM3438's rate: the MultiPCM's latest sample at each of its samples' start; each chip's
-   second output goes to the left speaker, its first to the right one (MAME's routes) */
+   second output goes to the left speaker, its first to the right one (MAME's routes), or both to both
+   (sound_chips_join_sides: the program pans each side to one output only, so the sum is each side whole) */
 static void mix(void)
 {
 	const size_t frames = sound.frame_counts[0] / 2;
@@ -253,9 +256,14 @@ static void mix(void)
 		for (int side = 0; side < 2; side++)
 		{
 			const int output = 1 - side;
-			const double fm_part = 0.15 * sound.frame[0][index * 2 + (size_t)output];
-			const double pcm_part = pcm_frames ? 0.35 * sound.frame[1][at * 2 + (size_t)output] : 0.0;
+			double fm_part = 0.15 * sound.frame[0][index * 2 + (size_t)output];
+			double pcm_part = pcm_frames ? 0.35 * sound.frame[1][at * 2 + (size_t)output] : 0.0;
 
+			if (sides_together)
+			{
+				fm_part += 0.15 * sound.frame[0][index * 2 + (size_t)side];
+				pcm_part += pcm_frames ? 0.35 * sound.frame[1][at * 2 + (size_t)side] : 0.0;
+			}
 			sound.mix[index * 2 + (size_t)side] = clamp16(fm_part + pcm_part);
 		}
 	}
@@ -303,6 +311,11 @@ const int16_t *sound_chips_frame_mix(size_t *frames)
 uint32_t sound_chips_mix_rate(void)
 {
 	return S32_SOUND_CLOCK / 144;
+}
+
+void sound_chips_join_sides(bool together)
+{
+	sides_together = together;
 }
 
 void sound_chips_attach(void)

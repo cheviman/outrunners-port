@@ -290,7 +290,7 @@ void check_test_button(void)
    (SOUND_COMMAND_1 for screen 1, SOUND_COMMAND_2 for screen 2), and one from its second ring at 840
    (second_sound_queue_read, second_sound_queue_write; only the unused request_second_sound fills it) to
    the byte 8 after it, which the sound program never reads. */
-void send_sound_requests(void)
+void CONSOLE_ORIGINAL(send_sound_requests)(void)
 {
 	uint32_t command_offset = 0, queue = 0, second_queue = 0, second_sound_queue_read = 0, sound_queue_read = 0;
 	uint8_t sound_queue_write = 0, second_sound_queue_write = 0;

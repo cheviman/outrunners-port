@@ -3,7 +3,7 @@ Name:        rom_in_executables.py
 Description: looks for the ROM set's content in the built executables: none of the game's may hold any
 Version:     0.1.0
 Created:     25-10-2026
-Modified:    25-10-2026
+Modified:    29-10-2026
 Author:      Sebastian Toyos
 
 Usage: py tools/rom_in_executables.py [EXECUTABLE ...]   (default: the game's in build/bin)
@@ -23,7 +23,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 import orunners_rom  # noqa: E402
 
 SPAN = 32
-GAME = ["orunners_game_headless.exe", "orunners.exe"]
+GAME = ["orunners_game_headless.exe", "orunners_console_headless.exe", "OutRunners Arcade.exe", "OutRunners.exe"]
 
 
 def trivial(chunk):

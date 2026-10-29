@@ -5,7 +5,7 @@
  *                 format tools/core/system32/reference/s32ref uses
  *    Version:     0.1.0
  *    Created:     11-10-2026
- *    Modified:    27-10-2026
+ *    Modified:    29-10-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
@@ -33,6 +33,9 @@
 #include "s32/script.h"
 #include "s32/video.h"
 #include "sound/chips.h"
+#ifdef ORUNNERS_CONSOLE
+#include "console.h"
+#endif
 #ifdef ORUNNERS_SCAFFOLD
 #include "game/data.h"
 #include "game/extract.h"
@@ -423,6 +426,10 @@ int main(int argc, char **argv)
 		sound_cpu_attach();
 		sound_hashes = fopen(sound_hashes_path, "w");
 	}
+#ifdef ORUNNERS_CONSOLE
+	sound_chips_join_sides(true);
+	console_attach();
+#endif
 	program_reset();
 	program_frame_done = on_frame_done;
 

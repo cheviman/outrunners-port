@@ -292,7 +292,7 @@ void ignition_key_prompt_update(void)
    number of credits in the font's digits (tens at x AC when there are, units at B4), and while coins are
    in toward the next credit the coins and the coins a credit costs (coins_per_credit) as a fraction (C0
    and C8), each drawn with credit_display_digit. */
-void credit_display_update(void)
+void CONSOLE_ORIGINAL(credit_display_update)(void)
 {
 	uint8_t coin_units = 0, coin_units_shown = 0, credits = 0, units = 0;
 	uint32_t text = 0;

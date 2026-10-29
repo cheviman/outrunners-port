@@ -1,0 +1,5 @@
+# The game's functions the console build puts its own in place of (console/*.c): tools/decompile.py writes
+# their definitions as CONSOLE_ORIGINAL(name), which is original_name there and the game's own elsewhere.
+load_settings            # free play always: the settings as the EEPROM has them, then the coins' set to it
+credit_display_update    # no FREE PLAY line: the console has no coins
+send_sound_requests      # the right seat's sounds only while it plays: one sound for both speakers

@@ -5,7 +5,7 @@
  *                 moves and searches
  *    Version:     0.1.0
  *    Created:     11-10-2026
- *    Modified:    27-10-2026
+ *    Modified:    29-10-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
@@ -182,6 +182,8 @@ static void switch_task(void)
 
 /* ---- calls by address ---- */
 
+bool (*call_code_elsewhere)(uint32_t address);
+
 void call_code(uint32_t address)
 {
 	const uint32_t key = address & 0xffffff;
@@ -201,6 +203,8 @@ void call_code(uint32_t address)
 		game_code[low].function();
 		return;
 	}
+	if (call_code_elsewhere && call_code_elsewhere(address))
+		return;
 	unknown_code(address);
 }
 
