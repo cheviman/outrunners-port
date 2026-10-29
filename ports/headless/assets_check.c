@@ -386,6 +386,25 @@ static int compare(const char *first_path, const char *second_path)
 
 /* ---- running itself ---- */
 
+/* A snapshot's file in the temporary folder, under a name of its own: made at once and only if nothing
+   stands there ("x"), so that no file or link of another's is written through */
+static int make_temporary(const char *folder, int which, char *path, size_t size)
+{
+	for (unsigned attempt = 0; attempt < 100u; attempt++)
+	{
+		FILE *file;
+
+		snprintf(path, size, "%s/orunners_assets_check_%lu_%u_%d.snapshot", folder, (unsigned long)time(NULL), attempt,
+			which);
+		if ((file = fopen(path, "wbx")) != NULL)
+		{
+			fclose(file);
+			return 1;
+		}
+	}
+	return 0;
+}
+
 /* This program run with --snapshot FOLDER FILE: whether it wrote the snapshot */
 static int snapshot_apart(const char *program, const char *folder, const char *path)
 {
@@ -432,8 +451,11 @@ int main(int argc, char **argv)
 		snprintf(program, sizeof(program), "%s", argv[0]);
 		temporary = getenv("TMPDIR") ? getenv("TMPDIR") : "/tmp";
 #endif
-		snprintf(first, sizeof(first), "%s/orunners_assets_check_%lu_1.snapshot", temporary, (unsigned long)time(NULL));
-		snprintf(second, sizeof(second), "%s/orunners_assets_check_%lu_2.snapshot", temporary, (unsigned long)time(NULL));
+		if (!make_temporary(temporary, 1, first, sizeof(first)) || !make_temporary(temporary, 2, second, sizeof(second)))
+		{
+			fprintf(stderr, "The snapshots' files cannot be made in %s\n", temporary);
+			return 2;
+		}
 		printf("first folder:  %s\nsecond folder: %s\n", argv[1], argv[2]);
 		if (!snapshot_apart(program, argv[1], first) || !snapshot_apart(program, argv[2], second))
 			result = 2;
