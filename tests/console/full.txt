@@ -1,0 +1,7 @@
+# & KNUCKLES > FULL (with full_controls.txt and --autopilot): the 31 courses in one race, to the goal and its total
+600 start
+660 down
+680 down
+700 accept
+760 down
+780 accept

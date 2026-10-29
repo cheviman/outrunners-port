@@ -963,10 +963,10 @@ static int draw_sprite(uint32_t entry, int x_offset, int y_offset, const area *i
 	return taken;
 }
 
-/* The list in sprite RAM, 16 bytes an entry, its command in the top two bits of the first word: draw a
-   sprite, set the clips (bit 12 the one to draw in, bit 13 the one to leave alone), jump (and with
-   bit 13, set the offset sprites can add), or end. */
-static void draw_sprite_list(void)
+/* The list in sprite RAM from its entry 'number', 16 bytes an entry, its command in the top two bits of the
+   first word: draw a sprite, set the clips (bit 12 the one to draw in, bit 13 the one to leave alone), jump
+   (and with bit 13, set the offset sprites can add), or end. The board's starts at 0. */
+static void draw_sprite_list(int number)
 {
 	/* (WIDE: the board's screen of 320 in the middle of 416, the sprites placed that much to the right) */
 	const bool wide = video.wide && !bit(s32_board.sprite_control_latched[6], 0);
@@ -976,7 +976,6 @@ static void draw_sprite_list(void)
 	area outside = { 0, -1, 0, -1 };
 	int x_offset = 0;
 	int y_offset = 0;
-	int number = 0;
 
 	video.sprite_side = side;
 	for (int entries = 0; entries < 0x20000 / 16; entries++)
@@ -1046,8 +1045,43 @@ void s32_video_sprites(bool erase, bool draw)
 	if (draw)
 	{
 		video.shown_sprites ^= 1;
-		draw_sprite_list();
+		draw_sprite_list(0);
 	}
+}
+
+/* ---- a port's sprites over the frame ---- */
+
+#define OVERLAY_ENTRY 0x1F00    /* where the overlay's list goes in sprite RAM, for the time it is drawn */
+
+static uint16_t overlay_saved[S32_SCREENS][HEIGHT][WIDTH];
+static bool overlay_on;
+
+void s32_video_overlay_sprites(const uint8_t *list, size_t size)
+{
+	static uint8_t sprite_ram_saved[S32_SPRITE_RAM_SIZE - OVERLAY_ENTRY * 16];
+	uint8_t *place = &s32_board.sprite_ram[OVERLAY_ENTRY * 16];
+
+	if (size > sizeof(sprite_ram_saved))
+		size = sizeof(sprite_ram_saved);
+	if (!overlay_on)
+		for (int screen = 0; screen < S32_SCREENS; screen++)
+			memcpy(overlay_saved[screen], video.sprites[screen][video.shown_sprites], sizeof(overlay_saved[screen]));
+	overlay_on = true;
+	memcpy(sprite_ram_saved, place, size);
+	memcpy(place, list, size);
+	video.shown_sprites ^= 1;    /* (the list draws into the buffer not shown: this one) */
+	draw_sprite_list(OVERLAY_ENTRY);
+	video.shown_sprites ^= 1;
+	memcpy(place, sprite_ram_saved, size);
+}
+
+void s32_video_overlay_end(void)
+{
+	if (!overlay_on)
+		return;
+	overlay_on = false;
+	for (int screen = 0; screen < S32_SCREENS; screen++)
+		memcpy(video.sprites[screen][video.shown_sprites], overlay_saved[screen], sizeof(overlay_saved[screen]));
 }
 
 /* ---- the mixer ---- */

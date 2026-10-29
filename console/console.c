@@ -147,17 +147,34 @@ static uint32_t press_start(uint32_t mode, uint32_t seat_credits)
 	return original_check_game_start(mode, seat_credits);
 }
 
-/* Each screen's frame before its game mode's code. The right seat starts only to join a 2 PLAYERS race (its
-   START is let alone otherwise); the left one's START opens the title's menu, whose ARCADE and 2 PLAYERS
-   start the game as the arcade's START does (menu.c) */
+/* Each screen's frame before its game mode's code. The right seat starts only to join a 2 PLAYERS race, or a
+   CLASSIC one with its own START, which shows its screen (its START is let alone otherwise); the left one's
+   START opens the title's menu, whose ARCADE and 2 PLAYERS start the game as the arcade's START does
+   (menu.c) */
 uint32_t check_game_start(uint32_t mode, uint32_t seat_credits)
 {
+	if (console.quit_seats & (1u << SCREEN(screen)->index))
+	{
+		/* (the pause's QUIT GAME: a game being played ends, back to the title) */
+		console.quit_seats &= (uint8_t)~(1u << SCREEN(screen)->index);
+		if (mode == GAME_MODE_PLAY)
+		{
+			AS32(SCREEN(screen)->game_mode) = GAME_MODE_RESTART;
+			return GAME_MODE_RESTART;
+		}
+	}
 	if (SCREEN(screen)->index != LEFT_SEAT)
 	{
 		if (console.join_right && mode == GAME_MODE_ENTRY_INVITATION)
 		{
 			console.join_right = false;
 			return press_start(mode, seat_credits);
+		}
+		if (console.classic && mode == GAME_MODE_ENTRY_INVITATION)
+		{
+			mode = original_check_game_start(mode, seat_credits);
+			if (mode == GAME_MODE_PLAY)
+				console.two_players = true;    /* (a challenger) */
 		}
 		return mode;
 	}
@@ -178,10 +195,30 @@ uint32_t check_game_start(uint32_t mode, uint32_t seat_credits)
 		else
 			console.time_attack = false;
 	}
-	console_reverse_frame(mode);
+	console_routes_frame(mode);
 	if (console.two_players && mode != GAME_MODE_PLAY && SCREEN(SCREEN_2)->game_mode != GAME_MODE_PLAY
 		&& SCREEN(SCREEN_2)->game_mode != GAME_MODE_ENTRY_INVITATION && !console.join_right)
 		console.two_players = false;    /* (the race of both is over) */
+	if (console.classic && mode != GAME_MODE_PLAY && SCREEN(SCREEN_2)->game_mode != GAME_MODE_PLAY)
+		console.classic = false;
+	if (console_route_select_running())
+	{
+		/* REVERSE's goal on the route map: the console's scene meanwhile */
+		const uint32_t pressed = console.pressed;
+
+		console.pressed = 0;
+		switch (console_route_select_frame(pressed))
+		{
+			case ROUTE_SELECT_START:
+				console_reverse_start(console_menu_reverse_goal());
+				return press_start(mode, seat_credits);
+			case ROUTE_SELECT_BACK:
+				AS32(SCREEN(screen)->game_mode) = GAME_MODE_RESTART;
+				return GAME_MODE_RESTART;
+			default:
+				return GAME_MODE_CONSOLE_SCENE;
+		}
+	}
 	switch (console_menu_frame(mode))
 	{
 		case MENU_START_ONE:
@@ -194,15 +231,39 @@ uint32_t check_game_start(uint32_t mode, uint32_t seat_credits)
 			console.time_attack = true;
 			console_ghost_start();
 			return press_start(mode, seat_credits);
+		case MENU_FULL:
+			console_full_start();
+			return press_start(mode, seat_credits);
+		case MENU_CLASSIC:
+			console.classic = true;
+			return press_start(mode, seat_credits);
 		case MENU_REVERSE:
 			console_reverse_start(console_menu_reverse_goal());
 			return press_start(mode, seat_credits);
+		case MENU_ROUTE_SELECT:
+			return GAME_MODE_CONSOLE_SCENE;
 		case MENU_TITLE:
 			AS32(SCREEN(screen)->game_mode) = GAME_MODE_RESTART;
 			return GAME_MODE_RESTART;
 		default:
 			return mode;
 	}
+}
+
+/* The car select's WAITING FOR CHALLENGERS! (then JUST A MOMENT PLEASE) once the player's choices are made,
+   while the race takes entries: with one player (no 2 PLAYERS, no CLASSIC) none, and the entries closed at
+   once (player 0's record's entry_frames), as no one else comes */
+void waiting_banner_show(void)
+{
+	if (console.two_players || console.classic)
+	{
+		original_waiting_banner_show();
+		return;
+	}
+	if (RACE(RACE_1)->entry_frames > 1u)
+		RACE(RACE_1)->entry_frames = 1u;
+	OBJECT(current_object)->flags = 0u;
+	OBJECT(current_object)->flags_high = 0u;
 }
 
 /* ---- the port ---- */
@@ -223,6 +284,9 @@ static bool console_code(uint32_t address)
 			return true;
 		case CONSOLE_CODE_GHOST:
 			ghost_object_update();
+			return true;
+		case CONSOLE_CODE_ROUTE_CAR:
+			route_select_car_update();
 			return true;
 		default:
 			return false;
@@ -249,7 +313,7 @@ static bool racing(uint32_t screen_block)
 
 bool console_wide_now(void)
 {
-	return console_window_settings.wide && racing(SCREEN_1);
+	return console_window_settings.wide && !console.two_players;    /* (2 PLAYERS: both screens alike) */
 }
 
 bool console_both_screens(void)
@@ -269,6 +333,21 @@ int console_test_autopilot(void)
 void console_actions(uint32_t pressed)
 {
 	console.pressed |= pressed;
+}
+
+bool console_can_pause(void)
+{
+	return SCREEN(SCREEN_1)->game_mode == GAME_MODE_PLAY && racing(SCREEN_1);
+}
+
+void console_quit_game(void)
+{
+	console.quit_seats = 3u;
+}
+
+bool console_right_seat_joins(void)
+{
+	return console.classic && SCREEN(SCREEN_2)->game_mode == GAME_MODE_ENTRY_INVITATION;
 }
 
 bool console_quit_requested(void)

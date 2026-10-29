@@ -1,0 +1,63 @@
+# FULL's race: START through car select, then the gas down; the race's time held (its high byte, every 40
+# seconds), the wheel the console headless's --autopilot
+1000 press start1
+1060 press start1
+1120 press start1
+1180 press start1
+1240 press start1
+1300 press start1
+1360 press start1
+1420 press start1
+1480 press start1
+1540 press start1
+1600 press start1
+1700 gas 1 255
+2000 poke 20FB6B 0A
+4400 poke 20FB6B 0A
+6800 poke 20FB6B 0A
+9200 poke 20FB6B 0A
+11600 poke 20FB6B 0A
+14000 poke 20FB6B 0A
+16400 poke 20FB6B 0A
+18800 poke 20FB6B 0A
+21200 poke 20FB6B 0A
+23600 poke 20FB6B 0A
+26000 poke 20FB6B 0A
+28400 poke 20FB6B 0A
+30800 poke 20FB6B 0A
+33200 poke 20FB6B 0A
+35600 poke 20FB6B 0A
+38000 poke 20FB6B 0A
+40400 poke 20FB6B 0A
+42800 poke 20FB6B 0A
+45200 poke 20FB6B 0A
+47600 poke 20FB6B 0A
+50000 poke 20FB6B 0A
+52400 poke 20FB6B 0A
+54800 poke 20FB6B 0A
+57200 poke 20FB6B 0A
+59600 poke 20FB6B 0A
+62000 poke 20FB6B 0A
+64400 poke 20FB6B 0A
+66800 poke 20FB6B 0A
+69200 poke 20FB6B 0A
+71600 poke 20FB6B 0A
+74000 poke 20FB6B 0A
+76400 poke 20FB6B 0A
+78800 poke 20FB6B 0A
+81200 poke 20FB6B 0A
+83600 poke 20FB6B 0A
+86000 poke 20FB6B 0A
+88400 poke 20FB6B 0A
+90800 poke 20FB6B 0A
+93200 poke 20FB6B 0A
+95600 poke 20FB6B 0A
+98000 poke 20FB6B 0A
+100400 poke 20FB6B 0A
+102800 poke 20FB6B 0A
+105200 poke 20FB6B 0A
+107600 poke 20FB6B 0A
+110000 poke 20FB6B 0A
+112400 poke 20FB6B 0A
+114800 poke 20FB6B 0A
+116000 end

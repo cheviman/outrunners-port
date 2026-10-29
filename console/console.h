@@ -10,6 +10,7 @@
 #define ORUNNERS_CONSOLE_H
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 /* Sets the console's part of the game up, before the program starts: the code of its own objects, which the
@@ -43,6 +44,26 @@ int console_test_autopilot(void);
 
 /* True once the menu's EXIT was picked: the port closes the game */
 bool console_quit_requested(void);
+
+/* The pause: true while a race of the left seat's runs, when the port may stop the game (its START or BACK;
+   the seats' START is then no cabinet's: the radio's >> has its own control); QUIT GAME ends the games
+   being played, back to the title */
+bool console_can_pause(void);
+void console_quit_game(void);
+
+/* The pause's words, PAUSE and its lines (CONTINUE, QUIT GAME), in the game's letters: sprite entries for
+   s32_video_overlay_sprites into 'list' ('room' bytes), the line 'choice' in colour; their size in bytes */
+enum
+{
+	CONSOLE_PAUSE_CONTINUE,
+	CONSOLE_PAUSE_QUIT,
+	CONSOLE_PAUSE_ITEMS
+};
+
+size_t console_pause_sprites(uint8_t *list, size_t room, int choice);
+
+/* CLASSIC: true while the right seat may join the race being entered with its START, its screen unseen */
+bool console_right_seat_joins(void);
 
 /* The cabinet's controls each seat has, which OPTIONS > CONTROLS binds to keys and buttons (the port keeps
    them, controls.c) */

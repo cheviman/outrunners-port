@@ -11,7 +11,7 @@
  *    license:BSD-3-Clause
  *    The scene is the console's own game mode on the left seat's screen (console.c): its objects are the
  *    game's, with handlers of the console's (console_code), drawn by the game's own draw_object. The SEGA is
- *    the title's (title_pictures' third: the sprite title/title_pictures, row sega_logo) at four times its
+ *    the title's (title_pictures' third: the sprite title/title_pictures, row sega_logo) at twice its
  *    size; a shadow (draw.c) darkens it from where the leading car is to the right; the cars are the title's
  *    logo cars (title_car_animations, title_logo_car_palettes), larger, in the depth layer after the
  *    shadow's. The engine is sound 21, the one the game plays as a game starts (the ignition key turned);
@@ -25,14 +25,14 @@
 
 #define SCREEN_WIDTH        320
 #define LOGO_PICTURE        2          /* title_pictures' SEGA */
-#define LOGO_SCALE          0x400u     /* four times */
+#define LOGO_SCALE          0x200u     /* twice */
 #define LOGO_X              160
-#define LOGO_Y              144        /* (its bottom: the picture hangs above its place) */
-#define LOGO_WIDTH          256        /* its 64 pixels, four times */
-#define LOGO_HEIGHT         64
+#define LOGO_Y              128        /* (its bottom: the picture hangs above its place) */
+#define LOGO_WIDTH          128        /* its 64 pixels, twice */
+#define LOGO_HEIGHT         32
 #define LOGO_LAYER          0x180u
 #define CAR_LAYER           0x19Fu     /* after the text's (19E), where the shadow is */
-#define CAR_SCALE           0x70u
+#define CAR_SCALE           0x48u
 #define CAR_FRAME           9u         /* the logo cars' frame: from the side */
 #define CAR_SPEED           9          /* pixels a frame (the screen's 30 a second) */
 #define CAR_START_X         (-48)
@@ -47,7 +47,7 @@
 #define AT_FADE_OUT         140
 #define AT_END              156
 
-static const int car_rows[CARS] = { LOGO_Y - 44, LOGO_Y - 24, LOGO_Y - 4 };
+static const int car_rows[CARS] = { LOGO_Y - 22, LOGO_Y - 12, LOGO_Y - 2 };
 
 static struct
 {

@@ -18,6 +18,7 @@
 #include "console_draw.h"
 
 #include "game.h"
+#include "s32/video.h"
 
 #include <stdio.h>
 
@@ -36,6 +37,7 @@
 #define TIME_STAGES         6
 #define TIME_RANGE          5          /* seconds more or less */
 #define SOUND_STOP          0x1Fu      /* the sound program's command: every sound off */
+#define MENU_SONG           0          /* the menu's music, of the radio's songs: Magical Sound Shower */
 #define CONTROLS_Y          38         /* CONTROLS' PLAYER line */
 #define CONTROLS_HEADING_Y  14
 
@@ -48,20 +50,16 @@ enum
 	PAGE_TIME,
 	PAGE_SOUND_TEST,
 	PAGE_VIDEO,
-	PAGE_CONTROLS,
-	PAGE_REVERSE
+	PAGE_CONTROLS
 };
 
 static const char *const menu_items[] = { "ARCADE", "2 PLAYERS", "& KNUCKLES", "OPTIONS", "EXIT" };
-static const char *const deluxe_items[] = { "TIME ATTACK", "FULL", "REVERSE", "BACK" };
+static const char *const deluxe_items[] = { "TIME ATTACK", "FULL", "REVERSE", "CLASSIC", "BACK" };
 static const char *const options_items[] = { "CONTROLS", "DIFFICULTY", "TIME", "VIDEO", "VOLUME", "SOUND TEST",
 	"BACK" };
 static const char *const time_stages[TIME_STAGES] = { "PRE-STAGE", "STAGE 1", "STAGE 2", "STAGE 3", "STAGE 4",
 	"FINAL STAGE" };
 static const char *const pixel_kinds[PIXELS_KINDS] = { "SHARP", "SMOOTH", "BILINEAR", "CRT" };
-/* the goals, as the test mode's BOOKKEEPING names them (stages 15-1E) */
-static const char *const goal_names[] = { "AUSTRALIA", "HONGKONG", "JAPAN", "CHINA", "RUSSIA", "NORTHERN EUROPE",
-	"SWITZERLAND", "ATLANTIC OCEAN", "SPAIN", "KENYA" };
 static const char *const control_names[CONTROLS] = { "STEER LEFT", "STEER RIGHT", "GAS", "BRAKE", "SHIFT UP",
 	"SHIFT DOWN", "MUSIC", "SONG <<", "SONG >>", "START" };
 /* the test mode's GAME DIFFICULTY, from EASY to HARD on its bar of 8 (the fourth, the game's own) */
@@ -71,7 +69,7 @@ static const char *const difficulties[DIFFICULTIES] = { "VERY EASY", "EASIER", "
 #define COUNT(list) ((int)(sizeof(list) / sizeof((list)[0])))
 
 enum { MENU_ARCADE, MENU_TWO_PLAYERS, MENU_DELUXE, MENU_OPTIONS, MENU_EXIT };
-enum { DELUXE_TIME_ATTACK, DELUXE_FULL, DELUXE_REVERSE, DELUXE_BACK };
+enum { DELUXE_TIME_ATTACK, DELUXE_FULL, DELUXE_REVERSE, DELUXE_CLASSIC, DELUXE_BACK };
 enum { OPTIONS_CONTROLS, OPTIONS_DIFFICULTY, OPTIONS_TIME, OPTIONS_VIDEO, OPTIONS_VOLUME, OPTIONS_SOUND_TEST,
 	OPTIONS_BACK };
 enum { VIDEO_WINDOW, VIDEO_FULL_SCREEN, VIDEO_PIXELS, VIDEO_WIDE, VIDEO_TWO_PLAYERS, VIDEO_BACK, VIDEO_ITEMS };
@@ -91,6 +89,7 @@ static struct
 	int controls_waiting;   /* CONTROLS: the control waiting for its key or button, or -1 */
 	bool controls_defaults; /* CONTROLS: DEFAULTS picked, for the port */
 	int reverse_goal;       /* REVERSE: the goal picked (0-9) */
+	bool music;             /* the menu's song asked for */
 } menu = { .controls_waiting = -1 };
 
 console_window console_window_settings = { 2, false, PIXELS_SHARP, false, false, 5, false };
@@ -122,7 +121,9 @@ static void page_heading(const char *heading)
 
 static void darken_page(void)
 {
-	console_shade(0, 0, SCREEN_WIDTH, 224);
+	const int side = console_wide_now() ? S32_VIDEO_WIDE_SIDE : 0;    /* (WIDE: the screen's sides too) */
+
+	console_shade(-side, 0, SCREEN_WIDTH + 2 * side, 224);
 }
 
 /* ---- the attract mode's objects ---- */
@@ -174,7 +175,6 @@ static int lines_of(int page)
 		case PAGE_SOUND_TEST: return 2;
 		case PAGE_VIDEO: return VIDEO_ITEMS;
 		case PAGE_CONTROLS: return 0;    /* (its grid moves its own way: controls_move) */
-		case PAGE_REVERSE: return COUNT(goal_names) + 1;
 		default: return 0;
 	}
 }
@@ -327,6 +327,7 @@ static void sound_test_frame(uint32_t pressed)
 		else
 		{
 			queue_sound(SOUND_STOP);
+			menu.music = false;    /* (the menu's song again) */
 			open_page(PAGE_OPTIONS, menu.options_choice);
 			return;
 		}
@@ -524,32 +525,9 @@ bool console_controls_defaults(void)
 	return picked;
 }
 
-/* REVERSE: the goal it starts from */
-static int reverse_frame(uint32_t pressed)
-{
-	if ((pressed & ACTION_BIT(ACTION_BACK))
-		|| ((pressed & ACTION_BIT(ACTION_ACCEPT)) && menu.choice == COUNT(goal_names)))
-	{
-		open_page(PAGE_DELUXE, DELUXE_REVERSE);
-		return MENU_NOTHING;
-	}
-	if (pressed & (ACTION_BIT(ACTION_ACCEPT) | ACTION_BIT(ACTION_START)))
-	{
-		menu.reverse_goal = menu.choice;
-		open_page(PAGE_NONE, 0);
-		return MENU_REVERSE;
-	}
-	page_heading("REVERSE");
-	for (int goal = 0; goal < COUNT(goal_names); goal++)
-		line(goal, goal_names[goal], NULL);
-	line(COUNT(goal_names), "BACK", NULL);
-	darken_page();
-	return MENU_NOTHING;
-}
-
 int console_menu_reverse_goal(void)
 {
-	return menu.reverse_goal;
+	return menu.reverse_goal = console_route_select_goal();
 }
 
 /* The title's menu and DELUXE: their lines centred under the logo, over a shadow */
@@ -579,7 +557,10 @@ int console_menu_frame(uint32_t mode)
 	if (mode == GAME_MODE_PLAY || mode == GAME_MODE_POWER_ON || mode == GAME_MODE_RESTART)
 	{
 		if (mode == GAME_MODE_PLAY)
+		{
 			menu.page = PAGE_NONE;
+			menu.music = false;    /* (the game's own from its car select on) */
+		}
 		return MENU_NOTHING;
 	}
 
@@ -587,17 +568,31 @@ int console_menu_frame(uint32_t mode)
 	if (menu.page == PAGE_NONE)
 	{
 		if ((++menu.blink & 16) == 0)
-			centred(PROMPT_Y, 2, CHOSEN_COLOUR, "PRESS START");
+			centred(PROMPT_Y, 1, CHOSEN_COLOUR, "PRESS START");
 		if (pressed & (ACTION_BIT(ACTION_START) | ACTION_BIT(ACTION_ACCEPT)))
 		{
 			open_page(PAGE_MENU, MENU_ARCADE);
 			if (mode != GAME_MODE_TITLE)
 				return MENU_TITLE;
+			queue_sound(PICK_SOUND);
 		}
 		return MENU_NOTHING;
 	}
 	if (mode != GAME_MODE_TITLE)
 		return MENU_NOTHING;    /* (the title coming back from another mode: the menu stays open) */
+
+	/* the menu's song while it is open, and a sound for each line changed or picked (SOUND TEST's ACCEPT
+	   plays its own) */
+	if (!menu.music)
+	{
+		menu.music = true;
+		queue_sound((uint8_t)(radio_songs[MENU_SONG] >> 24));
+	}
+	if (pressed & (ACTION_BIT(ACTION_UP) | ACTION_BIT(ACTION_DOWN) | ACTION_BIT(ACTION_LEFT) | ACTION_BIT(ACTION_RIGHT)))
+		queue_sound(MOVE_SOUND);
+	else if ((pressed & (ACTION_BIT(ACTION_ACCEPT) | ACTION_BIT(ACTION_START) | ACTION_BIT(ACTION_BACK)))
+		&& !(menu.page == PAGE_SOUND_TEST && menu.choice == 0))
+		queue_sound(PICK_SOUND);
 
 	if (menu.page == PAGE_CONTROLS && menu.controls_waiting >= 0)
 	{
@@ -620,6 +615,8 @@ int console_menu_frame(uint32_t mode)
 			if (pressed & ACTION_BIT(ACTION_BACK))
 			{
 				open_page(PAGE_NONE, 0);
+				fade_out_music();
+				menu.music = false;
 				return MENU_NOTHING;
 			}
 			if (pressed & (ACTION_BIT(ACTION_ACCEPT) | ACTION_BIT(ACTION_START)))
@@ -656,10 +653,20 @@ int console_menu_frame(uint32_t mode)
 				open_page(PAGE_NONE, 0);
 				return MENU_TIME_ATTACK;
 			}
+			if ((pressed & (ACTION_BIT(ACTION_ACCEPT) | ACTION_BIT(ACTION_START))) && menu.choice == DELUXE_FULL)
+			{
+				open_page(PAGE_NONE, 0);
+				return MENU_FULL;
+			}
+			if ((pressed & (ACTION_BIT(ACTION_ACCEPT) | ACTION_BIT(ACTION_START))) && menu.choice == DELUXE_CLASSIC)
+			{
+				open_page(PAGE_NONE, 0);
+				return MENU_CLASSIC;
+			}
 			if ((pressed & (ACTION_BIT(ACTION_ACCEPT) | ACTION_BIT(ACTION_START))) && menu.choice == DELUXE_REVERSE)
 			{
-				open_page(PAGE_REVERSE, menu.reverse_goal);
-				return title_opening() ? MENU_NOTHING : MENU_TITLE;
+				console_route_select_start(menu.reverse_goal);
+				return MENU_ROUTE_SELECT;    /* (& KNUCKLES open again when it comes back) */
 			}
 			list_frame(deluxe_items, COUNT(deluxe_items));
 			return MENU_NOTHING;
@@ -667,10 +674,8 @@ int console_menu_frame(uint32_t mode)
 			break;
 	}
 
-	/* OPTIONS and its pages, and REVERSE's goals, over the title's opening */
+	/* OPTIONS and its pages, over the title's opening */
 	hold_title(true);
-	if (menu.page == PAGE_REVERSE)
-		return reverse_frame(pressed);
 	if (pressed & ACTION_BIT(ACTION_BACK))
 	{
 		if (menu.page == PAGE_OPTIONS)

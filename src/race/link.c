@@ -1220,7 +1220,7 @@ void race_entries_update(void)
    player and by order (checkpoint_orders, checkpoint_order, checkpoint_times_by_player,
    checkpoint_times); the first car past a fork decides the route: forks_decided + 1, its branch in
    route_branches and the stage it leads to in route_stages. */
-void race_progress_update(void)
+void CONSOLE_ORIGINAL(race_progress_update)(void)
 {
 	uint8_t branch = 0, host_pass_count = 0, pass_branch = 0, pass_count = 0, place = 0, player = 0;
 	uint16_t order = 0, pass_time = 0;

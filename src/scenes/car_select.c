@@ -1615,7 +1615,7 @@ void car_gears_caption_show(void)
 /* The car select's message once the choices are made, by state: 0 sets up WAITING FOR CHALLENGERS! JUST
    A MOMENT PLEASE (animation 28B); 1 drawn 20 frames (timer); 2 hidden 10; once the entry time is over
    (car_select entry_over) JUST A MOMENT PLEASE (animation 28D) instead: 3 drawn 20 frames, 4 hidden 10. */
-void waiting_banner_show(void)
+void CONSOLE_ORIGINAL(waiting_banner_show)(void)
 {
 	uint32_t animation = 0;
 	uint8_t timer = 0, timer_2 = 0;

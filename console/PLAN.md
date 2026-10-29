@@ -81,8 +81,9 @@ merged here; this repository adds console/, the ports and their documents.
    - DELUXE, the modes of our own:
      - TIME ATTACK: a course or a route against the clock, best times kept.
      - FULL: every course, level by level: the pre-stage, then the 2 of the first level, the 4 of the
-       second, the 6, the 8 and the 10 goals, 31 in all (stage 0 to 1E, the map's order). Where the next
-       course is a branch of the fork, the road takes it; where it is not, the race cuts to its start.
+       second, the 6, the 8 and the 10 goals, 31 in all (stage 0 to 1E, the map's order), in one race:
+       whichever branch the player takes at a fork leads to the next course, and the goals fork to the
+       next one as well, as REVERSE's do, but the last.
      - REVERSE: the route from the hardest stages to the easiest. The goal it starts at is picked as
        SegaSonic's STAGE SELECT picks a level: on the route map (the game's own, its world map and its
        routes), each goal a marker, and the route shown from the top down, from the goal to the
@@ -128,7 +129,17 @@ merged here; this repository adds console/, the ports and their documents.
   Prompts Pixel drawn by the window, controls.ini), DIFFICULTY by name, TIME by stage, VIDEO, VOLUME, SOUND
   TEST. DIFFICULTY and TIME reach the races at once (console_settings_to_race) and the EEPROM.
 - 2 PLAYERS: both seats in one race, the window's two screens side by side or one over the other.
-- PIXELS: sharp, smooth, bilinear, CRT.
+- PIXELS: sharp, smooth, bilinear, CRT. WIDE.
+- & KNUCKLES (DELUXE's name, Sebas): TIME ATTACK with the fastest run's ghost, see-through, while it is on
+  the player's route (ghost.c); REVERSE from the goal picked, its start line in the pre-stage's colours
+  (the video's extra palette) and its finish where the pre-stage's fork was; FULL, the 31 courses in one
+  race, its total time at the goal (routes.c); REVERSE's goal picked on the route map of the race's end,
+  whole, its ten goals, a car driving to the one picked (route_select.c); CLASSIC, the arcade's game as it
+  is (WAITING FOR CHALLENGERS, the right seat's START joins, its screen shown).
+- The menu's song (Magical Sound Shower) and sounds (the name entry's letters); one player with no
+  WAITING FOR CHALLENGERS (waiting_banner_show); WIDE on every screen; the pause in a race (Escape, Enter,
+  a game controller's Start): the frame in grey, PAUSE, CONTINUE and QUIT GAME in the game's letters (the
+  video's overlay of sprites).
 
 ## Order
 

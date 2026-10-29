@@ -1,4 +1,4 @@
-# & KNUCKLES > REVERSE from AUSTRALIA (with reverse_controls.txt: car select, the gas down)
+# & KNUCKLES > REVERSE from AUSTRALIA, the first goal on the route map (with reverse_controls.txt: car select, the gas down)
 600 start
 660 down
 680 down

@@ -283,6 +283,15 @@ static int pixels_kind(void)
 #endif
 }
 
+#ifdef ORUNNERS_CONSOLE
+/* ---- the pause ---- */
+
+static bool pause_requested;
+static bool pause_shown;            /* the window shows pause_pixels, not the game's frame */
+static uint32_t pause_pixels[2][S32_VIDEO_MAX_WIDTH * S32_VIDEO_HEIGHT];
+static int pause_widths[2];
+#endif
+
 /* The picture (its part 'source' of 'texture') in the window, as large as it fits with its proportions */
 static void present(SDL_Rect source)
 {
@@ -462,13 +471,13 @@ static const uint32_t *with_controls(const uint32_t *pixels)
 }
 #endif
 
-static void on_frame_shown(void)
+/* The frames drawn into the window */
+static void show_screens(void)
 {
 	SDL_Rect source = { 0, 0, 0, 0 };
 	const int shown = screens_shown();
 	const bool stacked = screens_stacked();
 
-	s32_video_draw_frame();
 	/* each screen into the texture: the left one at its top left, the right one beside it or under it; with
 	   WIDE a frame of 416 pixels loses 9 at each side, one of 320 sits between black bars */
 	for (int screen = 0; screen < shown; screen++)
@@ -476,6 +485,13 @@ static void on_frame_shown(void)
 		static uint32_t bars[S32_VIDEO_MAX_WIDTH * S32_VIDEO_HEIGHT];    /* (black) */
 		int width = 0;
 		const uint32_t *pixels = s32_video_frame(screen, &width);
+#ifdef ORUNNERS_CONSOLE
+		if (pause_shown)
+		{
+			pixels = pause_pixels[screen];    /* (the pause's picture) */
+			width = pause_widths[screen];
+		}
+#endif
 #ifdef ORUNNERS_CONSOLE
 		const int cell = screen_width();
 #else
@@ -507,6 +523,12 @@ static void on_frame_shown(void)
 		source.h = stacked ? source.h + S32_VIDEO_HEIGHT : S32_VIDEO_HEIGHT;
 	}
 	present(source);
+}
+
+static void on_frame_shown(void)
+{
+	s32_video_draw_frame();
+	show_screens();
 }
 
 static void toggle_full_screen(void)
@@ -613,7 +635,10 @@ static void apply_window_settings(void)
 }
 
 /* The menus' actions: the arrows, Enter (START too), Escape or Backspace; each game controller's pad or
-   left stick, A, B and Start */
+   left stick, A, B and Start. PAUSE_BIT, with them: what pauses a race and goes on from the pause (Escape,
+   Enter, a game controller's Start; not B, the brake) */
+#define PAUSE_BIT (1u << 31)
+
 static uint32_t actions_held;
 static bool actions_taken;    /* a key or button just bound on CONTROLS: it is no action this frame */
 
@@ -633,6 +658,8 @@ static uint32_t read_actions(const Uint8 *keys)
 		held |= ACTION_BIT(ACTION_ACCEPT) | ACTION_BIT(ACTION_START);
 	if (keys[SDL_SCANCODE_ESCAPE] || keys[SDL_SCANCODE_BACKSPACE])
 		held |= ACTION_BIT(ACTION_BACK);
+	if (keys[SDL_SCANCODE_ESCAPE] || keys[SDL_SCANCODE_RETURN] || keys[SDL_SCANCODE_KP_ENTER])
+		held |= PAUSE_BIT;
 	for (int player = 0; player < PLAYERS; player++)
 	{
 		SDL_GameController *pad = controllers[player];
@@ -655,7 +682,7 @@ static uint32_t read_actions(const Uint8 *keys)
 		if (SDL_GameControllerGetButton(pad, SDL_CONTROLLER_BUTTON_B))
 			held |= ACTION_BIT(ACTION_BACK);
 		if (SDL_GameControllerGetButton(pad, SDL_CONTROLLER_BUTTON_START))
-			held |= ACTION_BIT(ACTION_START);
+			held |= ACTION_BIT(ACTION_START) | PAUSE_BIT;
 	}
 	return held;
 }
@@ -793,8 +820,10 @@ static void on_controls_update(void)
 
 		s32_video_set_wide(console_wide_now());    /* (before VBLANK's sprites and the frame) */
 
-		if (!actions_taken)
-			console_actions(held & ~actions_held);
+		if (console_can_pause() && (held & ~actions_held & PAUSE_BIT))
+			pause_requested = true;    /* (run_pause, once the frame is done) */
+		else if (!actions_taken)
+			console_actions(held & ~actions_held & ~PAUSE_BIT);
 		actions_taken = false;
 		actions_held = held;
 		if (console_controls_defaults())
@@ -892,10 +921,12 @@ static void on_controls_update(void)
 		if (player >= screens_shown())
 		{
 			shift_up[player] = shift_down[player] = music[player] = previous[player] = next[player] = false;
-			start[player] = false;
+			start[player] = start[player] && player == 1 && console_right_seat_joins();    /* (CLASSIC's challenger) */
 			wheels[player] = WHEEL_CENTRE;
 			gases[player] = brakes[player] = 0;
 		}
+		if (console_can_pause())
+			start[player] = false;    /* (in a race START pauses) */
 	}
 #endif
 	/* each player's 315-5296 (chip 0 player 1, chip 1 player 2); its ports are active low: a cleared bit
@@ -922,6 +953,87 @@ static void on_controls_update(void)
 }
 
 /* ---- the frame ---- */
+
+#ifdef ORUNNERS_CONSOLE
+/* The pause's picture: the frame it stopped at in grey, PAUSE and its lines in colour over it in the game's
+   letters (console_pause_sprites). The frame is drawn again as the board stands, then with the words' sprites
+   over it (s32_video_overlay_sprites): the pixels that change are the words' */
+static void make_pause_picture(const uint32_t frozen[2][S32_VIDEO_MAX_WIDTH * S32_VIDEO_HEIGHT], int choice)
+{
+	static uint8_t list[0x1000];
+	static uint32_t plain[2][S32_VIDEO_MAX_WIDTH * S32_VIDEO_HEIGHT];
+	const size_t size = console_pause_sprites(list, sizeof(list), choice);
+	int width;
+
+	s32_video_draw_frame();
+	for (int screen = 0; screen < 2; screen++)
+		memcpy(plain[screen], s32_video_frame(screen, &width), sizeof(plain[screen]));
+	s32_video_overlay_sprites(list, size);
+	s32_video_draw_frame();
+	for (int screen = 0; screen < 2; screen++)
+	{
+		const uint32_t *with_words = s32_video_frame(screen, &width);
+
+		for (size_t index = 0; index < S32_VIDEO_MAX_WIDTH * S32_VIDEO_HEIGHT; index++)
+		{
+			const uint32_t colour = frozen[screen][index];
+			const uint32_t level = ((((colour >> 16) & 0xFF) * 77 + ((colour >> 8) & 0xFF) * 150 + (colour & 0xFF) * 29)
+				>> 8) * 3 / 5;
+
+			pause_pixels[screen][index] = with_words[index] != plain[screen][index] ? with_words[index]
+				: 0xFF000000u | (level << 16) | (level << 8) | level;
+		}
+	}
+	s32_video_overlay_end();
+}
+
+/* The game stopped, its sound too, the picture in grey under PAUSE: Escape, Enter or a game controller's
+   Start goes on, as CONTINUE does; QUIT GAME ends the games being played (console_quit_game) */
+static void run_pause(void)
+{
+	static uint32_t frozen[2][S32_VIDEO_MAX_WIDTH * S32_VIDEO_HEIGHT];
+	uint32_t held = actions_held;
+	int choice = CONSOLE_PAUSE_CONTINUE;
+
+	pause_requested = false;
+	if (audio)
+		SDL_PauseAudioDevice(audio, 1);
+	for (int screen = 0; screen < 2; screen++)
+		memcpy(frozen[screen], s32_video_frame(screen, &pause_widths[screen]), sizeof(frozen[screen]));
+	make_pause_picture(frozen, choice);
+	pause_shown = true;
+	show_screens();
+	for (;;)
+	{
+		uint32_t now, pressed;
+
+		read_events();    /* (closing the window ends the game there: program_stop) */
+		now = read_actions(SDL_GetKeyboardState(NULL));
+		pressed = now & ~held;
+		held = now;
+		if (pressed & (ACTION_BIT(ACTION_UP) | ACTION_BIT(ACTION_DOWN)))
+		{
+			choice = choice == CONSOLE_PAUSE_CONTINUE ? CONSOLE_PAUSE_QUIT : CONSOLE_PAUSE_CONTINUE;
+			make_pause_picture(frozen, choice);
+		}
+		if (pressed & ACTION_BIT(ACTION_ACCEPT))
+		{
+			if (choice == CONSOLE_PAUSE_QUIT)
+				console_quit_game();
+			break;
+		}
+		if (pressed & (PAUSE_BIT | ACTION_BIT(ACTION_BACK)))
+			break;
+		show_screens();    /* (the line chosen, a window resized or put full screen meanwhile) */
+		SDL_Delay(16);
+	}
+	pause_shown = false;
+	actions_held = held;    /* (the key let go in the race is no action) */
+	if (audio)
+		SDL_PauseAudioDevice(audio, 0);
+	next_frame = SDL_GetPerformanceCounter();
+}
+#endif
 
 static void wait_for_frame(void)
 {
@@ -986,6 +1098,10 @@ static void on_frame_done(void)
 		save_eeprom();
 		save_backup_ram();
 	}
+#ifdef ORUNNERS_CONSOLE
+	if (pause_requested)
+		run_pause();
+#endif
 	if (!fast)
 		wait_for_frame();
 }

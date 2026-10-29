@@ -51,7 +51,8 @@
 #define USAGE "Usage: orunners_headless [--frames N] [--hashes FILE] [--script FILE] [--dump-frame N --dump-dir DIR]" \
 	" [--video-hashes FILE] [--video-dump N ... --video-dir DIR] [--sound-hashes FILE]" \
 	" [--sprite-census FILE] [--tile-census FILE] [--memory-census FILE] [--assets FOLDER] [--sound-wav FILE]" \
-	" (orunners_console_headless: [--actions FILE] [--wide] [--jingle PROGRAM LAYER TRANSPOSE])\n"
+	" (orunners_console_headless: [--actions FILE] [--wide] [--autopilot] [--ghost-folder DIR]" \
+	" [--pause-dump N] [--jingle PROGRAM LAYER TRANSPOSE])\n"
 #define MAX_VIDEO_DUMPS 64
 #define CENSUS_SLOTS (1u << 22)     /* open addressing for the censuses' hashes */
 #define TILE_CENSUS_EVERY 30        /* the tilemaps are looked at every this many frames */
@@ -65,6 +66,9 @@ static FILE *video_hashes;
 static uint64_t video_dumps[MAX_VIDEO_DUMPS];
 static int video_dump_count;
 static const char *video_dir;
+#ifdef ORUNNERS_CONSOLE
+static uint64_t pause_dump_frame;    /* --pause-dump: the frame drawn with the pause's words over it */
+#endif
 static FILE *sound_hashes;
 static FILE *sound_wav;            /* --sound-wav: the mix the window plays, 16-bit stereo */
 static uint32_t sound_wav_bytes;
@@ -264,6 +268,20 @@ static void on_frame_done(void)
 			snprintf(path, sizeof(path), "%s/frame_%" PRIu64 ".bmp", video_dir, video_dumps[index]);
 			write_bmp(path);
 		}
+#ifdef ORUNNERS_CONSOLE
+	if (pause_dump_frame && pause_dump_frame == program_frames() - 1 && video_dir)
+	{
+		/* the window's pause, its words in the game's letters over the frame as the board stands */
+		static uint8_t list[0x1000];
+		char path[1024];
+
+		s32_video_overlay_sprites(list, console_pause_sprites(list, sizeof(list), CONSOLE_PAUSE_QUIT));
+		s32_video_draw_frame();
+		snprintf(path, sizeof(path), "%s/pause_%" PRIu64 ".bmp", video_dir, pause_dump_frame);
+		write_bmp(path);
+		s32_video_overlay_end();
+	}
+#endif
 	if (program_frames() >= frames_wanted)
 		program_stop();
 }
@@ -418,6 +436,8 @@ int main(int argc, char **argv)
 			console_window_settings.wide = true;    /* (OPTIONS > VIDEO > WIDE) */
 		else if (strcmp(argv[index], "--autopilot") == 0)
 			autopilot = true;
+		else if (strcmp(argv[index], "--pause-dump") == 0 && index + 1 < argc)
+			pause_dump_frame = strtoull(argv[++index], NULL, 10);
 		else if (strcmp(argv[index], "--ghost-folder") == 0 && index + 1 < argc)
 			console_ghost_folder(argv[++index]);    /* (TIME ATTACK's ghosts: the current folder else) */
 		else if (strcmp(argv[index], "--actions") == 0 && index + 1 < argc)

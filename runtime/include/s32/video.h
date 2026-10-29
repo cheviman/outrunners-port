@@ -86,6 +86,13 @@ void s32_video_extra_colour(int screen, uint32_t index, uint16_t colour);
    and half the colour of what is under it */
 #define S32_SPRITE_GHOST 0x8000
 
+/* A port's own sprites over the frame shown (the console's pause, in the game's letters): 'list' is entries
+   as sprite RAM holds them (16 bytes each, 16-bit words in its order, an end command last), drawn over the
+   game's in the sprites shown, for s32_video_draw_frame to mix; s32_video_overlay_end puts the game's back
+   as they were */
+void s32_video_overlay_sprites(const uint8_t *list, size_t size);
+void s32_video_overlay_end(void);
+
 /* For tools that look at what the sprites are drawn with (the asset extractor's census): called for every
    sprite the list draws, before it is drawn, with the screen it goes to, its graphics' place in the sprite
    ROM (32-bit words, bank << 20 | offset), its size in words and rows, whether it is 8 bits a pen, whether it
