@@ -1,0 +1,9 @@
+# & KNUCKLES > REVERSE from AUSTRALIA (with reverse_controls.txt: car select, the gas down)
+600 start
+660 down
+680 down
+700 accept
+760 down
+780 down
+800 accept
+900 accept

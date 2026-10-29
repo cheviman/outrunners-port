@@ -31,7 +31,8 @@ enum
 	MENU_NOTHING,
 	MENU_START_ONE,     /* a game of one player (ARCADE) */
 	MENU_START_TWO,     /* a game of both seats (2 PLAYERS) */
-	MENU_TIME_ATTACK,   /* a game of one player without the time limit (DELUXE > TIME ATTACK) */
+	MENU_TIME_ATTACK,   /* a game of one player without the time limit (& KNUCKLES > TIME ATTACK) */
+	MENU_REVERSE,       /* a game of one player from a goal back to the start (& KNUCKLES > REVERSE) */
 	MENU_TITLE          /* the title from its start (game mode 1) */
 };
 
@@ -61,6 +62,15 @@ bool console_presentation_frame(uint32_t pressed);
 void console_jingle_start(void);
 void console_jingle_frame(void);
 void console_jingle_stop(void);    /* (its notes off at once: the scene skipped or over) */
+
+/* REVERSE (reverse.c): started from the goal picked (0-9: Australia to Kenya), running, and its part of the
+   left seat's frame before the game mode's code */
+void console_reverse_start(int goal);
+bool console_reverse_running(void);
+void console_reverse_frame(uint32_t mode);
+
+/* The goal REVERSE starts from (menu.c's pick, 0-9) */
+int console_menu_reverse_goal(void);
 
 /* DIFFICULTY and TIME, as OPTIONS leaves them, into the race records (console.c) */
 void console_settings_to_race(void);

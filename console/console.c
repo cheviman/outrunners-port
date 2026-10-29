@@ -174,6 +174,7 @@ uint32_t check_game_start(uint32_t mode, uint32_t seat_credits)
 		else
 			console.time_attack = false;
 	}
+	console_reverse_frame(mode);
 	if (console.two_players && mode != GAME_MODE_PLAY && SCREEN(SCREEN_2)->game_mode != GAME_MODE_PLAY
 		&& SCREEN(SCREEN_2)->game_mode != GAME_MODE_ENTRY_INVITATION && !console.join_right)
 		console.two_players = false;    /* (the race of both is over) */
@@ -187,6 +188,9 @@ uint32_t check_game_start(uint32_t mode, uint32_t seat_credits)
 			return press_start(mode, seat_credits);
 		case MENU_TIME_ATTACK:
 			console.time_attack = true;
+			return press_start(mode, seat_credits);
+		case MENU_REVERSE:
+			console_reverse_start(console_menu_reverse_goal());
 			return press_start(mode, seat_credits);
 		case MENU_TITLE:
 			AS32(SCREEN(screen)->game_mode) = GAME_MODE_RESTART;
@@ -239,6 +243,15 @@ bool console_wide_now(void)
 bool console_both_screens(void)
 {
 	return console.two_players;
+}
+
+int console_test_autopilot(void)
+{
+	/* the wheel back toward the middle of the road, by the left seat's place across it (race road_x) */
+	const int across = (int16_t)RACE(RACE_1)->road_x;
+	const int wheel = 0x80 - across / 6;
+
+	return wheel < 0x10 ? 0x10 : (wheel > 0xF0 ? 0xF0 : wheel);
 }
 
 void console_actions(uint32_t pressed)

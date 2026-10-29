@@ -4,7 +4,7 @@
  *                 reaches (game/assets.h)
  *    Version:     0.1.0
  *    Created:     27-10-2026
- *    Modified:    27-10-2026
+ *    Modified:    29-10-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
@@ -914,6 +914,8 @@ static uint32_t folded(uint32_t address)
 	return address;
 }
 
+const uint8_t *(*data_elsewhere)(uint32_t address);
+
 const uint8_t *data_at(uint32_t address)
 {
 	const uint32_t place = address & 0xffffff;
@@ -923,6 +925,8 @@ const uint8_t *data_at(uint32_t address)
 	{
 		if ((place & 0xf00000) == 0x200000)
 			return ram(address);
+		if (data_elsewhere && (found = data_elsewhere(place)) != NULL)
+			return found;
 		data_outside(address);
 	}
 	if (!(found = find(&program, folded(place))))

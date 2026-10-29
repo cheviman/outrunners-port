@@ -20,7 +20,7 @@
    stage starts at) and its stream; 3 (a fork) waits until the route's next stage is known (screen
    route_stage no longer stage), then goes on with the stream of the branch the car takes (car branch)
    from the fork's table, the same stage_start. */
-void road_object_stream_read(void)
+void CONSOLE_ORIGINAL(road_object_stream_read)(void)
 {
 	uint16_t position = 0;
 	uint32_t built_stage = 0, command_routine = 0, entry = 0, left_caller = 0;

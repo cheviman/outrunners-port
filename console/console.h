@@ -37,6 +37,10 @@ enum
 
 void console_actions(uint32_t pressed);
 
+/* For scripted checks (orunners_console_headless --autopilot): the left seat's wheel that keeps its car near
+   the middle of the road */
+int console_test_autopilot(void);
+
 /* True once the menu's EXIT was picked: the port closes the game */
 bool console_quit_requested(void);
 
@@ -106,7 +110,8 @@ extern console_window console_window_settings;
 bool console_wide_now(void);
 
 /* SEGA's jingle: the program of its chords (the sound program's, 0-FF), of the layer an octave under them (-1:
-   none) and the semitones both go up (outrunners.ini: jingle_program, jingle_layer, jingle_transpose) */
+   none) and the semitones both go up, in place of jingle.c's own (orunners_console_headless --jingle, to try
+   others by ear) */
 void console_jingle_program(int program, int layer, int transpose);
 
 #endif

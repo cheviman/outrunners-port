@@ -279,6 +279,7 @@ static struct
 	uint32_t action;
 } actions[MAX_ACTIONS];
 static size_t action_count;
+static bool autopilot;    /* --autopilot: player 1's wheel keeps the car on the road (console_test_autopilot) */
 
 static const char *load_actions(const char *path)
 {
@@ -320,6 +321,8 @@ static void on_controls_update(void)
 		if (actions[index].frame == s32_board.frame)
 			console_actions(actions[index].action);
 	s32_video_set_wide(console_wide_now());
+	if (autopilot)
+		s32_board.input.analog[0] = (uint8_t)console_test_autopilot();    /* (player 1's wheel) */
 #endif
 }
 
@@ -413,6 +416,8 @@ int main(int argc, char **argv)
 		}
 		else if (strcmp(argv[index], "--wide") == 0)
 			console_window_settings.wide = true;    /* (OPTIONS > VIDEO > WIDE) */
+		else if (strcmp(argv[index], "--autopilot") == 0)
+			autopilot = true;
 		else if (strcmp(argv[index], "--actions") == 0 && index + 1 < argc)
 		{
 			const char *problem = load_actions(argv[++index]);

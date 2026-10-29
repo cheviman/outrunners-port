@@ -494,7 +494,7 @@ void stage_indicator_start(void)
 
 /* Draws the stage's name after the label (stage_level_texts by the forks taken, screen
    route_stage_level: PRE-STAGE, 1 to 4, FINAL STAGE) and the label itself. */
-void stage_indicator_draw(void)
+void CONSOLE_ORIGINAL(stage_indicator_draw)(void)
 {
 	uint32_t text = 0;
 

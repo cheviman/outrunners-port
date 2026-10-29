@@ -298,6 +298,7 @@ void road_row_pair_draw(uint32_t rom_offset_and_palette, uint32_t piece_width);
 
 /* objects/backgrounds.c: the backgrounds: their layers and animations, the palette cycles, the sunset, the backdrops */
 void race_background_update(void);
+void CONSOLE_ORIGINAL(race_background_update)(void);
 void race_background_start_lower_animation(void);
 void race_background_lower_animation_wait(void);
 void race_background_lower_animation_cycle(void);
@@ -373,6 +374,7 @@ void road_tiles_change_update(void);
 
 /* objects/scenery.c: the road's objects: the streams that start them along the course, the scenery, the signs, the start gate and flagmen, the goal parades, the fork's branch */
 void road_object_stream_read(void);
+void CONSOLE_ORIGINAL(road_object_stream_read)(void);
 uint32_t road_object_stream_start_object(uint16_t position, uint32_t entry);
 uint32_t road_object_stream_stage_end(void);
 uint32_t road_object_stream_fork(uint32_t branch_streams);
@@ -428,6 +430,7 @@ uint32_t traffic_out_of_view(uint16_t position);
 
 /* race/course.c: the course: its segments built ahead of the car, the road projected for the view */
 void player_car_start_course(void);
+void CONSOLE_ORIGINAL(player_car_start_course)(void);
 void player_car_extend_course(void);
 void player_car_build_segment(uint16_t ring_mask);
 void player_car_project_road(void);
@@ -459,6 +462,7 @@ void lap_timer_update(void);
 void lap_timer_spare_return(void);
 void stage_indicator_start(void);
 void stage_indicator_draw(void);
+void CONSOLE_ORIGINAL(stage_indicator_draw)(void);
 void start_message_update(void);
 void time_left_display_update(void);
 void time_digits_start(void);
@@ -515,6 +519,7 @@ void race_record_clear(void);
 void set_player_ready(void);
 uint32_t players_not_ready(void);
 void course_records_update(void);
+void CONSOLE_ORIGINAL(course_records_update)(void);
 void link_receive_records(void);
 void link_isdn_receive_records(void);
 void link_copy_records_in(uint32_t record_count, uint32_t board_records, uint32_t race_records);
@@ -681,6 +686,7 @@ void kanji_text_viewer_draw_number(uint32_t cell, uint16_t number);
 
 /* scenes/name_entry.c: the name entry after a record: the certificate, the letters' drum, the LCD, the car, the drivers and the course's name */
 uint32_t course_record_beaten(void);
+uint32_t CONSOLE_ORIGINAL(course_record_beaten)(void);
 void name_entry_update(void);
 void name_entry_letter_update(void);
 void name_entry_lcd_update(void);
@@ -705,6 +711,7 @@ void ranking_background_load(void);
 
 /* scenes/route_map.c: the route map after the race: the car, the signs, the landmarks, the legs of the route, the stage results and the GAME OVER banner */
 void route_map_update(void);
+void CONSOLE_ORIGINAL(route_map_update)(void);
 void route_map_car_update(void);
 void route_map_sign_update(void);
 void route_map_landmark_update(void);

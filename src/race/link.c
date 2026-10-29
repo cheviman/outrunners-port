@@ -1489,7 +1489,7 @@ uint32_t players_not_ready(void)
    record (course_records, 6 bytes a course: model, the three letters of the name, the time) replaces it
    with its record_model and record_name (the first letter) and record_name_rest (the other two), also in
    the two copies in the backup (701F32 with its checksum, 011418, and 701FAE). */
-void course_records_update(void)
+void CONSOLE_ORIGINAL(course_records_update)(void)
 {
 	uint16_t finish_time = 0;
 	uint32_t backup_record = 0, ignored = 0, players_left = 0, race = 0, record_offset = 0, seen_serials = 0;

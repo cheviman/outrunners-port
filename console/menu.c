@@ -48,7 +48,8 @@ enum
 	PAGE_TIME,
 	PAGE_SOUND_TEST,
 	PAGE_VIDEO,
-	PAGE_CONTROLS
+	PAGE_CONTROLS,
+	PAGE_REVERSE
 };
 
 static const char *const menu_items[] = { "ARCADE", "2 PLAYERS", "& KNUCKLES", "OPTIONS", "EXIT" };
@@ -58,6 +59,9 @@ static const char *const options_items[] = { "CONTROLS", "DIFFICULTY", "TIME", "
 static const char *const time_stages[TIME_STAGES] = { "PRE-STAGE", "STAGE 1", "STAGE 2", "STAGE 3", "STAGE 4",
 	"FINAL STAGE" };
 static const char *const pixel_kinds[PIXELS_KINDS] = { "SHARP", "SMOOTH", "BILINEAR", "CRT" };
+/* the goals, as the test mode's BOOKKEEPING names them (stages 15-1E) */
+static const char *const goal_names[] = { "AUSTRALIA", "HONGKONG", "JAPAN", "CHINA", "RUSSIA", "NORTHERN EUROPE",
+	"SWITZERLAND", "ATLANTIC OCEAN", "SPAIN", "KENYA" };
 static const char *const control_names[CONTROLS] = { "STEER LEFT", "STEER RIGHT", "GAS", "BRAKE", "SHIFT UP",
 	"SHIFT DOWN", "MUSIC", "SONG <<", "SONG >>", "START" };
 /* the test mode's GAME DIFFICULTY, from EASY to HARD on its bar of 8 (the fourth, the game's own) */
@@ -86,6 +90,7 @@ static struct
 	int controls_player;    /* CONTROLS: whose */
 	int controls_waiting;   /* CONTROLS: the control waiting for its key or button, or -1 */
 	bool controls_defaults; /* CONTROLS: DEFAULTS picked, for the port */
+	int reverse_goal;       /* REVERSE: the goal picked (0-9) */
 } menu = { .controls_waiting = -1 };
 
 console_window console_window_settings = { 2, false, PIXELS_SHARP, false, false, 5, false };
@@ -169,6 +174,7 @@ static int lines_of(int page)
 		case PAGE_SOUND_TEST: return 2;
 		case PAGE_VIDEO: return VIDEO_ITEMS;
 		case PAGE_CONTROLS: return 0;    /* (its grid moves its own way: controls_move) */
+		case PAGE_REVERSE: return COUNT(goal_names) + 1;
 		default: return 0;
 	}
 }
@@ -518,6 +524,34 @@ bool console_controls_defaults(void)
 	return picked;
 }
 
+/* REVERSE: the goal it starts from */
+static int reverse_frame(uint32_t pressed)
+{
+	if ((pressed & ACTION_BIT(ACTION_BACK))
+		|| ((pressed & ACTION_BIT(ACTION_ACCEPT)) && menu.choice == COUNT(goal_names)))
+	{
+		open_page(PAGE_DELUXE, DELUXE_REVERSE);
+		return MENU_NOTHING;
+	}
+	if (pressed & (ACTION_BIT(ACTION_ACCEPT) | ACTION_BIT(ACTION_START)))
+	{
+		menu.reverse_goal = menu.choice;
+		open_page(PAGE_NONE, 0);
+		return MENU_REVERSE;
+	}
+	page_heading("REVERSE");
+	for (int goal = 0; goal < COUNT(goal_names); goal++)
+		line(goal, goal_names[goal], NULL);
+	line(COUNT(goal_names), "BACK", NULL);
+	darken_page();
+	return MENU_NOTHING;
+}
+
+int console_menu_reverse_goal(void)
+{
+	return menu.reverse_goal;
+}
+
 /* The title's menu and DELUXE: their lines centred under the logo, over a shadow */
 static void list_frame(const char *const *items, int count)
 {
@@ -622,14 +656,21 @@ int console_menu_frame(uint32_t mode)
 				open_page(PAGE_NONE, 0);
 				return MENU_TIME_ATTACK;
 			}
+			if ((pressed & (ACTION_BIT(ACTION_ACCEPT) | ACTION_BIT(ACTION_START))) && menu.choice == DELUXE_REVERSE)
+			{
+				open_page(PAGE_REVERSE, menu.reverse_goal);
+				return title_opening() ? MENU_NOTHING : MENU_TITLE;
+			}
 			list_frame(deluxe_items, COUNT(deluxe_items));
 			return MENU_NOTHING;
 		default:
 			break;
 	}
 
-	/* OPTIONS and its pages, over the title's opening */
+	/* OPTIONS and its pages, and REVERSE's goals, over the title's opening */
 	hold_title(true);
+	if (menu.page == PAGE_REVERSE)
+		return reverse_frame(pressed);
 	if (pressed & ACTION_BIT(ACTION_BACK))
 	{
 		if (menu.page == PAGE_OPTIONS)

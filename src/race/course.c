@@ -14,7 +14,7 @@
 /* Starts the race's course (stage_courses by screen first_stage, car course): clears the ring of
    segments, the first road width, and builds the segments as far as the view reaches (screen
    draw_distance >> 7, prebuilt_segments); the first stage into the stage history. */
-void player_car_start_course(void)
+void CONSOLE_ORIGINAL(player_car_start_course)(void)
 {
 	uint16_t ring_mask = 0, width_code = 0;
 	uint32_t course = 0;

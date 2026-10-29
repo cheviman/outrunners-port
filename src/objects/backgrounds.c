@@ -30,7 +30,7 @@
    quarter of it, all of it during a change) less A0, y by the slope (the car's road_pitch) and screen
    horizon_line, kept between 0 and 180 less the road's top line (screen road_top_line; also into screen
    background_scroll_y). */
-void race_background_update(void)
+void CONSOLE_ORIGINAL(race_background_update)(void)
 {
 	uint32_t zero = 0;
 	uint8_t background_2 = 0, branch = 0, first_stage_2 = 0;

@@ -12,11 +12,12 @@
  *    messages waiting at E759; 0x700100, 0x700758 and 0x700759 from the V70) on its 13 parts, which all play
  *    from power-on: the sequence players append messages as this does (the bytes, the write index, then the
  *    count), and the sound program takes one a pass of its main loop. The jingle uses channels B and C (parts
- *    9 and 10, the effects', whose volume the music's fades leave alone), B for the chords and C an octave
- *    under them, as SegaSonic's; their programs (an FM one on C that would be silent, a sample of another
- *    page on B) become program 15, the chords sample of Splash Wave in the fixed part of the sample ROM,
- *    and are put back once their notes are off (a program change first would leave the notes hanging:
- *    release_note_screen_1 goes by the part's program).
+ *    9 and 10, the effects', whose volume the music's fades leave alone): B for the chords and, if a layer
+ *    is asked for (console_jingle_program), C an octave under them, as SegaSonic's. Their programs (an FM one on C
+ *    that would be silent, a sample of another page on B) become the jingle's: by default program 2, a
+ *    lead of Magical Sound Shower, an octave up (Sebas picked it by ear of four), and are put back once
+ *    their notes are off (a program change first would leave the notes hanging: release_note_screen_1
+ *    goes by the part's program).
  */
 #include "console_internal.h"
 
@@ -30,7 +31,7 @@
 #define CHANNEL_LAYER       0x0Cu        /* an octave under */
 #define PART_PROGRAM_B      0x70035Du    /* part 9's program (channel B) */
 #define PART_PROGRAM_C      0x700367u    /* part 10's (channel C) */
-#define JINGLE_PROGRAM      0x15u        /* Splash Wave's chords: in every sound set */
+#define JINGLE_PROGRAM      0x02u        /* Magical Sound Shower's lead (sample page 2, the window's at power-on) */
 #define CHORD_NOTES         3
 #define AT_SECOND_CHORD     18           /* frames of the left seat's, 30 a second: 0.6 seconds */
 #define AT_END              54           /* 1.8 seconds */

@@ -40,7 +40,7 @@
    for each leg (stage + 1, at most 6), DJ message 38, 90 frames; 18 DJ message 39 once the DJ is quiet
    (screen dj_mouth_shapes); 19 when the 90 frames are over sets the game's next step (screen game_mode
    byte 2 = 0x10 (step 16)) and starts 0046BB; 20 nothing. */
-void route_map_update(void)
+void CONSOLE_ORIGINAL(route_map_update)(void)
 {
 	uint8_t dj_message = 0, landmark_index = 0, leg_number = 0;
 	uint32_t background_setup = 0, branch_road_length = 0, colour_block = 0, landmarks_left = 0, leg_distance = 0, legs_left = 0, lengths_place = 0, object = 0, route_branches = 0, route_map_registers = 0, setup_base = 0, stage_length = 0, stage_lengths = 0;

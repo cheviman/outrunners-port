@@ -257,6 +257,9 @@ GAME_NORETURN void unknown_code(uint32_t address);    /* a jump or call to an ad
 /* Code the program does not have, at addresses a port's console build gives its own (its objects' handlers):
    call_code runs it there, true once run; NULL elsewhere */
 extern bool (*call_code_elsewhere)(uint32_t address);
+/* Data the program does not have, at addresses a port's console build gives its own (its courses and road
+   object streams): data_at reads it there, the place's bytes or NULL; NULL elsewhere */
+extern const uint8_t *(*data_elsewhere)(uint32_t address);
 /* the default of a switch on a jump table's index: the original checks nothing, and an index past the table
    would jump to 'address', which no case handles */
 GAME_NORETURN void invalid_jump(uint32_t address);

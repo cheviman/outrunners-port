@@ -15,7 +15,7 @@
    (race_copy finished), the course (the goal's stage, screen built_stage, less 15) into record_course,
    and a record when the player came first (screen 320 + player is 0) in a time (screen 410 + 2 * player)
    under the course's (course_record_times by course). */
-uint32_t course_record_beaten(void)
+uint32_t CONSOLE_ORIGINAL(course_record_beaten)(void)
 {
 	uint32_t zero = 0;
 	uint32_t course_number = 0, player = 0;

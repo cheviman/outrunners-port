@@ -534,7 +534,6 @@ static char settings_path[1024];
 static int window_width, window_height;    /* the picture the window was last sized for */
 
 static const char *const pixel_names[PIXELS_KINDS] = { "sharp", "smooth", "bilinear", "crt" };
-static int jingle_program = 0x15, jingle_layer = -1, jingle_transpose = 12;    /* (SEGA's jingle: jingle.c) */
 
 static void save_window_settings(void)
 {
@@ -546,10 +545,9 @@ static void save_window_settings(void)
 	output = fopen(settings_path, "w");
 	if (!output)
 		return;
-	fprintf(output, "window_scale=%d\nfull_screen=%d\npixels=%s\nwide=%d\ntwo_players=%s\nvolume=%d\n"
-		"jingle_program=0x%02X\njingle_layer=%d\njingle_transpose=%d\n",
+	fprintf(output, "window_scale=%d\nfull_screen=%d\npixels=%s\nwide=%d\ntwo_players=%s\nvolume=%d\n",
 		settings->window_scale, settings->full_screen, pixel_names[settings->pixels], settings->wide,
-		settings->vertical ? "vertical" : "horizontal", settings->volume, jingle_program, jingle_layer, jingle_transpose);
+		settings->vertical ? "vertical" : "horizontal", settings->volume);
 	fclose(output);
 }
 
@@ -580,15 +578,8 @@ static void load_window_settings(void)
 		}
 		else if (sscanf(line, "two_players=%31s", text) == 1)
 			settings->vertical = strcmp(text, "vertical") == 0;
-		else if (sscanf(line, "jingle_program=%i", &number) == 1)
-			jingle_program = number;
-		else if (sscanf(line, "jingle_layer=%i", &number) == 1)
-			jingle_layer = number;
-		else if (sscanf(line, "jingle_transpose=%i", &number) == 1)
-			jingle_transpose = number;
 	}
 	fclose(input);
-	console_jingle_program(jingle_program, jingle_layer, jingle_transpose);
 }
 
 /* The window as the settings say: full screen or not, and out of it the picture times window_scale (the

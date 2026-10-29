@@ -7,3 +7,10 @@ check_game_start         # the console's menus, and the games they start
 coin_prompt_message_update  # TURN THE IGNITION KEY / INSERT COIN(S): none, PRESS START is the console's
 ignition_key_prompt_update  # the ignition key's picture: none either
 network_check_stand_alone   # alone without NETWORK CHECK and its 128 frames: the SEGA presentation first
+player_car_start_course     # REVERSE: the race's course its own, from the goal picked
+road_object_stream_read     # REVERSE: the goal stage's roadside objects to a fork in place of its goal
+race_background_update      # REVERSE: each stage's own background at the forks
+route_map_update            # REVERSE: no route map (it draws the forward route)
+course_record_beaten        # REVERSE: no course record (by goal; REVERSE finishes at the start)
+course_records_update       # (the same)
+stage_indicator_draw        # REVERSE: the STAGE label by the stage's own level
