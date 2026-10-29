@@ -1,0 +1,125 @@
+# The console build: what it will change, and in what order
+
+The port builds two games from the same decompiled program, as segasonic-port does:
+
+- **OutRunners Arcade**: the decompiled game as it is, the same frame by frame as the reference (both
+  cabinet screens side by side, coins, the test mode).
+- **OutRunners**: the console version, the arcade game made for playing at home. The game's functions
+  `console/replaced.txt` lists get the console's own versions (`console/*.c`, `ORUNNERS_CONSOLE`); their
+  definitions in `src/` are written as `CONSOLE_ORIGINAL(name)`, which is `original_name` in the console
+  build and the game's own name in the arcade one, so the arcade build runs the same program.
+
+What changes the decompilation (src/, symbols.txt, tools/, runtime/) is done in outrunners-decomp and
+merged here; this repository adds console/, the ports and their documents.
+
+## What the game has to build on
+
+- **Two seats, two screens.** Seat 1 is the left screen (screen block 208000, I/O chip 1, the window's
+  left picture, the keyboard's player); seat 2 the right one (218000). Each runs its own frames, at 30 a
+  second, swapping tasks every VBLANK; they share video RAM (seat 1 draws on NBG0 and NBG2, seat 2 on NBG1
+  and NBG3) and the text layer. Both screens are 320 x 224 (video control bit 15 clear).
+- **A one player game** takes the seat whose start is pressed; the other screen waits for challengers
+  (game mode 7, link.c) for the entry time, then goes back to the title. **Two players** on one cabinet:
+  the second start in the entry time joins the same race (race_entries_update); the first car past a fork
+  takes everyone that way.
+- **Sound**: each seat's requests go to their own command byte and their own copy of the MIDI handler;
+  seat 1's notes are panned to the left speaker only, seat 2's to the right (pans 7 and 9, nothing on the
+  other side). The two seats share the MultiPCM's 24 voices: a hidden seat that plays can take voices from
+  the one shown.
+- **Coins**: with free play (coin setting 26, `free_play` FF) coins are not counted and every seat's
+  prompt is TURN THE IGNITION KEY with its key; the credit line says FREE PLAY. There is no PRESS START.
+- **No debug mode**, used or unused. What there is: the test mode's settings (below); `flip_screen` (in
+  the EEPROM, no test mode item); the staff credits code in the car presentation (shift down twice, up
+  twice, left, right, left, right, brake, gas); unused, a kanji text viewer on the bitmap layer, a timing
+  counter on the text layer, and the FBI and EPA notices unpacked at boot and never shown.
+- **The test mode's settings**: GAME ASSIGNMENTS: difficulty 1-8 (the traffic), time difficulty -5..+5
+  seconds by stage (PRE-STAGE, STAGE 1-4, FINAL STAGE; the program reads them one stage early and never
+  the last), steering wheel reaction (the wheel's motor), advertise sound; COIN ASSIGNMENTS; NETWORK
+  ASSIGNMENTS: stand alone, master or slave, cabinet 0-3, ISDN; volume (the six analog controls' range);
+  SOUND (the 122 sounds); BOOKKEEPING; BACKUP DATA CLEAR.
+- **Pictures**: the title (two scrolling tilemaps, the logo, its oval board, SEGA and (C) SEGA 1992 as
+  sprites); the ranking's course panoramas across both screens; the route map's world map (two zoomable
+  tilemaps); the car presentation's checked backdrop; car select's frames and turntable; the name entry's
+  certificate; the WELCOME OUTRUNNERS letter. Nothing shows at boot but the cabinet's LCD (SEGA
+  Enterprises).
+- **The map**: 31 stages (0 the pre-stage, then levels of 2, 4, 6 and 8 stages, then the ten goals 15-1E,
+  Australia to Kenya); each fork has two branches, by the side of the road (fork_next_stages). Everything
+  that loads a stage reads the screen's first_stage: the demo races already start on any stage, a game
+  always on 0 (the checkpoint count, the goal test, the route map and the start time assume it).
+- **The link**: up to four cabinets (cabinet 0-3, master and slaves), 8 players, through the link board
+  (EPR-15033); the board model has it with no other cabinet on the line (runtime/src/machine.c, MAME's
+  simulation).
+
+## The guidelines (Sebas, 29-10-2026)
+
+1. **The build.** console/ and console/replaced.txt; the core's decompiler (arcade-decomp) writes
+   CONSOLE_ORIGINAL for a game's console list beside BOARD_ORIGINAL for the board's (nothing changes where
+   a game has no list); `OutRunners` and `OutRunners Arcade` (windows, .apps), a headless console build
+   for scripted checks with `--actions` (the console's actions, for screenshots and checks); an icon of our
+   own (tools/make_icon.py), nothing of the game's in the executables. As SegaSonic NSP and SegaSonic APK
+   do, the Switch's and Android's makers take a picture of the player's own as the icon (icon.jpg beside
+   them, 256 x 256): Sebas's is the arcade flyer's art, which stays out of the repository (Sega's).
+2. **One screen.** The console shows seat 1's screen, the left one, and not the right one, whose task
+   still runs (the program runs both seats). 2 PLAYERS shows both, side by side or one over the other (an
+   option: HORIZONTAL, VERTICAL).
+3. **One sound.** Both speakers get what is heard (the mix of the chips' outputs, runtime/src/sound_chips.c,
+   after the hashes): in one player games the seat shown, in 2 PLAYERS both; the hidden seat kept silent at
+   its source, so that it takes no voices.
+4. **No coins.** Free play always, ARCADE too: no INSERT COIN and no credit line; the ignition key prompt
+   stays, as the game's own start prompt.
+5. **The SEGA presentation.** Before the title, a screen of its own: the title's SEGA (the sprite
+   `title/title_pictures` row `sega_logo`, 64 x 16, 4 bits), large with the board's sprite zoom, its
+   letters dark; cars race across it, as the title's logo cars race across the logo, and the letters
+   light up as they pass, with the sound of an engine starting; then SEGA's jingle, and the title. The
+   ROM has no recorded SEGA: the jingle is SegaSonic's, two chords of our own (E flat major, then C major;
+   0.6 and 1.2 seconds) through the sound program's own MIDI queue. Nor has it an engine start of its own:
+   it comes from what the game has (sound 21 as a game starts, the engines, the cars going by), to be
+   heard and chosen.
+6. **The title's menu**, over the title (the logo and the palm beach), where INSERT COIN was:
+   - ARCADE: the arcade game, one player, free play.
+   - 2 PLAYERS: both seats, head to head (the game's own two player race), the second screen shown.
+   - DELUXE, the modes of our own:
+     - TIME ATTACK: a course or a route against the clock, best times kept.
+     - FULL: every course, level by level: the pre-stage, then the 2 of the first level, the 4 of the
+       second, the 6, the 8 and the 10 goals, 31 in all (stage 0 to 1E, the map's order). Where the next
+       course is a branch of the fork, the road takes it; where it is not, the race cuts to its start.
+     - REVERSE: the route from the hardest stages to the easiest. The goal it starts at is picked as
+       SegaSonic's STAGE SELECT picks a level: on the route map (the game's own, its world map and its
+       routes), each goal a marker, and the route shown from the top down, from the goal to the
+       pre-stage; each fork leads back a level (first_stage for the start). The courses run as they
+       are, not mirrored.
+   - OPTIONS (Sebas):
+     - CONTROLS: the buttons: each action's keys and game controller buttons, with Kenney's icons, kept
+       in a file.
+     - DIFFICULTY: the test mode's 1-8 (the traffic).
+     - TIME: the test mode's seconds by stage (-5..+5: PRE-STAGE, STAGE 1-4, FINAL STAGE).
+     - SOUND TEST: the game's sounds and songs.
+     - VIDEO: WINDOW, FULL SCREEN, PIXELS, WIDE, the 2 PLAYERS layout.
+     - VOLUME, as SegaSonic's.
+     - BACK.
+   - EXIT.
+   OPTIONS over the title's opening: the palm beach in the dusk, dark, with the cars going by. DELUXE's
+   pages over the ranking's course panoramas or the route map's world map.
+7. **Video.** PIXELS as in SegaSonic: sharp, smooth (sharp bilinear), plain bilinear, and CRT (scanlines,
+   a phosphor mask, a little vignette). WIDE: a 16:9 picture as SegaSonic's: the board's 416 pixel mode,
+   the game drawing 48 more pixels at each side (the road, the tilemaps, the sprites the game leaves out
+   past the edges).
+8. **Kenney** (CC0): the letters of the window's own messages (Kenney Mini, as SegaSonic's
+   ports/sdl2/font) and the controls' icons (Input Prompts Pixel, ports/sdl2/prompts) in CONTROLS.
+9. **The ports**: the same as SegaSonic's: Windows, Linux and macOS from the CI with a package each; the
+   Nintendo Switch (an .nsp made on the player's computer by OutRunners NSP), Android (an APK made by
+   OutRunners APK, touch controls) and Anbernic's H700 handhelds. Of the devices, only the Switch has
+   2 PLAYERS, side by side only; WIDE on the Switch and Android, not on Anbernic's handhelds (4:3).
+10. **Network**: up to 8 players, each on a device of their own: the game's own link of four cabinets.
+
+## Order
+
+1. The build: CONSOLE_ORIGINAL in the core, console/, the two executables, the headless console build.
+2. One screen, one sound, no coins.
+3. The SEGA presentation and the title's menu (ARCADE, 2 PLAYERS, OPTIONS, EXIT; DELUXE's place).
+4. OPTIONS: the test mode's settings, VIDEO with PIXELS, CONTROLS with Kenney's icons, VOLUME, SOUND TEST.
+5. 2 PLAYERS with its two layouts.
+6. DELUXE: TIME ATTACK, FULL, REVERSE.
+7. WIDE.
+8. The CI's packages, the Switch, Android and Anbernic.
+9. The network.
