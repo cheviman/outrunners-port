@@ -12,9 +12,9 @@
  *    The scene is the console's own game mode on the left seat's screen (console.c): its objects are the
  *    game's, with handlers of the console's (console_code), drawn by the game's own draw_object. The SEGA is
  *    the title's (title_pictures' third: the sprite title/title_pictures, row sega_logo) at twice its
- *    size; a shadow (draw.c) darkens it from where the leading car is to the right; the cars are the title's
- *    logo cars (title_car_animations, title_logo_car_palettes), larger, in the depth layer after the
- *    shadow's. The engine is sound 21, the one the game plays as a game starts (the ignition key turned);
+ *    size; a black rectangle (console_black, draw.c) hides it from where the leading car is to the right;
+ *    the cars are the title's logo cars (title_car_animations, title_logo_car_palettes), in the depth layer
+ *    after the rectangle's. The engine is sound 21, the one the game plays as a game starts (the ignition key turned);
  *    the voice is the test mode's sound 107 (sound 58 of sound set A, which the sound program is put on for it
  *    and back on its own, set 0, after it).
  */
@@ -29,10 +29,11 @@
 #define LOGO_SCALE          0x200u     /* twice */
 #define LOGO_X              160
 #define LOGO_Y              128        /* (its bottom: the picture hangs above its place) */
-#define LOGO_WIDTH          128        /* its 64 pixels, twice */
-#define LOGO_HEIGHT         32
+#define LOGO_WIDTH          138        /* its pixels, twice: 69 x 24 with its edges, over its place */
+#define LOGO_HEIGHT         48
+#define DARK_MARGIN         4          /* the black over the part not lit, past the logo's edges */
 #define LOGO_LAYER          0x180u
-#define CAR_LAYER           0x19Fu     /* after the text's (19E), where the shadow is */
+#define CAR_LAYER           0x19Fu     /* after the text's (19E), where the black is */
 #define CAR_SCALE           0x48u
 #define CAR_FRAME           9u         /* the logo cars' frame: from the side */
 #define CAR_SPEED           9          /* pixels a frame (the screen's 30 a second) */
@@ -51,7 +52,7 @@
 #define AT_FADE_OUT         140
 #define AT_END              156
 
-static const int car_rows[CARS] = { LOGO_Y - 22, LOGO_Y - 12, LOGO_Y - 2 };
+static const int car_rows[CARS] = { LOGO_Y - 32, LOGO_Y - 18, LOGO_Y - 4 };
 
 static struct
 {
@@ -62,7 +63,7 @@ static struct
 
 /* ---- the objects' code (console_code) ---- */
 
-/* The SEGA: the title's picture, scaled up and centred; the shadow over its dark part */
+/* The SEGA: the title's picture, scaled up and centred; black over its part not lit yet */
 void presentation_logo_update(void)
 {
 	if (OBJECT(current_object)->state == 0u)
@@ -81,7 +82,8 @@ void presentation_logo_update(void)
 	}
 	draw_object(0u);
 	if (scene.lit_to < SCREEN_WIDTH)
-		console_shade(scene.lit_to, LOGO_Y - LOGO_HEIGHT - 8, SCREEN_WIDTH - scene.lit_to, LOGO_HEIGHT + 16);
+		console_black(scene.lit_to, LOGO_Y - LOGO_HEIGHT - DARK_MARGIN, SCREEN_WIDTH - scene.lit_to,
+			LOGO_HEIGHT + 2 * DARK_MARGIN);
 }
 
 /* A car racing across the SEGA from the left (index: its row, and its start a few frames after the one
@@ -151,7 +153,7 @@ bool console_presentation_frame(uint32_t pressed)
 		queue_palette(title_palette);
 		SCREEN(screen)->fade_kind = 1u;
 		SCREEN(screen)->flags |= 1u;
-		scene.lit_to = (SCREEN_WIDTH - LOGO_WIDTH) / 2;
+		scene.lit_to = (SCREEN_WIDTH - LOGO_WIDTH) / 2 - DARK_MARGIN;
 		start(CONSOLE_CODE_PRESENTATION_LOGO, 0u);
 		for (uint8_t car = 0; car < CARS; car++)
 			start(CONSOLE_CODE_PRESENTATION_CAR, car);

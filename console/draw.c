@@ -17,6 +17,7 @@
 #include "console_draw.h"
 
 #include "game.h"
+#include "s32/video.h"
 
 #include <string.h>
 
@@ -59,27 +60,44 @@ static void link_group(uint32_t first, uint32_t end)
 	SCREEN(screen)->sprite_groups++;
 }
 
-void console_shade(int x, int y, int width, int height)
+/* One pen of graphics stretched over the rectangle, through a table of its own (the two entries after it)
+   whose colours are never see-through: a shadow darkens what is under it, else the pen's colour (the
+   table's, 0) covers it, from the extra palette (where it is black) */
+static void put_rectangle(int x, int y, int width, int height, bool shadow)
 {
-	/* one pen of graphics stretched over the rectangle, through a table of its own (the two entries after
-	   it) whose colours are never see-through: every pixel of it darkens what is under it */
 	const uint32_t first = SCREEN(screen)->sprite_list_last + 0x10u;
 	const uint32_t size = text_sprite_size | ((uint32_t)SCREEN(screen)->sprite_screen_bit << 16);
 	uint16_t words[8] = { 0 };
 
 	if (width <= 0 || height <= 0 || SCREEN(screen)->sprite_list_limit <= first + 0x30u)
 		return;
-	words[0] = 0x3B0Au;    /* indirect (13), its table inline (12), a shadow (11), opaque (8), by its top left */
+	words[0] = shadow ? 0x3B0Au : 0x330Au;    /* indirect (13), its table inline (12), a shadow (11), opaque (8),
+	                                             by its top left */
 	words[1] = 0x0102u;    /* one row of one word */
 	words[2] = (uint16_t)(height & SIZE_BITS);
 	words[3] = (uint16_t)(((uint16_t)(size >> 16) & ~SIZE_BITS) | (uint16_t)(width & SIZE_BITS));
 	words[4] = (uint16_t)y;
 	words[5] = (uint16_t)x;
+	if (!shadow)
+	{
+		words[1] |= S32_SPRITE_EXTRA_PALETTE;
+		s32_video_extra_colour(SCREEN(screen)->index, 0u, 0x0000u);
+	}
 	put_entry(first, words);
 	words[0] = words[1] = words[2] = words[3] = words[4] = words[5] = 0u;
 	put_entry(first + 0x10u, words);
 	put_entry(first + 0x20u, words);
 	link_group(first, first + 0x30u);
+}
+
+void console_shade(int x, int y, int width, int height)
+{
+	put_rectangle(x, y, width, height, true);
+}
+
+void console_black(int x, int y, int width, int height)
+{
+	put_rectangle(x, y, width, height, false);
 }
 
 void console_text(int x, int y, int scale, uint16_t colour, const char *text)

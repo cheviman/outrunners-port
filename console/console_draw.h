@@ -24,4 +24,8 @@ int console_text_width(const char *text, int scale);
    first in the list) */
 void console_shade(int x, int y, int width, int height);
 
+/* Likewise, a rectangle that hides what is under it: black (its pen the palette's first colour, the
+   screen's backdrop where nothing is drawn) */
+void console_black(int x, int y, int width, int height);
+
 #endif
