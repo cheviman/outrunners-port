@@ -52,7 +52,7 @@
 	" [--video-hashes FILE] [--video-dump N ... --video-dir DIR] [--sound-hashes FILE]" \
 	" [--sprite-census FILE] [--tile-census FILE] [--memory-census FILE] [--assets FOLDER] [--sound-wav FILE]" \
 	" (orunners_console_headless: [--actions FILE] [--wide] [--autopilot] [--ghost-folder DIR]" \
-	" [--pause-dump N] [--jingle PROGRAM LAYER TRANSPOSE])\n"
+	" [--pause-dump N])\n"
 #define MAX_VIDEO_DUMPS 64
 #define CENSUS_SLOTS (1u << 22)     /* open addressing for the censuses' hashes */
 #define TILE_CENSUS_EVERY 30        /* the tilemaps are looked at every this many frames */
@@ -423,15 +423,6 @@ int main(int argc, char **argv)
 		else if (strcmp(argv[index], "--assets") == 0 && index + 1 < argc)
 			assets_path = argv[++index];
 #ifdef ORUNNERS_CONSOLE
-		else if (strcmp(argv[index], "--jingle") == 0 && index + 3 < argc)
-		{
-			/* the jingle's program, layer (-1: none) and transpose, as outrunners.ini's */
-			const int program = (int)strtol(argv[index + 1], NULL, 0);
-			const int layer = (int)strtol(argv[index + 2], NULL, 0);
-
-			console_jingle_program(program, layer, (int)strtol(argv[index + 3], NULL, 0));
-			index += 3;
-		}
 		else if (strcmp(argv[index], "--wide") == 0)
 			console_window_settings.wide = true;    /* (OPTIONS > VIDEO > WIDE) */
 		else if (strcmp(argv[index], "--autopilot") == 0)

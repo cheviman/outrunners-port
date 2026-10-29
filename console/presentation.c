@@ -2,7 +2,7 @@
  *    Name:        presentation.c
  *    Description: the console's SEGA presentation, before the title at power-on: the title's SEGA large on
  *                 black, its letters dark until cars race across them and light them up, the engine
- *                 starting and SEGA's jingle
+ *                 starting, then the game's own voice of SEGA's
  *    Version:     0.1.0
  *    Created:     29-10-2026
  *    Modified:    29-10-2026
@@ -15,7 +15,8 @@
  *    size; a shadow (draw.c) darkens it from where the leading car is to the right; the cars are the title's
  *    logo cars (title_car_animations, title_logo_car_palettes), larger, in the depth layer after the
  *    shadow's. The engine is sound 21, the one the game plays as a game starts (the ignition key turned);
- *    the jingle is SegaSonic's two chords (jingle.c).
+ *    the voice is the test mode's sound 107 (sound 58 of sound set A, which the sound program is put on for it
+ *    and back on its own, set 0, after it).
  */
 #include "console.h"
 #include "console_internal.h"
@@ -39,11 +40,14 @@
 #define CAR_END_X           380
 #define CARS                3
 #define ENGINE_SOUND        0x21u      /* the game starting: the ignition key turned */
+#define VOICE_SET           0xDAu      /* sound set A, the voice's */
+#define VOICE_SOUND         0x58u      /* the test mode's sound 107 */
+#define FIRST_SET           0xD0u      /* the sound program's own, set 0 (init_parts) */
 
 /* The scene's frames, at the screen's 30 a second */
 #define AT_ENGINE           12
 #define AT_CARS             30         /* the first car leaves (the others 5 frames apart) */
-#define AT_JINGLE           82         /* every letter lit */
+#define AT_VOICE            66         /* every letter lit, the engine's roar over */
 #define AT_FADE_OUT         140
 #define AT_END              156
 
@@ -156,21 +160,21 @@ bool console_presentation_frame(uint32_t pressed)
 		scene.frame = AT_FADE_OUT;    /* (skipped: the fade out at once) */
 	if (scene.frame == AT_ENGINE)
 		queue_sound(ENGINE_SOUND);
-	if (scene.frame == AT_JINGLE)
+	if (scene.frame == AT_VOICE)
 	{
 		scene.lit_to = SCREEN_WIDTH;
-		console_jingle_start();
+		queue_sound(VOICE_SET);
+		queue_sound(VOICE_SOUND);
 	}
 	if (scene.frame == AT_FADE_OUT)
 	{
 		SCREEN(screen)->fade_kind = 0u;
 		SCREEN(screen)->flags |= 1u;
 	}
-	console_jingle_frame();
 	if (++scene.frame >= AT_END && (SCREEN(screen)->flags & 1u) == 0u)
 	{
 		scene.done = true;
-		console_jingle_stop();
+		queue_sound(FIRST_SET);    /* (the game's sounds from set 0, as at power-on) */
 		clear_objects();
 		return false;
 	}

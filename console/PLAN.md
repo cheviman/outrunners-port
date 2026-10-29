@@ -70,11 +70,9 @@ merged here; this repository adds console/, the ports and their documents.
 5. **The SEGA presentation.** Before the title, a screen of its own: the title's SEGA (the sprite
    `title/title_pictures` row `sega_logo`, 64 x 16, 4 bits), large with the board's sprite zoom, its
    letters dark; cars race across it, as the title's logo cars race across the logo, and the letters
-   light up as they pass, with the sound of an engine starting; then SEGA's jingle, and the title. The
-   ROM has no recorded SEGA: the jingle is SegaSonic's, two chords of our own (E flat major, then C major;
-   0.6 and 1.2 seconds) through the sound program's own MIDI queue. Nor has it an engine start of its own:
-   it comes from what the game has (sound 21 as a game starts, the engines, the cars going by), to be
-   heard and chosen.
+   light up as they pass, with the sound of an engine starting (sound 21, as a game starts); then, once
+   its roar is over, the game's own voice of SEGA's (the test mode's sound 107: sound 58 of sound set A,
+   the sound program back on its set 0 after it), and the title.
 6. **The title's menu**, over the title (the logo and the palm beach), where INSERT COIN was:
    - ARCADE: the arcade game, one player, free play.
    - 2 PLAYERS: both seats, head to head (the game's own two player race), the second screen shown.

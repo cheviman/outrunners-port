@@ -130,11 +130,6 @@ extern console_window console_window_settings;
    black bars */
 bool console_wide_now(void);
 
-/* SEGA's jingle: the program of its chords (the sound program's, 0-FF), of the layer an octave under them (-1:
-   none) and the semitones both go up, in place of jingle.c's own (orunners_console_headless --jingle, to try
-   others by ear) */
-void console_jingle_program(int program, int layer, int transpose);
-
 /* The folder TIME ATTACK keeps its ghosts in (ghost_0.bin to ghost_9.bin, a goal each), with its separator */
 void console_ghost_folder(const char *folder);
 

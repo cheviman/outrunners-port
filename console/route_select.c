@@ -192,13 +192,13 @@ int console_route_select_frame(uint32_t pressed)
 	}
 	if (pressed & (ACTION_BIT(ACTION_START) | ACTION_BIT(ACTION_ACCEPT)))
 	{
-		queue_sound(PICK_SOUND);
+		queue_sound(MENU_SOUND);
 		pick.running = false;
 		return ROUTE_SELECT_START;
 	}
 	if (pressed & ACTION_BIT(ACTION_BACK))
 	{
-		queue_sound(PICK_SOUND);
+		queue_sound(MENU_SOUND);
 		pick.running = false;
 		return ROUTE_SELECT_BACK;
 	}
@@ -210,7 +210,7 @@ int console_route_select_frame(uint32_t pressed)
 		choice = goal_at(1 - side, rank);
 	if (choice != pick.goal)
 	{
-		queue_sound(MOVE_SOUND);
+		queue_sound(MENU_SOUND);
 		pick.goal = choice;
 		pick.from_x = pick.car_x;
 		pick.from_y = pick.car_y;

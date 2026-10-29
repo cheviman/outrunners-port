@@ -59,9 +59,8 @@ extern console_state console;
 #define CONSOLE_CODE_GHOST              0xFE0003u    /* TIME ATTACK's ghost's objects (ghost.c) */
 #define CONSOLE_CODE_ROUTE_CAR          0xFE0004u    /* the car on REVERSE's route map (route_select.c) */
 
-/* The menus' sounds (the name entry's letters): a line or a value changed, a line picked or BACK */
-#define MOVE_SOUND          0x2Cu
-#define PICK_SOUND          0x2Du
+/* The menus' sound, a line changed or picked: the test mode's sound 57 */
+#define MENU_SOUND          0x4Eu
 
 void presentation_logo_update(void);
 void presentation_car_update(void);
@@ -77,10 +76,6 @@ void console_ghost_frame(void);
    true while it lasts (the game mode's code waits), false once it is over */
 bool console_presentation_frame(uint32_t pressed);
 
-/* SEGA's jingle (jingle.c): started, then stepped once a frame of the left seat's */
-void console_jingle_start(void);
-void console_jingle_frame(void);
-void console_jingle_stop(void);    /* (its notes off at once: the scene skipped or over) */
 
 /* & KNUCKLES' routes (routes.c): REVERSE started from the goal picked (0-9: Australia to Kenya), FULL, and
    their part of the left seat's frame before the game mode's code */

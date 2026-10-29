@@ -37,6 +37,7 @@
 #define TIME_STAGES         6
 #define TIME_RANGE          5          /* seconds more or less */
 #define SOUND_STOP          0x1Fu      /* the sound program's command: every sound off */
+#define FIRST_SOUND_SET     0xD0u      /* the sound program's command: sound set 0, its own (init_parts) */
 #define MENU_SONG           0          /* the menu's music, of the radio's songs: Magical Sound Shower */
 #define CONTROLS_Y          38         /* CONTROLS' PLAYER line */
 #define CONTROLS_HEADING_Y  14
@@ -54,7 +55,7 @@ enum
 };
 
 static const char *const menu_items[] = { "ARCADE", "2 PLAYERS", "& KNUCKLES", "OPTIONS", "EXIT" };
-static const char *const deluxe_items[] = { "TIME ATTACK", "FULL", "REVERSE", "CLASSIC", "BACK" };
+static const char *const deluxe_items[] = { "CLASSIC", "TIME ATTACK", "FULL", "REVERSE", "BACK" };
 static const char *const options_items[] = { "CONTROLS", "DIFFICULTY", "TIME", "VIDEO", "VOLUME", "SOUND TEST",
 	"BACK" };
 static const char *const time_stages[TIME_STAGES] = { "PRE-STAGE", "STAGE 1", "STAGE 2", "STAGE 3", "STAGE 4",
@@ -69,7 +70,7 @@ static const char *const difficulties[DIFFICULTIES] = { "VERY EASY", "EASIER", "
 #define COUNT(list) ((int)(sizeof(list) / sizeof((list)[0])))
 
 enum { MENU_ARCADE, MENU_TWO_PLAYERS, MENU_DELUXE, MENU_OPTIONS, MENU_EXIT };
-enum { DELUXE_TIME_ATTACK, DELUXE_FULL, DELUXE_REVERSE, DELUXE_CLASSIC, DELUXE_BACK };
+enum { DELUXE_CLASSIC, DELUXE_TIME_ATTACK, DELUXE_FULL, DELUXE_REVERSE, DELUXE_BACK };
 enum { OPTIONS_CONTROLS, OPTIONS_DIFFICULTY, OPTIONS_TIME, OPTIONS_VIDEO, OPTIONS_VOLUME, OPTIONS_SOUND_TEST,
 	OPTIONS_BACK };
 enum { VIDEO_WINDOW, VIDEO_FULL_SCREEN, VIDEO_PIXELS, VIDEO_WIDE, VIDEO_TWO_PLAYERS, VIDEO_BACK, VIDEO_ITEMS };
@@ -327,6 +328,7 @@ static void sound_test_frame(uint32_t pressed)
 		else
 		{
 			queue_sound(SOUND_STOP);
+			queue_sound(FIRST_SOUND_SET);    /* (the game's sounds from set 0 again) */
 			menu.music = false;    /* (the menu's song again) */
 			open_page(PAGE_OPTIONS, menu.options_choice);
 			return;
@@ -574,25 +576,24 @@ int console_menu_frame(uint32_t mode)
 			open_page(PAGE_MENU, MENU_ARCADE);
 			if (mode != GAME_MODE_TITLE)
 				return MENU_TITLE;
-			queue_sound(PICK_SOUND);
+			queue_sound(MENU_SOUND);
 		}
 		return MENU_NOTHING;
 	}
 	if (mode != GAME_MODE_TITLE)
 		return MENU_NOTHING;    /* (the title coming back from another mode: the menu stays open) */
 
-	/* the menu's song while it is open, and a sound for each line changed or picked (SOUND TEST's ACCEPT
-	   plays its own) */
+	/* the menu's song while it is open, and a sound for each line changed or picked on the title's menu and
+	   & KNUCKLES (OPTIONS' pages go without: it would never stop) */
 	if (!menu.music)
 	{
 		menu.music = true;
 		queue_sound((uint8_t)(radio_songs[MENU_SONG] >> 24));
 	}
-	if (pressed & (ACTION_BIT(ACTION_UP) | ACTION_BIT(ACTION_DOWN) | ACTION_BIT(ACTION_LEFT) | ACTION_BIT(ACTION_RIGHT)))
-		queue_sound(MOVE_SOUND);
-	else if ((pressed & (ACTION_BIT(ACTION_ACCEPT) | ACTION_BIT(ACTION_START) | ACTION_BIT(ACTION_BACK)))
-		&& !(menu.page == PAGE_SOUND_TEST && menu.choice == 0))
-		queue_sound(PICK_SOUND);
+	if ((menu.page == PAGE_MENU || menu.page == PAGE_DELUXE)
+		&& (pressed & (ACTION_BIT(ACTION_UP) | ACTION_BIT(ACTION_DOWN) | ACTION_BIT(ACTION_ACCEPT)
+			| ACTION_BIT(ACTION_START) | ACTION_BIT(ACTION_BACK))))
+		queue_sound(MENU_SOUND);
 
 	if (menu.page == PAGE_CONTROLS && menu.controls_waiting >= 0)
 	{
