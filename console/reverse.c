@@ -27,6 +27,7 @@
 #include "console_internal.h"
 
 #include "game.h"
+#include "s32/video.h"
 
 #define CONSOLE_DATA        0x900000u    /* REVERSE's courses and streams, for data_at (data_elsewhere) */
 #define CONSOLE_DATA_SIZE   0x8000u
@@ -42,7 +43,7 @@
 #define START_OBJECTS_TO    84           /* the pre-stage's stream: its start line (gate, flagman, balloons) */
 #define LONG_RUN            16384        /* past a finish, as the goal stages' courses go on */
 #define SHARED_RECORDS      0x02D900u    /* the stream records the stages share (fork, checkpoint) from here */
-#define START_LINE_PASSED   200          /* the race's segment past the start line: the stage's own colours */
+#define START_LINE_KINDS    16           /* the start line's objects' records, at most */
 
 enum
 {
@@ -73,7 +74,12 @@ static struct
 	uint8_t parents[STAGES][2];        /* by branch (the same twice for one parent) */
 	int goal;                          /* the picked goal's stage, or 0 */
 	bool running;                      /* the game REVERSE started is on */
-	int start_colours;                 /* the start line's colours: 0 to come, 1 the pre-stage's, 2 the stage's back */
+	struct
+	{
+		uint32_t record;               /* a start line object's record (its parameter) */
+		uint32_t handler;              /* and its own handler */
+	} start_line[START_LINE_KINDS];
+	int start_line_kinds;
 } reverse;
 
 /* ---- the console's data, at CONSOLE_DATA ---- */
@@ -237,6 +243,27 @@ static uint32_t branch_stream(int branch, int shift)
 	return start;
 }
 
+/* One of the pre-stage's start line's objects into a stream, with the console's handler
+   (presentation_start_line_update, which runs the object's own and draws it in the pre-stage's colours); its
+   own handler kept by its record */
+static void put_start_line_object(uint32_t entry)
+{
+	const uint32_t handler = u32_at(entry + 4u), record = u32_at(entry + 8u);
+	int kind;
+
+	for (kind = 0; kind < reverse.start_line_kinds && reverse.start_line[kind].record != record; kind++)
+		;
+	if (kind == reverse.start_line_kinds && kind < START_LINE_KINDS)
+	{
+		reverse.start_line[kind].record = record;
+		reverse.start_line[kind].handler = handler;
+		reverse.start_line_kinds++;
+	}
+	copy(entry, 4);
+	put32(CONSOLE_CODE_START_LINE);
+	put32(record);
+}
+
 /* A goal stage's stream for REVERSE: the pre-stage's start line (its gate and lights, flagman, balloons and
    crowd) among its own objects before its goal's approach, stage 1's fork objects moved to its fork, and the
    fork with stage 1's branch streams moved alike */
@@ -252,7 +279,7 @@ static uint32_t goal_stream(int stage, uint32_t branches[2])
 		/* (the two streams merged by place: the reader takes them in order) */
 		while (s16_at(start_line) < START_OBJECTS_TO && s16_at(start_line) <= s16_at(entry))
 		{
-			copy(start_line, 12);
+			put_start_line_object(start_line);
 			start_line += 12u;
 		}
 		copy(entry, 12);
@@ -390,10 +417,56 @@ bool console_reverse_running(void)
 	return reverse.running;
 }
 
+/* The pre-stage's scene colours (its colour block: its place in palette RAM, its length in bytes, the
+   colours; the upper half of the window in the board's alternate format) into the left screen's extra palette:
+   the start line's gate and stands take theirs from it, the stage's own scenery the board's */
+static void start_line_colours(void)
+{
+	const uint32_t block = scene_palettes[0];
+	const uint32_t place = (uint32_t)(byte_at(block) | byte_at(block + 1u) << 8) / 2u;
+	const uint32_t count = (uint32_t)(byte_at(block + 2u) | byte_at(block + 3u) << 8) / 2u;
+
+	for (uint32_t index = 0; index < count; index++)
+	{
+		const uint32_t entry = place + index;
+		uint16_t colour = (uint16_t)(byte_at(block + 4u + 2u * index) | byte_at(block + 5u + 2u * index) << 8);
+
+		if (entry & 0x4000u)
+		{
+			/* (the alternate format, as the board's palette_write takes it) */
+			const int r = ((colour >> 12) & 0x01) | ((colour << 1) & 0x1e);
+			const int g = ((colour >> 13) & 0x01) | ((colour >> 3) & 0x1e);
+			const int b = ((colour >> 14) & 0x01) | ((colour >> 7) & 0x1e);
+
+			colour = (uint16_t)((colour & 0x8000) | (b << 10) | (g << 5) | r);
+		}
+		s32_video_extra_colour(0, entry, colour);
+	}
+}
+
+/* A start line object of REVERSE's (a goal stage's stream): its own handler, then its sprites (the entries it
+   put in the list) marked for the extra palette, where the pre-stage's colours are */
+void presentation_start_line_update(void)
+{
+	const uint32_t record = OBJECT(current_object)->parameter;
+	const uint32_t first = SCREEN(screen)->sprite_list_last + 0x10u;
+
+	for (int kind = 0; kind < reverse.start_line_kinds; kind++)
+		if (reverse.start_line[kind].record == record)
+		{
+			call_code(reverse.start_line[kind].handler);
+			break;
+		}
+	for (uint32_t sprite = first; sprite <= SCREEN(screen)->sprite_list_last; sprite += 0x10u)
+		if ((SPRITE_WORDS(sprite)[0] >> 14) == 0u)    /* (a sprite, not the group's jump) */
+		{
+			SPRITE_WORDS(sprite)[1] |= S32_SPRITE_EXTRA_PALETTE;
+			SPRITE_WORDS(sprite + 0x3000u)[1] |= S32_SPRITE_EXTRA_PALETTE;
+		}
+}
+
 /* On the left seat's frame, before its game mode's code: the race's first stage the goal picked, before the
-   game loads it (game_mode_play step 5); the start line in the pre-stage's colours (its gate and stands take
-   them from the pre-stage's scene palette, as the game loads one a stage), the stage's own once the car is
-   past it; over with the game */
+   game loads it (game_mode_play step 5), and the start line's colours; over with the game */
 void console_reverse_frame(uint32_t mode)
 {
 	if (!reverse.running)
@@ -408,17 +481,7 @@ void console_reverse_frame(uint32_t mode)
 		SCREEN(screen)->first_stage = (uint8_t)reverse.goal;
 		SCREEN(screen)->route_stage = (uint8_t)reverse.goal;
 		SCREEN(screen)->built_stage = (uint8_t)reverse.goal;
-		reverse.start_colours = 0;
-	}
-	if (SCREEN(screen)->game_step == 23u && reverse.start_colours == 0)
-	{
-		queue_palette(scene_palettes[0]);
-		reverse.start_colours = 1;
-	}
-	if (reverse.start_colours == 1 && RACE(SCREEN(screen)->race)->segment > START_LINE_PASSED)
-	{
-		queue_palette(scene_palettes[reverse.goal]);
-		reverse.start_colours = 2;
+		start_line_colours();
 	}
 }
 

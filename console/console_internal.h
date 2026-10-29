@@ -50,9 +50,11 @@ extern console_state console;
 /* The console's own objects' code, at addresses the program has none at (console_code) */
 #define CONSOLE_CODE_PRESENTATION_LOGO  0xFE0000u
 #define CONSOLE_CODE_PRESENTATION_CAR   0xFE0001u
+#define CONSOLE_CODE_START_LINE         0xFE0002u    /* REVERSE's start line (reverse.c) */
 
 void presentation_logo_update(void);
 void presentation_car_update(void);
+void presentation_start_line_update(void);
 
 /* The SEGA presentation (presentation.c) on the left seat's frame at power-on, with the actions pressed:
    true while it lasts (the game mode's code waits), false once it is over */

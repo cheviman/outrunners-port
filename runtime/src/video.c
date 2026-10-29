@@ -96,6 +96,8 @@ typedef struct mix_layer
 typedef struct sprite_drawing
 {
 	uint16_t *row;
+	uint8_t *extra_row;         /* the extra palette's marks of the row (s32_video_use_extra_palette) */
+	bool extra;                 /* this sprite's pixels take the extra palette */
 	const area *inside;         /* the clip it draws in */
 	const area *outside;        /* the clip it leaves alone, on the rows it covers */
 	bool outside_row;
@@ -119,6 +121,10 @@ static struct
 	bool wide;                              /* s32_video_set_wide */
 	int side;                               /* this frame's: S32_VIDEO_WIDE_SIDE when wide, else 0 */
 	int sprite_side;                        /* the sprite list's: every sprite that much to the right */
+	bool extra_used;                        /* s32_video_use_extra_palette */
+	uint16_t extra_palette[S32_SCREENS][S32_PALETTE_ENTRIES];
+	bool extra_set[S32_SCREENS][S32_PALETTE_ENTRIES];    /* the entries s32_video_extra_colour set */
+	uint8_t extra_pixels[S32_SCREENS][2][HEIGHT][WIDTH];    /* the sprite buffers' pixels that take it */
 	layer layers[LAYERS];                   /* the sprites' entry is unused: they have their own buffers */
 	uint16_t sprites[S32_SCREENS][2][HEIGHT][WIDTH];    /* each screen's frame buffers: one is shown, the
 	                                                       list draws into the other */
@@ -753,7 +759,11 @@ static void put_sprite_pixel(const sprite_drawing *sprite, int x, int pen, int s
 			return;
 	}
 	if (!sprite->shadow)
+	{
 		sprite->row[x] = (uint16_t)pixel;
+		if (sprite->extra_row)
+			sprite->extra_row[x] = sprite->extra;
+	}
 	else
 		sprite->row[x] &= 0x7fff;
 }
@@ -843,6 +853,8 @@ static int draw_sprite(uint32_t entry, int x_offset, int y_offset, const area *i
 
 	sprite.inside = inside;
 	sprite.outside = outside;
+	sprite.extra = video.extra_used && (size & S32_SPRITE_EXTRA_PALETTE) != 0;
+	sprite.extra_row = NULL;
 	sprite.indirect = bit(flags, 13);
 	sprite.shadow = bit(flags, 11) && bit(latched[5], 0);
 	sprite.bits8 = bit(flags, 9);
@@ -933,6 +945,8 @@ static int draw_sprite(uint32_t entry, int x_offset, int y_offset, const area *i
 		if (row >= inside->top && row <= inside->bottom)
 		{
 			sprite.row = video.sprites[screen][video.shown_sprites ^ 1][row];
+			if (video.extra_used)
+				sprite.extra_row = video.extra_pixels[screen][video.shown_sprites ^ 1][row];
 			sprite.outside_row = row >= outside->top && row <= outside->bottom;
 			draw_sprite_row(&sprite, from_ram, bank, address, x, x_end, x_delta, x_zoom, end_pen);
 		}
@@ -1021,6 +1035,8 @@ void s32_video_sprites(bool erase, bool draw)
 
 			for (size_t index = 0; index < (size_t)HEIGHT * WIDTH; index++)
 				shown[index] = 0xffff;
+			if (video.extra_used)
+				memset(video.extra_pixels[screen][video.shown_sprites], 0, sizeof(video.extra_pixels[screen][0]));
 		}
 	if (draw)
 	{
@@ -1236,6 +1252,15 @@ static void mix(int screen, int drawn)
 			const mix_layer *first = top_layer(orders[group], rows, x, sprite_pixel, shadow_mask, sprite_bits,
 				shadow_pen, &pixel, &shadow);
 			uint16_t color = palette_color(screen, first, pixel);
+
+			if (video.extra_used && first->index == LAYER_SPRITES
+				&& video.extra_pixels[screen][video.shown_sprites][sprite_y][sprite_x])
+			{
+				const int index = (first->palette_base + ((pixel >> first->shift) & 0xfff0) + (pixel & 0x0f)) & 0x3fff;
+
+				if (video.extra_set[screen][index])
+					color = video.extra_palette[screen][index];
+			}
 			int red = (color & 0x1f) + offsets[first->offsets][0];
 			int green = ((color >> 5) & 0x1f) + offsets[first->offsets][1];
 			int blue = ((color >> 10) & 0x1f) + offsets[first->offsets][2];
@@ -1364,6 +1389,17 @@ const uint32_t *s32_video_frame(int screen, int *width)
 	if (width)
 		*width = video.visible.right + 1;
 	return &video.frame[screen & 1][0][0];
+}
+
+void s32_video_use_extra_palette(bool used)
+{
+	video.extra_used = used;
+}
+
+void s32_video_extra_colour(int screen, uint32_t index, uint16_t colour)
+{
+	video.extra_palette[screen & 1][index & 0x3fff] = colour;
+	video.extra_set[screen & 1][index & 0x3fff] = true;
 }
 
 void s32_video_set_wide(bool wide)

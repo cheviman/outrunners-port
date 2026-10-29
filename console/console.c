@@ -17,6 +17,7 @@
 #include "console_internal.h"
 
 #include "game.h"
+#include "s32/video.h"
 
 #define COIN_SETTINGS       0x1Au    /* the test mode's COIN/CREDIT SETTING: 26 */
 #define START_BUTTON        0x40u    /* screen buttons_pressed: START */
@@ -213,6 +214,9 @@ static bool console_code(uint32_t address)
 		case CONSOLE_CODE_PRESENTATION_CAR:
 			presentation_car_update();
 			return true;
+		case CONSOLE_CODE_START_LINE:
+			presentation_start_line_update();
+			return true;
 		default:
 			return false;
 	}
@@ -221,6 +225,7 @@ static bool console_code(uint32_t address)
 void console_attach(void)
 {
 	call_code_elsewhere = console_code;
+	s32_video_use_extra_palette(true);    /* (REVERSE's start line) */
 }
 
 /* The steps of game mode 6 (and of the demo's race, game mode 4) from the race's set-up to its fade out

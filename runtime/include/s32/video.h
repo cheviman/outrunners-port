@@ -73,6 +73,14 @@ void s32_video_set_wide(bool wide);
 /* This frame's: S32_VIDEO_WIDE_SIDE with WIDE, else 0 */
 int s32_video_side(void);
 
+/* The extra palette (a port's console build): colours of each screen's beside the board's palette, by the
+   same indexes and in its format (xBBBBBGGGGGRRRRR), for sprites whose second word has
+   S32_SPRITE_EXTRA_PALETTE set (a bit the board does not read): their pixels take the colours set here, and
+   the board's where none is. Off, the default, the bit is let alone as the board does */
+#define S32_SPRITE_EXTRA_PALETTE 0x0080
+void s32_video_use_extra_palette(bool used);
+void s32_video_extra_colour(int screen, uint32_t index, uint16_t colour);
+
 /* For tools that look at what the sprites are drawn with (the asset extractor's census): called for every
    sprite the list draws, before it is drawn, with the screen it goes to, its graphics' place in the sprite
    ROM (32-bit words, bank << 20 | offset), its size in words and rows, whether it is 8 bits a pen, whether it
