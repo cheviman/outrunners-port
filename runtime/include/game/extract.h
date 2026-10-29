@@ -46,6 +46,12 @@ extern const size_t extract_sound_piece_count;
    extract_assets.py writes do. NULL, or what failed, in words for the player */
 const char *game_assets_extract(const char *source, const char *folder);
 
+/* The version of the assets this build of the game reads (a hash of extract_layout.c's pieces): the first
+   run writes it into the folder, in version.txt, and a folder of another one (an update of the game since)
+   is taken out of the ROM set again */
+uint32_t game_assets_version(void);
+#define GAME_ASSETS_VERSION_FILE "version.txt"
+
 #ifdef __cplusplus
 }
 #endif

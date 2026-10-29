@@ -56,6 +56,7 @@
 #include "sound/chips.h"
 #include "game/assets.h"
 #include "first_run.h"
+#include "game/extract.h"
 #ifdef ORUNNERS_CONSOLE
 #include "console.h"
 #include "controls.h"
@@ -1147,6 +1148,23 @@ static char *saves_folder(void)
 
 /* On macOS, the folder the .app is in (the game's base is the .app's Resources folder: where the player sees
    the game is beside the .app); 0 elsewhere */
+/* A folder of assets the first run made for another build of the game (its version.txt; extract_assets.py's
+   have none) */
+static bool assets_of_another_version(const char *folder)
+{
+	char path[1200];
+	unsigned version = 0;
+	FILE *file;
+	bool other;
+
+	snprintf(path, sizeof(path), "%s/" GAME_ASSETS_VERSION_FILE, folder);
+	if ((file = fopen(path, "rb")) == NULL)
+		return false;
+	other = fscanf(file, "%x", &version) != 1 || version != game_assets_version();
+	fclose(file);
+	return other;
+}
+
 static int app_folder(const char *base, char *folder, size_t size)
 {
 #ifdef __APPLE__
@@ -1237,6 +1255,7 @@ int main(int argc, char **argv)
 		const char *found = assets_path;
 		const char *problem;
 		size_t count = 0;
+		bool stale = false;
 
 		places[count++] = base ? base : "";
 		if (app_folder(base, beside_app, sizeof(beside_app)))
@@ -1254,11 +1273,17 @@ int main(int argc, char **argv)
 			{
 				fclose(probe);
 				found = folder;
+				if (assets_of_another_version(folder))
+				{
+					stale = true;    /* (the first run's, before an update: taken out again there) */
+					break;
+				}
 			}
 		}
-		if (!found)
+		if (!found || stale)
 		{
-			snprintf(folder, sizeof(folder), "%sassets", saves ? saves : (base ? base : ""));
+			if (!stale)
+				snprintf(folder, sizeof(folder), "%sassets", saves ? saves : (base ? base : ""));
 			if (!first_run(TITLE, base, saves, folder))
 			{
 				/* (the window closed before a ROM set came) */

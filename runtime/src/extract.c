@@ -577,6 +577,36 @@ static int write_samples(const char *folder)
 
 /* ---- the first run ---- */
 
+static uint32_t fnv_add(uint32_t hash, const void *bytes, size_t size)
+{
+	const uint8_t *byte = bytes;
+
+	for (size_t index = 0; index < size; index++)
+		hash = (hash ^ byte[index]) * 16777619u;
+	return hash;
+}
+
+uint32_t game_assets_version(void)
+{
+	static const struct
+	{
+		const extract_piece *pieces;
+		const size_t *count;
+	} regions[] = { { extract_program_pieces, &extract_program_piece_count }, { extract_sound_pieces, &extract_sound_piece_count } };
+	uint32_t hash = 2166136261u;
+
+	for (size_t region = 0; region < sizeof(regions) / sizeof(regions[0]); region++)
+		for (size_t index = 0; index < *regions[region].count; index++)
+		{
+			const extract_piece *piece = &regions[region].pieces[index];
+
+			hash = fnv_add(hash, &piece->address, sizeof(piece->address));
+			hash = fnv_add(hash, &piece->size, sizeof(piece->size));
+			hash = fnv_add(hash, piece->name, strlen(piece->name) + 1);
+		}
+	return hash;
+}
+
 const char *game_assets_extract(const char *source, const char *folder)
 {
 	static const char *const folders[] = { "tilesets", "sprites", "sound/samples", "sound/data", "data" };
@@ -598,5 +628,12 @@ const char *game_assets_extract(const char *source, const char *folder)
 		|| !write_region(folder, "sound/data", game_sound, GAME_SOUND_SIZE, extract_sound_pieces, extract_sound_piece_count)
 		|| !write_region(folder, "data", game_program, GAME_PROGRAM_SIZE, extract_program_pieces, extract_program_piece_count))
 		return problem;
+	{
+		/* (the folder whole: its version, for a later build of the game to tell) */
+		FILE *version = create(folder, GAME_ASSETS_VERSION_FILE, path);
+
+		if (!version || !finish(version, path, fprintf(version, "%08X\n", (unsigned)game_assets_version()) > 0))
+			return problem;
+	}
 	return NULL;
 }
