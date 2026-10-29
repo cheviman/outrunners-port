@@ -41,6 +41,9 @@
 #define MENU_SONG           0          /* the menu's music, of the radio's songs: Magical Sound Shower */
 #define CONTROLS_Y          38         /* CONTROLS' PLAYER line */
 #define CONTROLS_HEADING_Y  14
+#define SIGNATURE           "@cheviman"    /* the port's author, under the title's (C) SEGA 1992 (Sebas) */
+#define COPYRIGHT_PICTURE   0              /* title_pictures' (C) SEGA 1992 */
+#define SIGNATURE_DROP      6              /* the signature's top, under the picture's middle */
 
 enum
 {
@@ -550,6 +553,19 @@ static void list_frame(const char *const *items, int count)
 
 /* ---- the frame ---- */
 
+/* The port's author under the title's (C) SEGA 1992, while the title shows it */
+static void draw_signature(void)
+{
+	for (uint32_t picture = console_find_object(title_picture_draw_ADDRESS, 0u); picture;
+		picture = console_find_object(title_picture_draw_ADDRESS, picture))
+		if (OBJECT(picture)->title_picture.index == COPYRIGHT_PICTURE && OBJECT(picture)->state != 0u)
+		{
+			console_text((int16_t)OBJECT(picture)->x - console_text_width(SIGNATURE, 1) / 2,
+				(int16_t)OBJECT(picture)->y + SIGNATURE_DROP, 1, ITEM_COLOUR, SIGNATURE);
+			return;
+		}
+}
+
 int console_menu_frame(uint32_t mode)
 {
 	const uint32_t pressed = console.pressed;
@@ -565,6 +581,7 @@ int console_menu_frame(uint32_t mode)
 		}
 		return MENU_NOTHING;
 	}
+	draw_signature();
 
 	/* the attract mode: PRESS START, the menu on the title */
 	if (menu.page == PAGE_NONE)
