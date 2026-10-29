@@ -16,9 +16,7 @@
 
 /* the V70's program space (data/layout.json) */
 const extract_piece extract_program_pieces[] = {
-	{ 0x000000u, 0x1u, "data_000000" },
-	{ 0x000001u, 0x1u, "rom_000001" },
-	{ 0x000002u, 0x4u, "rom_000002" },
+	{ 0x000000u, 0x6u, "data_000000" },
 	{ 0x0000A3u, 0x1u, "data_0000A3" },
 	{ 0x0000A4u, 0x10u, "boot_e00000_bytes" },
 	{ 0x0000B4u, 0x10u, "boot_e80000_bytes" },
@@ -271,8 +269,8 @@ const extract_piece extract_program_pieces[] = {
 	{ 0x00804Au, 0x1062u, "car_crash_physics" },
 	{ 0x0090ACu, 0x120u, "grid_road_place_lists" },
 	{ 0x0091CCu, 0xA0u, "grid_segment_lists" },
-	{ 0x00926Cu, 0x50u, "player_car_steer_animations" },
-	{ 0x0092BCu, 0x44u, "steer_frames_by_steering" },
+	{ 0x00926Cu, 0x10u, "player_car_steer_animations" },
+	{ 0x00927Cu, 0x84u, "steer_frames_by_steering" },
 	{ 0x009300u, 0x10u, "player_car_wheelspin_animations" },
 	{ 0x009310u, 0x100u, "player_car_skid_animations_wheel_high" },
 	{ 0x009410u, 0x100u, "player_car_skid_animations_wheel_low" },

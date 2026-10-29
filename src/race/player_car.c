@@ -281,7 +281,7 @@ void player_car_update(void)
 				set_tyre_noise(tyre_noise);
 				if (CAR(player_car)->speed != 0u)
 				{
-					segment_record = ((screen + 0x2000u) & ~0xFFFFu) | (uint16_t)(screen + 0x2000u + CAR(player_car)->segment_offset);
+					segment_record = PAGE_ADD(screen + 0x2000u, CAR(player_car)->segment_offset);
 					player_car_drive(&segment_record, &road_x, &segment_fraction, &segment_length);
 					CAR(player_car)->wheel_effect_1 = 2u;
 					CAR(player_car)->wheel_effect_2 = 2u;
@@ -307,7 +307,7 @@ void player_car_update(void)
 				OBJECT(current_object)->player_car.timer = timer_4 - 1u;
 				if (timer_4 != 1u)
 				{
-					segment_record = ((screen + 0x2000u) & ~0xFFFFu) | (uint16_t)(screen + 0x2000u + CAR(player_car)->segment_offset);
+					segment_record = PAGE_ADD(screen + 0x2000u, CAR(player_car)->segment_offset);
 					player_car_drive(&segment_record, &road_x, &segment_fraction, &segment_length);
 					player_car_place_view(segment_record, road_x, segment_fraction, segment_length);
 					player_car_move_view();
@@ -321,7 +321,7 @@ void player_car_update(void)
 				}
 				OBJECT(current_object)->player_car.step++;
 				SCREEN(screen)->flags |= 0x10u;
-				segment_record = ((screen + 0x2000u) & ~0xFFFFu) | (uint16_t)(screen + 0x2000u + CAR(player_car)->segment_offset);
+				segment_record = PAGE_ADD(screen + 0x2000u, CAR(player_car)->segment_offset);
 				player_car_drive(&segment_record, &road_x, &segment_fraction, &segment_length);
 				player_car_place_view(segment_record, road_x, segment_fraction, segment_length);
 				player_car_move_view();
@@ -336,7 +336,7 @@ void player_car_update(void)
 				OBJECT(current_object)->player_car.gas = 0u;
 				OBJECT(current_object)->player_car.brake = 0x80u;
 				OBJECT(current_object)->player_car.wheel = 0x80u;
-				segment_record = ((screen + 0x2000u) & ~0xFFFFu) | (uint16_t)(screen + 0x2000u + CAR(player_car)->segment_offset);
+				segment_record = PAGE_ADD(screen + 0x2000u, CAR(player_car)->segment_offset);
 				player_car_drive(&segment_record, &road_x, &segment_fraction, &segment_length);
 				player_car_place_view(segment_record, road_x, segment_fraction, segment_length);
 				player_car_move_view();
@@ -415,7 +415,7 @@ void player_car_update(void)
 		return;
 	case 1:
 		hit_object = LINKED(screen, OBJECT(current_object)->player_car.hit_other);
-		car_segment_record = ((screen + 0x2000u) & ~0xFFFFu) | (uint16_t)(screen + 0x2000u + CAR(player_car)->segment_offset);
+		car_segment_record = PAGE_ADD(screen + 0x2000u, CAR(player_car)->segment_offset);
 		own_speed = OBJECT(current_object)->player_car.speed;
 		impact = (uint32_t)(uint16_t)OBJECT(hit_object)->traffic.speed << 8;
 		other_weight = OBJECT(hit_object)->traffic.weight;
@@ -889,8 +889,8 @@ void player_car_animate(void)
 }
 
 /* The car's body as it steers: the model's animation (player_car_steer_animations) in the row of the
-   view's height, its frame (steer_frame) one step a frame toward the one of the steering (the bytes
-   around 0092BC: 0-8, 4 straight on). */
+   view's height, its frame (steer_frame) one step a frame toward the one of the steering
+   (steer_frames_by_steering, from its middle: 0 full left to 8 full right, 4 straight on). */
 void player_car_steer_frame(uint32_t model)
 {
 	uint8_t steer_frame = 0, target_frame = 0;
@@ -899,7 +899,7 @@ void player_car_steer_frame(uint32_t model)
 	animation = player_car_steer_animations[model];
 	view_height = player_car_view_height();
 	OBJECT(current_object)->animation = animation + view_height;
-	target_frame = mem_read8(steer_frames_by_steering_ADDRESS + OBJECT(current_object)->player_car.steering);
+	target_frame = steer_frames_by_steering[64 + OBJECT(current_object)->player_car.steering];
 	steer_frame = OBJECT(current_object)->player_car.steer_frame;
 	if (target_frame == steer_frame)
 	{

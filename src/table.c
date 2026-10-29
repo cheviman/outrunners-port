@@ -339,8 +339,6 @@ const game_code_entry game_code[] =
 
 const size_t game_code_count = 244;
 
-const void *rom_000001_data;
-const void *rom_000002_data;
 const void *boot_e80000_bytes_data;
 const void *seat_credits_addresses_data;
 const void *game_mode_jumps_data;
@@ -511,6 +509,7 @@ const void *car_crash_physics_data;
 const void *grid_road_place_lists_data;
 const void *grid_segment_lists_data;
 const void *player_car_steer_animations_data;
+const void *steer_frames_by_steering_data;
 const void *player_car_wheelspin_animations_data;
 const void *player_car_skid_animations_wheel_high_data;
 const void *player_car_skid_animations_wheel_low_data;
@@ -885,8 +884,6 @@ const void *kanji_font_data;
 /* the tables the game loads from its assets: their names, addresses and pointers */
 const game_table game_tables[] =
 {
-	{ "rom_000001", 0x000001u, &rom_000001_data },
-	{ "rom_000002", 0x000002u, &rom_000002_data },
 	{ "boot_e80000_bytes", 0x0000B4u, &boot_e80000_bytes_data },
 	{ "seat_credits_addresses", 0x0008C4u, &seat_credits_addresses_data },
 	{ "game_mode_jumps", 0x0008CCu, &game_mode_jumps_data },
@@ -1057,6 +1054,7 @@ const game_table game_tables[] =
 	{ "grid_road_place_lists", 0x0090ACu, &grid_road_place_lists_data },
 	{ "grid_segment_lists", 0x0091CCu, &grid_segment_lists_data },
 	{ "player_car_steer_animations", 0x00926Cu, &player_car_steer_animations_data },
+	{ "steer_frames_by_steering", 0x00927Cu, &steer_frames_by_steering_data },
 	{ "player_car_wheelspin_animations", 0x009300u, &player_car_wheelspin_animations_data },
 	{ "player_car_skid_animations_wheel_high", 0x009310u, &player_car_skid_animations_wheel_high_data },
 	{ "player_car_skid_animations_wheel_low", 0x009410u, &player_car_skid_animations_wheel_low_data },
@@ -1429,7 +1427,7 @@ const game_table game_tables[] =
 	{ "kanji_font", 0x1CF000u, &kanji_font_data },
 };
 
-const size_t game_table_count = 542;
+const size_t game_table_count = 541;
 
 /* the code at the reset vector */
 void game_entry(void)
