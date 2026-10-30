@@ -6,9 +6,11 @@ is the same game as on a computer, with what a handheld asks for:
 
 - **The game's own 4:3 picture**, as large as the 640 x 480 screen takes it, smooth pixels. OPTIONS has no
   VIDEO page, and the title's menu no 2 PLAYERS.
-- **The handheld's buttons**: the d-pad or the left stick steers, A or R2 is the gas, B or L2 the brake, R1
-  and L1 shift up and down, Y is the radio (the d-pad's up and down its songs), START starts and pauses.
-  OPTIONS' CONTROLS gives each action another button.
+- **The handheld's buttons** (Sebas): the d-pad or the left stick steers, L1 (or R2) is the gas, L2 the brake,
+  Y and B shift up and down, SELECT is the radio (the d-pad's up and down its songs), START starts and pauses
+  (`ORUNNERS_ANBERNIC_BUTTONS`); in the menus A accepts and B goes back. OPTIONS' CONTROLS gives each action
+  another button, and its DEFAULTS brings these back (a `controls.ini` kept from an earlier version keeps the
+  buttons it has until then).
 - **MENU leaves the game**, as it leaves the firmware's other games; the volume keys turn the game's volume
   (OPTIONS' VOLUME).
 - **The board's video on the four cores** (`runtime/src/workers.c`), the left screen alone in a one player

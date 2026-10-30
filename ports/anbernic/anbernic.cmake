@@ -17,7 +17,7 @@
 # player's ROM set.
 
 target_compile_definitions(orunners_game_console PUBLIC ORUNNERS_HANDHELD ORUNNERS_HANDHELD_KEYS
-	ORUNNERS_CONTROLS_PAGE)
+	ORUNNERS_CONTROLS_PAGE ORUNNERS_ANBERNIC_BUTTONS)    # (L1 the gas, L2 the brake, Y and B the gears, SELECT the music)
 
 set(ORUNNERS_SDL2_INCLUDE "" CACHE PATH "SDL2's headers (the folder with SDL.h)")
 if(NOT ORUNNERS_SDL2_INCLUDE)

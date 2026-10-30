@@ -575,6 +575,9 @@ static const prompt button_prompts[] = {
 	{ SDL_CONTROLLER_BUTTON_BACK, 18, 4, 1 }, { SDL_CONTROLLER_BUTTON_START, 18, 5, 1 },
 	{ SDL_CONTROLLER_BUTTON_LEFTSHOULDER, 18, 7, 1 }, { SDL_CONTROLLER_BUTTON_RIGHTSHOULDER, 18, 8, 1 },
 };
+/* the triggers, which press the pedals on any controller (LT and RT) */
+static const prompt left_trigger_prompt = { SDL_CONTROLLER_BUTTON_INVALID, 18, 9, 1 };
+static const prompt right_trigger_prompt = { SDL_CONTROLLER_BUTTON_INVALID, 18, 10, 1 };
 
 #define PROMPT_SIZE  16
 #define PROMPT_CLEAR 0xFFFF00FFu    /* magenta: the sheet's see-through */
@@ -644,6 +647,9 @@ static const uint32_t *with_controls(const uint32_t *pixels)
 		}
 		if ((icon = find_prompt(button_prompts, SDL_arraysize(button_prompts), bindings[control].buttons[0])) != NULL)
 			draw_prompt(icon, x + CONSOLE_CONTROLS_BUTTON_X, y);
+		else if (control == CONTROL_BRAKE || control == CONTROL_GAS)
+			draw_prompt(control == CONTROL_BRAKE ? &left_trigger_prompt : &right_trigger_prompt,
+				x + CONSOLE_CONTROLS_BUTTON_X, y);    /* (a pedal without a button: its trigger, which presses it always) */
 	}
 	return controls_picture;
 }

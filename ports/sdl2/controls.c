@@ -4,7 +4,7 @@
  *                 file that keeps them (controls.ini)
  *    Version:     0.1.0
  *    Created:     29-10-2026
- *    Modified:    29-10-2026
+ *    Modified:    30-10-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
@@ -48,6 +48,18 @@ static const SDL_Scancode default_keys[CONTROL_PLAYERS][CONTROLS][CONTROL_KEYS] 
 	},
 };
 
+#ifdef ORUNNERS_ANBERNIC_BUTTONS
+/* Anbernic's handhelds (Sebas): the pad's left and right turn the wheel, L1 the gas and L2 the brake (its
+   trigger, as the pedals' axis the window port reads), Y and B shift up and down, SELECT the music, the pad's
+   down and up the songs */
+static const SDL_GameControllerButton default_buttons[CONTROLS] = {
+	[CONTROL_STEER_LEFT] = SDL_CONTROLLER_BUTTON_DPAD_LEFT, [CONTROL_STEER_RIGHT] = SDL_CONTROLLER_BUTTON_DPAD_RIGHT,
+	[CONTROL_GAS] = SDL_CONTROLLER_BUTTON_LEFTSHOULDER, [CONTROL_BRAKE] = SDL_CONTROLLER_BUTTON_INVALID,
+	[CONTROL_SHIFT_UP] = SDL_CONTROLLER_BUTTON_Y, [CONTROL_SHIFT_DOWN] = SDL_CONTROLLER_BUTTON_B,
+	[CONTROL_MUSIC] = SDL_CONTROLLER_BUTTON_BACK, [CONTROL_SONG_BACK] = SDL_CONTROLLER_BUTTON_DPAD_DOWN,
+	[CONTROL_SONG_NEXT] = SDL_CONTROLLER_BUTTON_DPAD_UP, [CONTROL_START] = SDL_CONTROLLER_BUTTON_START,
+};
+#else
 /* Every player's game controller: the pad's left and right turn the wheel (as the stick does), A the gas and
    B the brake (as the triggers do), the shoulders shift, Y the music, the pad's down and up the songs */
 static const SDL_GameControllerButton default_buttons[CONTROLS] = {
@@ -57,6 +69,7 @@ static const SDL_GameControllerButton default_buttons[CONTROLS] = {
 	[CONTROL_MUSIC] = SDL_CONTROLLER_BUTTON_Y, [CONTROL_SONG_BACK] = SDL_CONTROLLER_BUTTON_DPAD_DOWN,
 	[CONTROL_SONG_NEXT] = SDL_CONTROLLER_BUTTON_DPAD_UP, [CONTROL_START] = SDL_CONTROLLER_BUTTON_START,
 };
+#endif
 
 control_binding control_bindings[CONTROL_PLAYERS][CONTROLS];
 
