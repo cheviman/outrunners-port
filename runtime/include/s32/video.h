@@ -4,7 +4,7 @@
  *                 as the hardware does
  *    Version:     0.1.0
  *    Created:     13-10-2026
- *    Modified:    29-10-2026
+ *    Modified:    30-10-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
@@ -57,6 +57,11 @@ void s32_video_draw_frame(void);
 /* The last frame of screen 0 (left) or 1 (right): S32_VIDEO_MAX_WIDTH pixels a row, S32_VIDEO_HEIGHT rows;
    its width is 320 or 416 */
 const uint32_t *s32_video_frame(int screen, int *width);
+
+/* The screens a port shows (bit 0 the left, bit 1 the right; both unless it says otherwise, as the headless
+   runs and their hashes have them): the video draws those alone, their sprites, the layers their mixers
+   take and their mixing, and a screen left out keeps its last frame */
+void s32_video_show_screens(int screens);
 
 /* FNV-1a hash of the last frames' visible pixels (red, green, blue bytes), the left screen's then the
    right one's, as tools/core/system32/reference/s32ref writes it */

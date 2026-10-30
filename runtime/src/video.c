@@ -5,7 +5,7 @@
  *                 memories
  *    Version:     0.1.0
  *    Created:     13-10-2026
- *    Modified:    29-10-2026
+ *    Modified:    30-10-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
@@ -123,6 +123,7 @@ static struct
 	int side;                               /* this frame's: S32_VIDEO_WIDE_SIDE when wide, else 0 */
 	int sprite_side;                        /* the sprite list's: every sprite that much to the right */
 	bool extra_used;                        /* s32_video_use_extra_palette */
+	int screens_shown;                      /* s32_video_show_screens: bit 0 the left, bit 1 the right */
 	uint16_t extra_palette[S32_SCREENS][S32_PALETTE_ENTRIES];
 	bool extra_set[S32_SCREENS][S32_PALETTE_ENTRIES];    /* the entries s32_video_extra_colour set */
 	uint8_t extra_pixels[S32_SCREENS][2][HEIGHT][WIDTH];    /* the sprite buffers' pixels' marks */
@@ -767,47 +768,48 @@ static void observe_tilemap(int number)
 	}
 }
 
-static int draw_layers(void)
+/* The layers that are on, of those 'wanted' (LAYER_* bits): the ones the mixers of the screens shown take */
+static int draw_layers(int wanted)
 {
 	const uint16_t control = video_register(0x00);
 	const uint16_t off = video_register(0x02);
 	const uint16_t more_off = video_register(0x8e);
 	int drawn = 0;
 
-	if (!bit(off, 0) && !bit(more_off, 1))
+	if (bit((uint32_t)wanted, LAYER_NBG0) && !bit(off, 0) && !bit(more_off, 1))
 	{
 		draw_zoomed(0);
 		if (s32_video_tile_observer != NULL)
 			observe_tilemap(0);
 		drawn |= 1 << LAYER_NBG0;
 	}
-	if (!bit(off, 1) && !bit(more_off, 2))
+	if (bit((uint32_t)wanted, LAYER_NBG1) && !bit(off, 1) && !bit(more_off, 2))
 	{
 		draw_zoomed(1);
 		if (s32_video_tile_observer != NULL)
 			observe_tilemap(1);
 		drawn |= 1 << LAYER_NBG1;
 	}
-	if (!bit(off, 2) && !bit(more_off, 3) && !bit(control, 12))
+	if (bit((uint32_t)wanted, LAYER_NBG2) && !bit(off, 2) && !bit(more_off, 3) && !bit(control, 12))
 	{
 		draw_scrolled(2);
 		if (s32_video_tile_observer != NULL)
 			observe_tilemap(2);
 		drawn |= 1 << LAYER_NBG2;
 	}
-	if (!bit(off, 3) && !bit(more_off, 4) && !bit(control, 13))
+	if (bit((uint32_t)wanted, LAYER_NBG3) && !bit(off, 3) && !bit(more_off, 4) && !bit(control, 13))
 	{
 		draw_scrolled(3);
 		if (s32_video_tile_observer != NULL)
 			observe_tilemap(3);
 		drawn |= 1 << LAYER_NBG3;
 	}
-	if (!bit(off, 4) && !bit(more_off, 0))
+	if (bit((uint32_t)wanted, LAYER_TEXT) && !bit(off, 4) && !bit(more_off, 0))
 	{
 		draw_text();
 		drawn |= 1 << LAYER_TEXT;
 	}
-	if (!bit(off, 5) && !bit(more_off, 5))
+	if (bit((uint32_t)wanted, LAYER_BITMAP) && !bit(off, 5) && !bit(more_off, 5))
 	{
 		draw_bitmap();
 		drawn |= 1 << LAYER_BITMAP;
@@ -919,6 +921,9 @@ static int draw_sprite(uint32_t entry, int x_offset, int y_offset, const area *i
 	const uint32_t bank = ((width_word & 0x2000) >> 13 | (width_word & 0x8000) >> 14) % (video.graphics.sprite_banks ? video.graphics.sprite_banks : 1);
 	const int screen = bit(width_word, 11);
 	const int taken = (bit(flags, 13) && table_inline) ? 2 : 0;
+
+	if (!bit((uint32_t)video.screens_shown, screen))
+		return taken;    /* (a screen the port does not show: s32_video_show_screens) */
 	sprite_drawing sprite;
 	int source_width;
 	int end_pen;
@@ -1043,19 +1048,19 @@ static int draw_sprite(uint32_t entry, int x_offset, int y_offset, const area *i
 
 /* The list in sprite RAM from its entry 'number', 16 bytes an entry, its command in the top two bits of the
    first word: draw a sprite, set the clips (bit 12 the one to draw in, bit 13 the one to leave alone), jump
-   (and with bit 13, set the offset sprites can add), or end. The board's starts at 0. */
-static void draw_sprite_list(int number)
+   (and with bit 13, set the offset sprites can add), or end. The board's starts at 0. Only its rows from
+   first_row to last_row are drawn: each thread walks the whole list for a band of them (draw_sprites) */
+static void draw_sprite_list(int number, int first_row, int last_row)
 {
 	/* (WIDE: the board's screen of 320 in the middle of 416, the sprites placed that much to the right) */
 	const bool wide = video.wide && !bit(s32_board.sprite_control_latched[6], 0);
-	const int side = wide ? S32_VIDEO_WIDE_SIDE : 0;
-	const area screen = { 0, wide || bit(s32_board.sprite_control_latched[6], 0) ? 415 : 319, 0, HEIGHT - 1 };
+	const int side = video.sprite_side;
+	const area screen = { 0, wide || bit(s32_board.sprite_control_latched[6], 0) ? 415 : 319, first_row, last_row };
 	area inside = screen;
 	area outside = { 0, -1, 0, -1 };
 	int x_offset = 0;
 	int y_offset = 0;
 
-	video.sprite_side = side;
 	for (int entries = 0; entries < 0x20000 / 16; entries++)
 	{
 		const uint32_t entry = 8 * (uint32_t)(number & 0x1fff);
@@ -1108,6 +1113,24 @@ static void draw_sprite_list(int number)
 	}
 }
 
+static void draw_sprite_list_rows(void *context, int first_row, int last_row)
+{
+	draw_sprite_list(*(const int *)context, first_row, last_row);
+}
+
+/* The list from its entry 'number', a band of its rows on each of the workers' threads; on this one alone
+   while an observer watches the sprites (it sees them in the list's order) */
+static void draw_sprites(int number)
+{
+	const bool wide = video.wide && !bit(s32_board.sprite_control_latched[6], 0);
+
+	video.sprite_side = wide ? S32_VIDEO_WIDE_SIDE : 0;
+	if (s32_video_sprite_observer != NULL)
+		draw_sprite_list(number, 0, HEIGHT - 1);
+	else
+		s32_workers_rows(draw_sprite_list_rows, &number, 0, HEIGHT - 1);
+}
+
 void s32_video_sprites(bool erase, bool draw)
 {
 	if (erase)
@@ -1123,7 +1146,7 @@ void s32_video_sprites(bool erase, bool draw)
 	if (draw)
 	{
 		video.shown_sprites ^= 1;
-		draw_sprite_list(0);
+		draw_sprites(0);
 	}
 }
 
@@ -1148,7 +1171,7 @@ void s32_video_overlay_sprites(const uint8_t *list, size_t size)
 	memcpy(sprite_ram_saved, place, size);
 	memcpy(place, list, size);
 	video.shown_sprites ^= 1;    /* (the list draws into the buffer not shown: this one) */
-	draw_sprite_list(OVERLAY_ENTRY);
+	draw_sprites(OVERLAY_ENTRY);
 	video.shown_sprites ^= 1;
 	memcpy(place, sprite_ram_saved, size);
 }
@@ -1475,11 +1498,21 @@ void s32_video_draw_frame(void)
 	video.visible.top = 0;
 	video.visible.bottom = HEIGHT - 1;
 
-	/* each screen's I/O chip turns it on (CNT1); the layers they share are drawn once */
+	/* each screen's I/O chip turns it on (CNT1); the layers they share are drawn once, those the mixers of
+	   the screens shown take (a layer with no priority is not mixed); a screen the port does not show keeps
+	   its last frame */
+	int wanted = 0;
 	int drawn = -1;
 
 	for (int screen = 0; screen < S32_SCREENS; screen++)
+		if (bit((uint32_t)video.screens_shown, screen) && s32_display_enabled(screen))
+			for (int index = LAYER_TEXT; index <= LAYER_BITMAP; index++)
+				if ((mixer_register(screen, 0x20 + 2 * (uint32_t)index) & 0x0f) != 0)
+					wanted |= 1 << index;
+	for (int screen = 0; screen < S32_SCREENS; screen++)
 	{
+		if (!bit((uint32_t)video.screens_shown, screen))
+			continue;
 		if (!s32_display_enabled(screen))
 		{
 			for (int y = 0; y < HEIGHT; y++)
@@ -1487,9 +1520,14 @@ void s32_video_draw_frame(void)
 			continue;
 		}
 		if (drawn < 0)
-			drawn = draw_layers();
+			drawn = draw_layers(wanted);
 		mix(screen, drawn);
 	}
+}
+
+void s32_video_show_screens(int screens)
+{
+	video.screens_shown = screens & ((1 << S32_SCREENS) - 1);
 }
 
 void s32_video_init_graphics(const s32_graphics *graphics)
@@ -1500,6 +1538,7 @@ void s32_video_init_graphics(const s32_graphics *graphics)
 	const uint32_t sprite_rom_words = video.sprite_rom_words;
 
 	memset(&video, 0, sizeof(video));
+	video.screens_shown = (1 << S32_SCREENS) - 1;
 	video.graphics = *graphics;
 	video.image_pens = image_pens;
 	video.image_tiles = image_tiles;

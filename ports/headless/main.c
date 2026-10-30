@@ -5,7 +5,7 @@
  *                 format tools/core/system32/reference/s32ref uses
  *    Version:     0.1.0
  *    Created:     11-10-2026
- *    Modified:    29-10-2026
+ *    Modified:    30-10-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
@@ -24,6 +24,8 @@
  *    and the chips, runtime/src/sound_cpu.c and sound_chips.c), and writes for each frame the hash of its
  *    samples and of the sound board's memory. --sprite-census and --tile-census write what the sprites and
  *    the tilemaps draw, with the colors each pen shows, for the asset extractor (tools/palette_census.py).
+ *    --screens 1 draws the left screen alone, as the console's window does in one player games
+ *    (s32_video_show_screens): the right one keeps its first frame.
  *    --memory-census writes what memory each mem_read and mem_write of the game's C reached, by its line
  *    (runtime/src/memory_census.c), in a build with ORUNNERS_MEMORY_CENSUS (tools/memory_census.py).
  */
@@ -52,7 +54,7 @@
 #define USAGE "Usage: orunners_headless [--frames N] [--hashes FILE] [--script FILE] [--dump-frame N --dump-dir DIR]" \
 	" [--video-hashes FILE] [--video-dump N ... --video-dir DIR] [--sound-hashes FILE]" \
 	" [--sprite-census FILE] [--tile-census FILE] [--memory-census FILE] [--assets FOLDER|PACK.assets]" \
-	" [--write-pack PACK.assets] [--workers N] [--sound-wav FILE]" \
+	" [--write-pack PACK.assets] [--workers N] [--screens 1|2] [--sound-wav FILE]" \
 	" (orunners_console_headless: [--actions FILE] [--wide] [--autopilot] [--ghost-folder DIR]" \
 	" [--pause-dump N])\n"
 #define MAX_VIDEO_DUMPS 64
@@ -60,6 +62,7 @@
 #define TILE_CENSUS_EVERY 30        /* the tilemaps are looked at every this many frames */
 
 static uint64_t frames_wanted = 600;
+static int screens = 2;               /* --screens: the screens the video draws */
 static FILE *hashes;
 static s32_script *script;
 static uint64_t dump_frame = UINT64_MAX;
@@ -434,6 +437,8 @@ int main(int argc, char **argv)
 			pack_path = argv[++index];
 		else if (strcmp(argv[index], "--workers") == 0 && index + 1 < argc)
 			s32_workers_start(atoi(argv[++index]));    /* (the video's rows on that many more threads) */
+		else if (strcmp(argv[index], "--screens") == 0 && index + 1 < argc)
+			screens = atoi(argv[++index]);
 #ifdef ORUNNERS_CONSOLE
 		else if (strcmp(argv[index], "--wide") == 0)
 			console_window_settings.wide = true;    /* (OPTIONS > VIDEO > WIDE) */
@@ -549,6 +554,7 @@ int main(int argc, char **argv)
 #else
 		s32_video_init_graphics(assets_graphics());
 #endif
+	s32_video_show_screens(screens == 1 ? 1 : 3);
 	if (sound_hashes_path || sound_wav)
 	{
 #ifdef ORUNNERS_SCAFFOLD
