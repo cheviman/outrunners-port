@@ -160,7 +160,8 @@ merged here; this repository adds console/, the ports and their documents.
   controls (ports/sdl2/touch.c: the wheel, GAS, BRAKE, START, the gears with the manual transmission alone,
   MUSIC a small oval at the bottom); OutRunners APK, SegaSonic APK's with the pack made from the ROM set.
 - The project's icon (tools/make_icon.py): a steering wheel on a sunset, for the builds without a picture of
-  the player's own. Sebas's own (local/, never committed): the car for the computer, the flyer for the
+  the player's own; since 1.0 Sebas's car on that sunset (ports/sdl2/icon/car.png, a picture he took from a
+  Steam page that offers it free to use). Sebas's own (local/, never committed): the car for the computer, the flyer for the
   Switch, the title's oval for Android.
 - REVERSE's map: no pause over it (it is the race's step 5), so START confirms the goal.
 - WIDE 16:9 and 20:9 (Sebas): OPTIONS > VIDEO's WIDE OFF, 16:9 (48 columns more at each side, 416) or 20:9
