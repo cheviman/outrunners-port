@@ -36,6 +36,7 @@
  *    has none); each fork adds the time of the stage it leads to; there is no route map after the race and
  *    no course record (the game's are by goal).
  */
+#include "console.h"
 #include "console_internal.h"
 
 #include <stddef.h>
@@ -495,10 +496,10 @@ static const route *route_running(void)
 	return routes.running == ROUTE_FULL ? &routes.full : &routes.reverse;
 }
 
-void console_reverse_start(int goal)
+void console_reverse_start(void)
 {
 	build_reverse();
-	routes.goal = FIRST_GOAL + goal;
+	routes.goal = 0;    /* (picked on the route map, once the car select is over) */
 	routes.running = ROUTE_REVERSE;
 }
 
@@ -645,31 +646,48 @@ static void full_total(void)
 		OBJECT_TEXT_CHARACTERS(goal + 0x86u)[letter] = (uint8_t)text[letter];
 }
 
-/* On the left seat's frame, before its game mode's code: REVERSE's first stage the goal picked, before the
-   game loads it (game_mode_play step 5), and the start line's colours; FULL's counts and its total; over
-   with the game */
-void console_routes_frame(uint32_t mode)
+/* On the left seat's frame, before its game mode's code: REVERSE's goal picked on the route map once the
+   car select is over and its fade out too (game_mode_play step 5, before the game loads the stage: the game
+   waits meanwhile, true), then the race's first stage that goal, and the start line's colours; BACK there
+   gives the game up; FULL's counts and its total; over with the game */
+bool console_routes_frame(uint32_t mode, uint32_t pressed)
 {
 	if (routes.running == ROUTE_NONE)
-		return;
+		return false;
 	if (mode != GAME_MODE_PLAY)
 	{
 		routes.running = ROUTE_NONE;
-		return;
+		return false;
 	}
 	if (routes.running == ROUTE_FULL)
 	{
 		full_fold();
 		full_total();
-		return;
+		return false;
 	}
-	if (SCREEN(screen)->game_step == 5u)
+	if (SCREEN(screen)->game_step != 5u || (SCREEN(screen)->flags & 1u) != 0u)
+		return false;
+	if (routes.goal == 0)
 	{
-		SCREEN(screen)->first_stage = (uint8_t)routes.goal;
-		SCREEN(screen)->route_stage = (uint8_t)routes.goal;
-		SCREEN(screen)->built_stage = (uint8_t)routes.goal;
-		start_line_colours();
+		if (!console_route_select_running())
+			console_route_select_start(RACE(SCREEN(screen)->race)->model);
+		switch (console_route_select_frame(pressed))
+		{
+			case ROUTE_SELECT_START:
+				routes.goal = FIRST_GOAL + console_route_select_goal();
+				break;
+			case ROUTE_SELECT_BACK:
+				console_quit_game();
+				return true;
+			default:
+				return true;
+		}
 	}
+	SCREEN(screen)->first_stage = (uint8_t)routes.goal;
+	SCREEN(screen)->route_stage = (uint8_t)routes.goal;
+	SCREEN(screen)->built_stage = (uint8_t)routes.goal;
+	start_line_colours();
+	return false;
 }
 
 /* ---- the game's functions the routes put their own in place of ---- */

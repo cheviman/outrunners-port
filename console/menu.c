@@ -92,7 +92,6 @@ static struct
 	int controls_player;    /* CONTROLS: whose */
 	int controls_waiting;   /* CONTROLS: the control waiting for its key or button, or -1 */
 	bool controls_defaults; /* CONTROLS: DEFAULTS picked, for the port */
-	int reverse_goal;       /* REVERSE: the goal picked (0-9) */
 	bool music;             /* the menu's song asked for */
 } menu = { .controls_waiting = -1 };
 
@@ -530,11 +529,6 @@ bool console_controls_defaults(void)
 	return picked;
 }
 
-int console_menu_reverse_goal(void)
-{
-	return menu.reverse_goal = console_route_select_goal();
-}
-
 /* The title's menu and DELUXE: their lines centred under the logo, over a shadow */
 static void list_frame(const char *const *items, int count)
 {
@@ -683,8 +677,8 @@ int console_menu_frame(uint32_t mode)
 			}
 			if ((pressed & (ACTION_BIT(ACTION_ACCEPT) | ACTION_BIT(ACTION_START))) && menu.choice == DELUXE_REVERSE)
 			{
-				console_route_select_start(menu.reverse_goal);
-				return MENU_ROUTE_SELECT;    /* (& KNUCKLES open again when it comes back) */
+				open_page(PAGE_NONE, 0);
+				return MENU_REVERSE;    /* (its goal on the route map once the car is chosen) */
 			}
 			list_frame(deluxe_items, COUNT(deluxe_items));
 			return MENU_NOTHING;

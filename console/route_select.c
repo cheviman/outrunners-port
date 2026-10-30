@@ -13,10 +13,11 @@
  *    race's end shows whole (route_map_update's last view): the routes over the world at 1:1, wider than the
  *    screen: the pre-stage's globe in the middle, the routes east of it to five goals and west of it to the
  *    other five, each half where route_map_whole_scroll_xs puts the screen for it; the WEST / EAST panel
- *    under the globe (route_map_direction_sign_show), moved with the map. The car is the route map's own
- *    (route_map_car_animations, model 0): it drives from goal to goal as the player picks them, up and down
- *    through a side's, left and right across to the other side's, and the map scrolls after it. START or
- *    ACCEPT starts REVERSE there, BACK goes back to & KNUCKLES.
+ *    under the globe (route_map_direction_sign_show), moved with the map. It comes once the car select is
+ *    over, so the car is the one chosen, as the route map shows it after a race (route_map_car_animations
+ *    by its model): it drives from goal to goal as the player picks them, up and down through a side's,
+ *    left and right across to the other side's, and the map scrolls after it. START or ACCEPT starts
+ *    REVERSE there, BACK gives the game up; either fades the map out first.
  */
 #include "console.h"
 #include "console_internal.h"
@@ -28,7 +29,6 @@
 #define SIDE_GOALS          5
 #define EAST                0          /* the pre-stage's branch 0 (route_map_whole_scroll_xs' first) */
 #define WEST                1
-#define CAR_MODEL           0          /* the generic car: the route map's first model */
 #define CAR_SIZE            0x50u      /* as the route map's */
 #define CAR_FRAME           0xCu
 #define CAR_OFFSET          10         /* the car beside the end of the goal's route, away from the globe */
@@ -58,6 +58,8 @@ static struct
 	int scroll;                    /* the screen's place on the map */
 	int car_x, car_y;              /* the car on the map, driving to the goal's place */
 	int from_x, from_y, moving, move_frames;
+	int model;                     /* the car chosen */
+	int leaving;                   /* ROUTE_SELECT_START or _BACK once picked, while the map fades out */
 } pick;
 
 static int side_of(int goal)
@@ -137,8 +139,8 @@ void route_select_car_update(void)
 	if (OBJECT(current_object)->state == 0u)
 	{
 		OBJECT(current_object)->draw_mode = 0xAu;
-		animation_start(route_map_car_animations[CAR_MODEL]);
-		OBJECT(current_object)->palette = route_map_car_palettes[CAR_MODEL];
+		animation_start(route_map_car_animations[pick.model]);
+		OBJECT(current_object)->palette = route_map_car_palettes[pick.model];
 		OBJECT(current_object)->width_scale = CAR_SIZE;
 		OBJECT(current_object)->height_scale = CAR_SIZE;
 		OBJECT(current_object)->frame = CAR_FRAME;
@@ -152,12 +154,13 @@ void route_select_car_update(void)
 
 /* ---- the scene ---- */
 
-void console_route_select_start(int goal)
+void console_route_select_start(int model)
 {
 	pick.running = true;
 	pick.frame = 0;
-	pick.goal = goal >= 0 && goal < GOALS ? goal : 0;
+	pick.model = model & 7;
 	pick.moving = 0;
+	pick.leaving = ROUTE_SELECT_NOTHING;
 }
 
 bool console_route_select_running(void)
@@ -190,18 +193,24 @@ int console_route_select_frame(uint32_t pressed)
 		SCREEN(screen)->flags |= 1u;
 		return ROUTE_SELECT_NOTHING;
 	}
-	if (pressed & (ACTION_BIT(ACTION_START) | ACTION_BIT(ACTION_ACCEPT)))
+	if (pick.leaving != ROUTE_SELECT_NOTHING && (SCREEN(screen)->flags & 1u) == 0u)
+	{
+		/* (the fade out over: the map's objects go, the game goes on) */
+		pick.running = false;
+		clear_objects();
+		return pick.leaving;
+	}
+	if (pick.leaving == ROUTE_SELECT_NOTHING && (pressed & (ACTION_BIT(ACTION_START) | ACTION_BIT(ACTION_ACCEPT)
+		| ACTION_BIT(ACTION_BACK))))
 	{
 		queue_sound(MENU_SOUND);
-		pick.running = false;
-		return ROUTE_SELECT_START;
+		pick.leaving = (pressed & ACTION_BIT(ACTION_BACK)) ? ROUTE_SELECT_BACK : ROUTE_SELECT_START;
+		SCREEN(screen)->fade_kind = 0u;
+		SCREEN(screen)->flags |= 1u;
+		pressed = 0;
 	}
-	if (pressed & ACTION_BIT(ACTION_BACK))
-	{
-		queue_sound(MENU_SOUND);
-		pick.running = false;
-		return ROUTE_SELECT_BACK;
-	}
+	if (pick.leaving != ROUTE_SELECT_NOTHING)
+		pressed = 0;
 	if (pressed & ACTION_BIT(ACTION_UP))
 		choice = goal_at(side, rank > 0 ? rank - 1 : SIDE_GOALS - 1);
 	else if (pressed & ACTION_BIT(ACTION_DOWN))

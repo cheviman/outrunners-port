@@ -195,30 +195,16 @@ uint32_t check_game_start(uint32_t mode, uint32_t seat_credits)
 		else
 			console.time_attack = false;
 	}
-	console_routes_frame(mode);
+	if (console_routes_frame(mode, console.pressed))
+	{
+		console.pressed = 0;
+		return GAME_MODE_CONSOLE_SCENE;    /* (REVERSE's goal on the route map: the game waits) */
+	}
 	if (console.two_players && mode != GAME_MODE_PLAY && SCREEN(SCREEN_2)->game_mode != GAME_MODE_PLAY
 		&& SCREEN(SCREEN_2)->game_mode != GAME_MODE_ENTRY_INVITATION && !console.join_right)
 		console.two_players = false;    /* (the race of both is over) */
 	if (console.classic && mode != GAME_MODE_PLAY && SCREEN(SCREEN_2)->game_mode != GAME_MODE_PLAY)
 		console.classic = false;
-	if (console_route_select_running())
-	{
-		/* REVERSE's goal on the route map: the console's scene meanwhile */
-		const uint32_t pressed = console.pressed;
-
-		console.pressed = 0;
-		switch (console_route_select_frame(pressed))
-		{
-			case ROUTE_SELECT_START:
-				console_reverse_start(console_menu_reverse_goal());
-				return press_start(mode, seat_credits);
-			case ROUTE_SELECT_BACK:
-				AS32(SCREEN(screen)->game_mode) = GAME_MODE_RESTART;
-				return GAME_MODE_RESTART;
-			default:
-				return GAME_MODE_CONSOLE_SCENE;
-		}
-	}
 	switch (console_menu_frame(mode))
 	{
 		case MENU_START_ONE:
@@ -238,10 +224,8 @@ uint32_t check_game_start(uint32_t mode, uint32_t seat_credits)
 			console.classic = true;
 			return press_start(mode, seat_credits);
 		case MENU_REVERSE:
-			console_reverse_start(console_menu_reverse_goal());
+			console_reverse_start();
 			return press_start(mode, seat_credits);
-		case MENU_ROUTE_SELECT:
-			return GAME_MODE_CONSOLE_SCENE;
 		case MENU_TITLE:
 			AS32(SCREEN(screen)->game_mode) = GAME_MODE_RESTART;
 			return GAME_MODE_RESTART;

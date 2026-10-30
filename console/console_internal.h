@@ -35,7 +35,6 @@ enum
 	MENU_FULL,          /* a game of one player through the 31 stages (& KNUCKLES > FULL) */
 	MENU_REVERSE,       /* a game of one player from a goal back to the start (& KNUCKLES > REVERSE) */
 	MENU_CLASSIC,       /* the arcade's game as it is, the right seat free to join (& KNUCKLES > CLASSIC) */
-	MENU_ROUTE_SELECT,  /* REVERSE's goal, picked on the route map (route_select.c) */
 	MENU_TITLE          /* the title from its start (game mode 1) */
 };
 
@@ -77,25 +76,23 @@ void console_ghost_frame(void);
 bool console_presentation_frame(uint32_t pressed);
 
 
-/* & KNUCKLES' routes (routes.c): REVERSE started from the goal picked (0-9: Australia to Kenya), FULL, and
-   their part of the left seat's frame before the game mode's code */
-void console_reverse_start(int goal);
+/* & KNUCKLES' routes (routes.c): REVERSE started (its goal picked on the route map after the car select),
+   FULL, and their part of the left seat's frame before the game mode's code, with the actions pressed */
+void console_reverse_start(void);
 void console_full_start(void);
-void console_routes_frame(uint32_t mode);
+bool console_routes_frame(uint32_t mode, uint32_t pressed);    /* (true: the left seat's game waits) */
 
-/* The goal REVERSE starts from (menu.c's pick, 0-9) */
-int console_menu_reverse_goal(void);
-
-/* REVERSE's goal on the route map (route_select.c): started at a goal (0-9), on while it is picked, the
-   left seat's frame meanwhile (its game mode's code waits) and the goal picked */
+/* REVERSE's goal on the route map (route_select.c), once the car select is over: started with the car
+   model chosen, on while the goal is picked, the left seat's frame meanwhile (its game waits) and the goal
+   picked (0-9, the last one picked when it starts again) */
 enum
 {
 	ROUTE_SELECT_NOTHING,
-	ROUTE_SELECT_START,     /* the goal picked: REVERSE starts there */
-	ROUTE_SELECT_BACK       /* back to & KNUCKLES */
+	ROUTE_SELECT_START,     /* the goal picked, the screen dark again: REVERSE starts there */
+	ROUTE_SELECT_BACK       /* the game given up: back to the title */
 };
 
-void console_route_select_start(int goal);
+void console_route_select_start(int model);
 bool console_route_select_running(void);
 int console_route_select_frame(uint32_t pressed);
 int console_route_select_goal(void);
