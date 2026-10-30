@@ -28,7 +28,7 @@
 extern "C" {
 #endif
 
-#define S32_VIDEO_MAX_WIDTH  416
+#define S32_VIDEO_MAX_WIDTH  496    /* (320 and WIDE's most at each side: S32_VIDEO_WIDE_SIDE_MOST) */
 #define S32_VIDEO_HEIGHT     224
 
 /* The board's graphics as the video draws them: every tile's pens by its number (16 rows of 16, a byte a pen)
@@ -67,15 +67,18 @@ void s32_video_show_screens(int screens);
    right one's, as tools/core/system32/reference/s32ref writes it */
 uint64_t s32_video_frame_hash(void);
 
-/* WIDE (a port's console build): frames of 416 pixels while the board shows 320, the game's picture in the
-   middle and S32_VIDEO_WIDE_SIDE more of it at each side: the tilemaps and the bitmap go on, the sprites
-   are drawn where they are (the game places them well past its edges), the text layer stays where it is
-   (and is clear at the sides), the clip windows that cover the screen cover the wider one. Off, the
-   default, the frames are the board's */
-#define S32_VIDEO_WIDE_SIDE 48
-void s32_video_set_wide(bool wide);
+/* WIDE (a port's console build): frames wider than the 320 pixels the board shows, the game's picture in the
+   middle and 'side' more of it at each side (S32_VIDEO_WIDE_SIDE_16_9 for 16:9's 416, at most
+   S32_VIDEO_WIDE_SIDE_MOST for 20:9's 496): the tilemaps and the bitmap go on, the sprites are drawn where
+   they are (the game places them well past its edges), the text layer stays where it is (and is clear at
+   the sides), the clip windows that cover the screen cover the wider one. 0, the default, the frames are
+   the board's */
+#define S32_VIDEO_WIDE_SIDE_16_9 48
+#define S32_VIDEO_WIDE_SIDE_20_9 88
+#define S32_VIDEO_WIDE_SIDE_MOST S32_VIDEO_WIDE_SIDE_20_9
+void s32_video_set_wide_side(int side);
 
-/* This frame's: S32_VIDEO_WIDE_SIDE with WIDE, else 0 */
+/* This frame's: WIDE's side, else 0 */
 int s32_video_side(void);
 
 /* The extra palette (a port's console build): colours of each screen's beside the board's palette, by the

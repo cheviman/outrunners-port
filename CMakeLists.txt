@@ -198,13 +198,30 @@ if(ORUNNERS_DECOMPILED AND ORUNNERS_SOUND_DECOMPILED)
 		target_include_directories(orunners_anbernic_maker PRIVATE ports/switch/nsp)
 		target_link_libraries(orunners_anbernic_maker PRIVATE orunners_game_console orunners_sound orunners_extract)
 		set_target_properties(orunners_anbernic_maker PROPERTIES OUTPUT_NAME "OutRunners Anbernic")
+
+		# Android's APK, made on the player's computer (ports/android/apk): the game's Android build
+		# (android/outrunners-base.apk) with the assets pack of the player's ROM set (rom_pack.c), signed with
+		# the player's own key; its SHA-256 is OutRunners NSP's (crypto.c). A command line; with SDL2 also a
+		# window (below)
+		add_executable(orunners_apk_maker ports/android/apk/main.c ports/android/apk/make_apk.c ports/android/apk/zip.c
+			ports/android/apk/sign.c ports/android/apk/key.c ports/android/apk/ecdsa.c ports/switch/nsp/crypto.c
+			ports/switch/nsp/rom_pack.c)
+		target_include_directories(orunners_apk_maker PRIVATE ports/switch/nsp)
+		target_link_libraries(orunners_apk_maker PRIVATE orunners_game_console orunners_sound orunners_extract)
+		if(WIN32)
+			target_link_libraries(orunners_apk_maker PRIVATE bcrypt)    # (BCryptGenRandom: the key)
+		endif()
+		set_target_properties(orunners_apk_maker PROPERTIES OUTPUT_NAME "OutRunners APK")
 	endif()
 
 	# The devices' builds, each with its toolchain: the Nintendo Switch (devkitPro's: its .nro and its .nsp's
-	# pieces, ports/switch) and Anbernic's H700 handhelds (ports/anbernic)
+	# pieces, ports/switch), Android (the NDK's: libmain.so in its APKs, ports/android) and Anbernic's H700
+	# handhelds (ports/anbernic)
 	option(ORUNNERS_ANBERNIC "Build the game for Anbernic's H700 handhelds" OFF)
 	if(ORUNNERS_SWITCH)
 		include(${CMAKE_SOURCE_DIR}/ports/switch/switch.cmake)
+	elseif(ANDROID)
+		include(${CMAKE_SOURCE_DIR}/ports/android/android.cmake)
 	elseif(ORUNNERS_ANBERNIC)
 		include(${CMAKE_SOURCE_DIR}/ports/anbernic/anbernic.cmake)
 	endif()
@@ -212,7 +229,7 @@ if(ORUNNERS_DECOMPILED AND ORUNNERS_SOUND_DECOMPILED)
 	# The game in a window (ports/sdl2): SDL2 from the system, or on Windows the development package
 	# unpacked in build/downloads/sdl2 (SDL2_DIR picks another), a library beside the executable; or, with
 	# ORUNNERS_STATIC_SDL2, SDL2 built from its own source into the executable
-	if(ORUNNERS_ANBERNIC OR ORUNNERS_SWITCH)
+	if(ORUNNERS_ANBERNIC OR ORUNNERS_SWITCH OR ANDROID)
 		set(SDL2_FOUND FALSE)    # (the device's own build above: no computer's window ports)
 	elseif(ORUNNERS_STATIC_SDL2)
 		include(FetchContent)
@@ -298,6 +315,18 @@ if(ORUNNERS_DECOMPILED AND ORUNNERS_SOUND_DECOMPILED)
 		target_link_libraries(orunners_anbernic_maker PRIVATE ${ORUNNERS_SDL2_LIBRARY})
 		if(WIN32)
 			target_link_libraries(orunners_anbernic_maker PRIVATE ole32 shell32 uuid)
+		endif()
+
+		# OutRunners APK's window (ports/android/apk/window.c), as OutRunners NSP's: its folder dialog (with a
+		# title of its own) and its letters, font.bmp beside it
+		target_sources(orunners_apk_maker PRIVATE ports/android/apk/window.c ports/switch/nsp/folder_dialog.c
+			ports/sdl2/letters.c)
+		target_include_directories(orunners_apk_maker PRIVATE ports/sdl2)
+		target_compile_definitions(orunners_apk_maker PRIVATE ORUNNERS_APK_WINDOW
+			[[FOLDER_TITLE="The folder for OutRunners.apk"]])
+		target_link_libraries(orunners_apk_maker PRIVATE ${ORUNNERS_SDL2_LIBRARY})
+		if(WIN32)
+			target_link_libraries(orunners_apk_maker PRIVATE ole32 shell32 uuid)
 		endif()
 	else()
 		message(STATUS "No SDL2: the window ports (OutRunners, OutRunners Arcade) are not built")

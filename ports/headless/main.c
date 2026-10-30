@@ -55,7 +55,7 @@
 	" [--video-hashes FILE] [--video-dump N ... --video-dir DIR] [--sound-hashes FILE]" \
 	" [--sprite-census FILE] [--tile-census FILE] [--memory-census FILE] [--assets FOLDER|PACK.assets]" \
 	" [--write-pack PACK.assets] [--workers N] [--screens 1|2] [--sound-wav FILE]" \
-	" (orunners_console_headless: [--actions FILE] [--wide] [--autopilot] [--ghost-folder DIR]" \
+	" (orunners_console_headless: [--actions FILE] [--wide | --wide-20-9] [--autopilot] [--ghost-folder DIR]" \
 	" [--pause-dump N])\n"
 #define MAX_VIDEO_DUMPS 64
 #define CENSUS_SLOTS (1u << 22)     /* open addressing for the censuses' hashes */
@@ -343,7 +343,7 @@ static void on_controls_update(void)
 	for (size_t index = 0; index < action_count; index++)
 		if (actions[index].frame == s32_board.frame)
 			console_actions(actions[index].action);
-	s32_video_set_wide(console_wide_now());
+	s32_video_set_wide_side(console_wide_side());
 	if (autopilot)
 		s32_board.input.analog[0] = (uint8_t)console_test_autopilot();    /* (player 1's wheel) */
 #endif
@@ -441,7 +441,9 @@ int main(int argc, char **argv)
 			screens = atoi(argv[++index]);
 #ifdef ORUNNERS_CONSOLE
 		else if (strcmp(argv[index], "--wide") == 0)
-			console_window_settings.wide = true;    /* (OPTIONS > VIDEO > WIDE) */
+			console_window_settings.wide = WIDE_16_9;    /* (OPTIONS > VIDEO > WIDE) */
+		else if (strcmp(argv[index], "--wide-20-9") == 0)
+			console_window_settings.wide = WIDE_20_9;
 		else if (strcmp(argv[index], "--autopilot") == 0)
 			autopilot = true;
 		else if (strcmp(argv[index], "--pause-dump") == 0 && index + 1 < argc)

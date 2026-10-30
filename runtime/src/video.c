@@ -118,9 +118,9 @@ static struct
 	const uint8_t *sprite_rom;              /* s32_video_init's image of the sprite chips */
 	uint32_t sprite_rom_words;
 
-	area visible;                           /* 320 or 416 x 224 */
-	bool wide;                              /* s32_video_set_wide */
-	int side;                               /* this frame's: S32_VIDEO_WIDE_SIDE when wide, else 0 */
+	area visible;                           /* 320, 416 or WIDE's x 224 */
+	int wide_side;                          /* s32_video_set_wide_side: WIDE's columns more at each side, or 0 */
+	int side;                               /* this frame's: WIDE's side (wide_side), else 0 */
 	int sprite_side;                        /* the sprite list's: every sprite that much to the right */
 	bool extra_used;                        /* s32_video_use_extra_palette */
 	int screens_shown;                      /* s32_video_show_screens: bit 0 the left, bit 1 the right */
@@ -1052,10 +1052,11 @@ static int draw_sprite(uint32_t entry, int x_offset, int y_offset, const area *i
    first_row to last_row are drawn: each thread walks the whole list for a band of them (draw_sprites) */
 static void draw_sprite_list(int number, int first_row, int last_row)
 {
-	/* (WIDE: the board's screen of 320 in the middle of 416, the sprites placed that much to the right) */
-	const bool wide = video.wide && !bit(s32_board.sprite_control_latched[6], 0);
+	/* (WIDE: the board's screen of 320 in the middle of a wider one, the sprites placed that much to the right) */
+	const bool board_wide = bit(s32_board.sprite_control_latched[6], 0);
+	const bool wide = video.wide_side != 0 && !board_wide;
 	const int side = video.sprite_side;
-	const area screen = { 0, wide || bit(s32_board.sprite_control_latched[6], 0) ? 415 : 319, first_row, last_row };
+	const area screen = { 0, board_wide ? 415 : 319 + 2 * side, first_row, last_row };
 	area inside = screen;
 	area outside = { 0, -1, 0, -1 };
 	int x_offset = 0;
@@ -1122,9 +1123,9 @@ static void draw_sprite_list_rows(void *context, int first_row, int last_row)
    while an observer watches the sprites (it sees them in the list's order) */
 static void draw_sprites(int number)
 {
-	const bool wide = video.wide && !bit(s32_board.sprite_control_latched[6], 0);
+	const bool wide = video.wide_side != 0 && !bit(s32_board.sprite_control_latched[6], 0);
 
-	video.sprite_side = wide ? S32_VIDEO_WIDE_SIDE : 0;
+	video.sprite_side = wide ? video.wide_side : 0;
 	if (s32_video_sprite_observer != NULL)
 		draw_sprite_list(number, 0, HEIGHT - 1);
 	else
@@ -1490,9 +1491,9 @@ static void mix_rows(void *context, int first_row, int last_row)
 void s32_video_draw_frame(void)
 {
 	const bool board_wide = bit(video_register(0x00), 15);
-	const int width = board_wide || video.wide ? 416 : 320;
+	const int width = board_wide ? 416 : 320 + 2 * video.wide_side;
 
-	video.side = video.wide && !board_wide ? S32_VIDEO_WIDE_SIDE : 0;
+	video.side = board_wide ? 0 : video.wide_side;
 	video.visible.left = 0;
 	video.visible.right = width - 1;
 	video.visible.top = 0;
@@ -1610,9 +1611,9 @@ void s32_video_extra_colour(int screen, uint32_t index, uint16_t colour)
 	video.extra_set[screen & 1][index & 0x3fff] = true;
 }
 
-void s32_video_set_wide(bool wide)
+void s32_video_set_wide_side(int side)
 {
-	video.wide = wide;
+	video.wide_side = side < 0 ? 0 : (side > S32_VIDEO_WIDE_SIDE_MOST ? S32_VIDEO_WIDE_SIDE_MOST : side);
 }
 
 int s32_video_side(void)

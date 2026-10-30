@@ -70,6 +70,9 @@
 #include "console.h"
 #include "controls.h"
 #endif
+#ifdef ORUNNERS_TOUCH
+#include "touch.h"
+#endif
 
 #include <SDL.h>
 
@@ -231,14 +234,17 @@ static bool screens_stacked(void)
 }
 
 /* The window's picture, in the game's pixels: its screens side by side, or one over the other */
-/* A screen's picture, in the game's pixels: 320, or 16:9 with the console's WIDE */
-#define WIDE_WIDTH 398    /* 16:9 at 224 rows: the video's 416 less 9 at each side */
+/* A screen's picture, in the game's pixels: 320, or with the console's WIDE 16:9 or 20:9 */
+#define WIDE_16_9_WIDTH 398    /* 16:9 at 224 rows: the video's 416 less 9 at each side */
+#define WIDE_20_9_WIDTH 496    /* the video's 496, whole (20:9 is 498) */
 
 static int screen_width(void)
 {
 #ifdef ORUNNERS_CONSOLE
-	if (console_window_settings.wide)
-		return WIDE_WIDTH;
+	if (console_window_settings.wide == WIDE_16_9)
+		return WIDE_16_9_WIDTH;
+	if (console_window_settings.wide == WIDE_20_9)
+		return WIDE_20_9_WIDTH;
 #endif
 	return 320;
 }
@@ -368,6 +374,9 @@ static void present(SDL_Rect source)
 	}
 	else
 		SDL_RenderCopy(renderer, texture, &source, &shown);
+#ifdef ORUNNERS_TOUCH
+	touch_draw(renderer, console_manual_gears());    /* (the gears' buttons with the manual transmission) */
+#endif
 	SDL_RenderPresent(renderer);
 }
 
@@ -507,7 +516,8 @@ static void show_screens(void)
 	const bool stacked = screens_stacked();
 
 	/* each screen into the texture: the left one at its top left, the right one beside it or under it; with
-	   WIDE a frame of 416 pixels loses 9 at each side, one of 320 sits between black bars */
+	   WIDE 16:9 a frame of 416 pixels loses 9 at each side (20:9's 496 are shown whole), one of 320 sits between
+	   black bars */
 	for (int screen = 0; screen < shown; screen++)
 	{
 		static uint32_t bars[S32_VIDEO_MAX_WIDTH * S32_VIDEO_HEIGHT];    /* (black) */
@@ -636,8 +646,8 @@ static void load_window_settings(void)
 			settings->window_scale = number;
 		else if (sscanf(line, "full_screen=%d", &number) == 1)
 			settings->full_screen = number != 0;
-		else if (sscanf(line, "wide=%d", &number) == 1)
-			settings->wide = number != 0;
+		else if (sscanf(line, "wide=%d", &number) == 1 && number >= 0 && number < WIDE_KINDS)
+			settings->wide = number;    /* (0 off, 1 16:9, 2 20:9) */
 		else if (sscanf(line, "volume=%d", &number) == 1 && number >= 0 && number <= 10)
 			settings->volume = number;
 		else if (sscanf(line, "pixels=%31s", text) == 1)
@@ -654,15 +664,25 @@ static void load_window_settings(void)
 
 #ifdef ORUNNERS_HANDHELD
 /* A game device's picture, fixed whatever outrunners.ini says (OPTIONS has no VIDEO there, console/menu.c):
-   the whole screen and smooth pixels; WIDE where the screen is 16:9 (ORUNNERS_SCREEN_WIDE: the Switch's), else
-   the game's 4:3 picture as large as it fits (a handheld's 640 x 480); 2 PLAYERS side by side */
+   the whole screen and smooth pixels; WIDE where the screen is wide (ORUNNERS_SCREEN_WIDE: the Switch's 16:9;
+   a phone's 20:9 where its screen is twice as wide as high or more, else 16:9), else the game's 4:3 picture
+   as large as it fits (a handheld's 640 x 480); 2 PLAYERS side by side */
 static void fix_window_settings(void)
 {
 	console_window_settings.full_screen = true;
-#ifdef ORUNNERS_SCREEN_WIDE
-	console_window_settings.wide = true;
+#if defined(ORUNNERS_SCREEN_WIDE) && defined(__ANDROID__)
+	{
+		SDL_DisplayMode mode;
+
+		console_window_settings.wide = WIDE_16_9;
+		if (SDL_GetCurrentDisplayMode(0, &mode) == 0 && mode.h > 0 && mode.w > 0
+			&& SDL_max(mode.w, mode.h) >= 2 * SDL_min(mode.w, mode.h))
+			console_window_settings.wide = WIDE_20_9;    /* (either way up: its long side across) */
+	}
+#elif defined(ORUNNERS_SCREEN_WIDE)
+	console_window_settings.wide = WIDE_16_9;
 #else
-	console_window_settings.wide = false;
+	console_window_settings.wide = WIDE_OFF;
 #endif
 	console_window_settings.pixels = PIXELS_SMOOTH;
 	console_window_settings.vertical = false;
@@ -728,6 +748,17 @@ static uint32_t read_actions(const Uint8 *keys)
 		held |= ACTION_BIT(ACTION_BACK);
 	if (keys[SDL_SCANCODE_ESCAPE] || keys[SDL_SCANCODE_RETURN] || keys[SDL_SCANCODE_KP_ENTER])
 		held |= PAUSE_BIT;
+#ifdef __ANDROID__
+	if (keys[SDL_SCANCODE_AC_BACK])
+		held |= ACTION_BIT(ACTION_BACK);    /* (Android's back: the menus' back, never the end of the game) */
+#endif
+#ifdef ORUNNERS_TOUCH
+	{
+		const uint32_t touched = touch_actions();
+
+		held |= touched | ((touched & ACTION_BIT(ACTION_START)) ? PAUSE_BIT : 0);    /* (START pauses a race) */
+	}
+#endif
 	for (int player = 0; player < PLAYERS; player++)
 	{
 		SDL_GameController *pad = controllers[player];
@@ -764,12 +795,24 @@ static void read_events(void)
 
 	while (SDL_PollEvent(&event))
 	{
+#ifdef ORUNNERS_TOUCH
+		touch_event(&event);
+#endif
 		switch (event.type)
 		{
 			case SDL_QUIT:
 				program_stop();    /* (back to main, which saves: the game runs on a task's stack, which a
 				                      longjmp to main's does not leave on Windows) */
 				return;
+#ifdef __ANDROID__
+			case SDL_APP_WILLENTERBACKGROUND:
+				/* (Android may end the game there: what it keeps is written; a race waits, paused) */
+				save_eeprom();
+				save_backup_ram();
+				if (console_can_pause())
+					pause_requested = true;
+				break;
+#endif
 #ifdef ORUNNERS_HANDHELD_KEYS
 			case SDL_JOYBUTTONDOWN:
 				if (event.jbutton.button == HANDHELD_MENU_BUTTON)
@@ -884,6 +927,19 @@ static int trigger_pedal(SDL_GameController *pad, SDL_GameControllerAxis axis)
 }
 
 /* the state of every control once a frame, where the board reads them (VBLANK) */
+#ifdef ORUNNERS_CONSOLE
+/* True while one of the player's keys or controller's buttons for 'control' is held, or for player 1 a finger
+   on the touch controls (Android's) */
+static bool holds(int player, SDL_GameController *pad, int control)
+{
+#ifdef ORUNNERS_TOUCH
+	if (player == 0 && touch_holds(control))
+		return true;
+#endif
+	return controls_holds(player, pad, control);
+}
+#endif
+
 static void on_controls_update(void)
 {
 	const Uint8 *keys;
@@ -905,7 +961,7 @@ static void on_controls_update(void)
 		/* the menus' actions newly pressed; EXIT; the settings OPTIONS changed */
 		const uint32_t held = read_actions(keys);
 
-		s32_video_set_wide(console_wide_now());    /* (before VBLANK's sprites and the frame) */
+		s32_video_set_wide_side(console_wide_side());    /* (before VBLANK's sprites and the frame) */
 
 		if (console_can_pause() && (held & ~actions_held & PAUSE_BIT))
 			pause_requested = true;    /* (run_pause, once the frame is done) */
@@ -937,21 +993,22 @@ static void on_controls_update(void)
 	}
 #endif
 #ifdef ORUNNERS_CONSOLE
-	/* each seat's keys and game controller buttons, as OPTIONS > CONTROLS binds them (controls.c) */
+	/* each seat's keys and game controller buttons, as OPTIONS > CONTROLS binds them (controls.c); player 1's
+	   fingers on the touch controls too */
 	for (int player = 0; player < PLAYERS; player++)
 	{
 		SDL_GameController *pad = controllers[player];
 
-		wheel[player] = steer(wheel[player], controls_holds(player, pad, CONTROL_STEER_LEFT),
-			controls_holds(player, pad, CONTROL_STEER_RIGHT));
-		gas[player] = press(gas[player], controls_holds(player, pad, CONTROL_GAS));
-		brake[player] = press(brake[player], controls_holds(player, pad, CONTROL_BRAKE));
-		shift_up[player] = controls_holds(player, pad, CONTROL_SHIFT_UP);
-		shift_down[player] = controls_holds(player, pad, CONTROL_SHIFT_DOWN);
-		music[player] = controls_holds(player, pad, CONTROL_MUSIC);
-		previous[player] = controls_holds(player, pad, CONTROL_SONG_BACK);
-		next[player] = controls_holds(player, pad, CONTROL_SONG_NEXT);
-		start[player] = controls_holds(player, pad, CONTROL_START);
+		wheel[player] = steer(wheel[player], holds(player, pad, CONTROL_STEER_LEFT),
+			holds(player, pad, CONTROL_STEER_RIGHT));
+		gas[player] = press(gas[player], holds(player, pad, CONTROL_GAS));
+		brake[player] = press(brake[player], holds(player, pad, CONTROL_BRAKE));
+		shift_up[player] = holds(player, pad, CONTROL_SHIFT_UP);
+		shift_down[player] = holds(player, pad, CONTROL_SHIFT_DOWN);
+		music[player] = holds(player, pad, CONTROL_MUSIC);
+		previous[player] = holds(player, pad, CONTROL_SONG_BACK);
+		next[player] = holds(player, pad, CONTROL_SONG_NEXT);
+		start[player] = holds(player, pad, CONTROL_START);
 	}
 #else
 	wheel[0] = steer(wheel[0], keys[SDL_SCANCODE_LEFT], keys[SDL_SCANCODE_RIGHT]);
@@ -974,6 +1031,11 @@ static void on_controls_update(void)
 		wheels[player] = wheel[player];
 		gases[player] = gas[player];
 		brakes[player] = brake[player];
+#ifdef ORUNNERS_TOUCH
+		if (player == 0 && touch_wheel() != 0)    /* (the touch wheel, as far as it turns) */
+			wheels[0] = clamp(WHEEL_CENTRE + touch_wheel() * (WHEEL_RIGHT - WHEEL_CENTRE) / TOUCH_WHEEL_FULL, WHEEL_LEFT,
+				WHEEL_RIGHT);
+#endif
 		if (!pad)
 			continue;
 		/* the controller's stick and triggers, where they are moved, over the keyboard's */
@@ -1322,6 +1384,8 @@ static char *saves_folder(void)
 #ifdef __SWITCH__
 	mkdir(SWITCH_FOLDER, 0777);
 	return SDL_strdup(SWITCH_FOLDER "/");
+#elif defined(__ANDROID__)
+	return SDL_GetPrefPath("", "OutRunners");    /* (the app's own folder, its internal storage) */
 #elif defined(_WIN32) || defined(ORUNNERS_HANDHELD)
 	return SDL_GetBasePath();    /* (a handheld's: the game's folder on its card) */
 #else
@@ -1372,6 +1436,42 @@ static int app_folder(const char *base, char *folder, size_t size)
 #endif
 }
 
+#ifdef __ANDROID__
+static const char android_pack_missing[] = "missing";
+
+/* The pack in the APK's assets, read whole: what the game loads points into it, so it is kept for as long as
+   the game runs. NULL, android_pack_missing, or what is wrong with it */
+static const char *load_android_pack(void)
+{
+	SDL_RWops *packed = SDL_RWFromFile(ASSETS_PACK, "rb");
+	const Sint64 size = packed ? SDL_RWsize(packed) : -1;
+	uint8_t *bytes = size > 0 ? malloc((size_t)size) : NULL;
+	size_t got = 0;
+	const char *problem;
+
+	if (!packed)
+		return android_pack_missing;
+	while (bytes && got < (size_t)size)
+	{
+		/* (its bytes as the asset manager hands them: maybe fewer than asked for at a time) */
+		const size_t now = SDL_RWread(packed, bytes + got, 1, (size_t)size - got);
+
+		if (now == 0)
+			break;
+		got += now;
+	}
+	SDL_RWclose(packed);
+	if (!bytes || got != (size_t)size)
+	{
+		free(bytes);
+		return "the pack cannot be read whole";
+	}
+	if ((problem = assets_load_pack_bytes(bytes, (size_t)size)) != NULL)
+		free(bytes);
+	return problem;
+}
+#endif
+
 int main(int argc, char **argv)
 {
 	SDL_AudioSpec wanted;
@@ -1387,6 +1487,22 @@ int main(int argc, char **argv)
 	mkdir(SWITCH_FOLDER, 0777);
 	freopen(SWITCH_FOLDER "/outrunners.log", "w", stderr);
 	fprintf(stderr, "OutRunners: starting\n");
+#endif
+#ifdef __ANDROID__
+	/* (what the game says goes to outrunners.log in the app's folder on the storage, Android/data/<the
+	   app>/files: stderr goes nowhere there) */
+	if (SDL_AndroidGetExternalStoragePath())
+	{
+		char log_path[1024];
+
+		snprintf(log_path, sizeof(log_path), "%s/outrunners.log", SDL_AndroidGetExternalStoragePath());
+		freopen(log_path, "w", stderr);
+	}
+	fprintf(stderr, "OutRunners: starting\n");
+	SDL_SetHint(SDL_HINT_ANDROID_TRAP_BACK_BUTTON, "1");    /* (back is the menus' back, never the end) */
+	SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");          /* (fingers are the touch controls, not the mouse) */
+	SDL_SetHint(SDL_HINT_ACCELEROMETER_AS_JOYSTICK, "0");
+	SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
 #endif
 #ifdef ORUNNERS_HANDHELD
 	add_device_mappings();
@@ -1435,6 +1551,8 @@ int main(int argc, char **argv)
 
 #ifdef __SWITCH__
 	base = SDL_strdup("romfs:/");    /* (what comes with the game: the pack and the pictures) */
+#elif defined(__ANDROID__)
+	base = SDL_strdup("");           /* (the APK's assets, which SDL's files read by a relative path) */
 #else
 	base = SDL_GetBasePath();
 #endif
@@ -1456,6 +1574,16 @@ int main(int argc, char **argv)
 		load_prompts(base ? base : "");    /* (the pictures come with the game, beside it) */
 	}
 #endif
+#ifdef __ANDROID__
+	{
+		/* the pack in the APK's assets (stored, not packed: android.cmake), read whole */
+		const char *problem = load_android_pack();
+
+		if (problem)
+			return fail(problem == android_pack_missing ? "The game's assets are missing." : "The game's assets cannot be read.",
+				problem == android_pack_missing ? ASSETS_PACK : problem);
+	}
+#else
 	{
 		/* the folder of the game's assets: --assets, else beside the executable, beside the .app on macOS, in
 		   the folder of what the game keeps, or in the current folder; with none, the first run's, in the
@@ -1540,6 +1668,7 @@ int main(int argc, char **argv)
 		}
 #endif
 	}
+#endif
 	SDL_free(base);
 	SDL_free(saves);
 
@@ -1565,6 +1694,9 @@ int main(int argc, char **argv)
 		return fail("The window could not be opened.", SDL_GetError());
 	SDL_RenderSetIntegerScale(renderer, SDL_FALSE);
 	SDL_SetTextureScaleMode(texture, SDL_ScaleModeNearest);
+#ifdef ORUNNERS_TOUCH
+	touch_open(renderer, "");    /* (their letters come with the game: Android's in the APK's assets) */
+#endif
 
 	/* the mix at the YM3438's rate; SDL takes it to the device's */
 	SDL_zero(wanted);
@@ -1617,6 +1749,9 @@ int main(int argc, char **argv)
 	SDL_Quit();
 #ifdef __SWITCH__
 	romfsExit();
+#endif
+#ifdef __ANDROID__
+	exit(0);    /* (the app's process ends with the game: Android would start the next one in it, as this one left it) */
 #endif
 	return 0;
 }

@@ -3,7 +3,7 @@
  *    Description: what the console build tells the port
  *    Version:     0.1.0
  *    Created:     29-10-2026
- *    Modified:    29-10-2026
+ *    Modified:    30-10-2026
  *    Author:      Sebastian Toyos
  */
 #ifndef ORUNNERS_CONSOLE_H
@@ -50,6 +50,10 @@ bool console_quit_requested(void);
    being played, back to the title */
 bool console_can_pause(void);
 void console_quit_game(void);
+
+/* True while the left seat races with the manual transmission (the car select's choice): the touch controls'
+   gear buttons are shown then alone */
+bool console_manual_gears(void);
 
 /* The pause's words, PAUSE and its lines (CONTINUE, QUIT GAME), in the game's letters: sprite entries for
    s32_video_overlay_sprites into 'list' ('room' bytes), the line 'choice' in colour; their size in bytes */
@@ -112,12 +116,20 @@ enum
 	PIXELS_KINDS
 };
 
+enum
+{
+	WIDE_OFF,           /* the board's 320 pixels, 4:3 */
+	WIDE_16_9,          /* 48 more at each side (S32_VIDEO_WIDE_SIDE_16_9) */
+	WIDE_20_9,          /* 88 more at each side (S32_VIDEO_WIDE_SIDE_20_9): a phone's screen */
+	WIDE_KINDS
+};
+
 typedef struct
 {
 	int window_scale;      /* 1-6: the window, in times the game's picture */
 	bool full_screen;
 	int pixels;            /* PIXELS_* */
-	bool wide;             /* a 16:9 picture */
+	int wide;              /* WIDE_*: a wider picture */
 	bool vertical;         /* 2 PLAYERS: one screen over the other (false: side by side) */
 	int volume;            /* 0-10: 5 is the game's own */
 	bool changed;
@@ -125,10 +137,9 @@ typedef struct
 
 extern console_window console_window_settings;
 
-/* WIDE draws this frame wider (s32_video_set_wide): a race is run on the left seat's screen (a game's or the
-   attract mode's demo); the other screens' pictures end at their 320 pixels, so they keep them, between
-   black bars */
-bool console_wide_now(void);
+/* WIDE draws the frames wider (s32_video_set_wide_side): the columns more at each side, or 0 (WIDE off, or
+   2 PLAYERS, whose screens are both the board's) */
+int console_wide_side(void);
 
 /* The folder TIME ATTACK keeps its ghosts in (ghost_0.bin to ghost_9.bin, a goal each), with its separator */
 void console_ghost_folder(const char *folder);

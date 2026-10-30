@@ -4,7 +4,7 @@
  *                 ten goals, a car on the one picked
  *    Version:     0.1.0
  *    Created:     29-10-2026
- *    Modified:    29-10-2026
+ *    Modified:    30-10-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
@@ -38,6 +38,8 @@
 #define HEADING_Y           12
 #define NAME_Y              30
 #define SCREEN_WIDTH        320
+#define MAP_RIGHT           904        /* the world map's right edge, in the map's columns (WIDE 20:9 reaches past
+                                          it at the east half's scroll) */
 
 /* Each goal's place on the map (stages 15-1E: its x, the screen's scroll x added; its y), where its route
    ends: the east's five from the bottom up, the west's from the top down */
@@ -234,8 +236,10 @@ int console_route_select_frame(uint32_t pressed)
 		pick.car_y = pick.from_y + (goal_places[pick.goal][1] - pick.from_y) * done / pick.move_frames;
 	}
 	{
-		/* the map after the car, from one side's place to the other's */
-		const int west = route_map_whole_scroll_xs[WEST], east = route_map_whole_scroll_xs[EAST];
+		/* the map after the car, from one side's place to the other's, the picture's right edge on the map */
+		const int west = route_map_whole_scroll_xs[WEST];
+		const int east_most = MAP_RIGHT - SCREEN_WIDTH - console_wide_side();
+		const int east = route_map_whole_scroll_xs[EAST] < east_most ? route_map_whole_scroll_xs[EAST] : east_most;
 		int scroll = pick.car_x - SCREEN_WIDTH / 2;
 
 		scroll = scroll < west ? west : (scroll > east ? east : scroll);

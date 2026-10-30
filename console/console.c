@@ -4,7 +4,7 @@
  *                 what it tells the port
  *    Version:     0.1.0
  *    Created:     29-10-2026
- *    Modified:    29-10-2026
+ *    Modified:    30-10-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
@@ -22,6 +22,8 @@
 #define COIN_SETTINGS       0x1Au    /* the test mode's COIN/CREDIT SETTING: 26 */
 #define START_BUTTON        0x40u    /* screen buttons_pressed: START */
 #define TIME_ATTACK_TIME_LEFT (99u * 30u)    /* race time_left, in 30ths of a second */
+#define SCREEN_CAR          0x1000u  /* the screen's car, beside its block (the register player_car) */
+#define TRANSMISSION_MANUAL 1u       /* car transmission (car_select_wheel_transmissions): 0 automatic */
 
 console_state console;
 
@@ -295,9 +297,16 @@ static bool racing(uint32_t screen_block)
 	return step == 5u || step == 6u || step == 7u || step == 8u || step == 11u || (step >= 23u && step <= 27u);
 }
 
-bool console_wide_now(void)
+int console_wide_side(void)
 {
-	return console_window_settings.wide && !console.two_players;    /* (2 PLAYERS: both screens alike) */
+	if (console.two_players)
+		return 0;    /* (2 PLAYERS: both screens alike) */
+	switch (console_window_settings.wide)
+	{
+		case WIDE_16_9: return S32_VIDEO_WIDE_SIDE_16_9;
+		case WIDE_20_9: return S32_VIDEO_WIDE_SIDE_20_9;
+		default: return 0;
+	}
 }
 
 bool console_both_screens(void)
@@ -321,7 +330,13 @@ void console_actions(uint32_t pressed)
 
 bool console_can_pause(void)
 {
-	return SCREEN(SCREEN_1)->game_mode == GAME_MODE_PLAY && racing(SCREEN_1);
+	/* (not over REVERSE's map, in the race's step 5: its START picks the goal) */
+	return SCREEN(SCREEN_1)->game_mode == GAME_MODE_PLAY && racing(SCREEN_1) && !console_route_select_running();
+}
+
+bool console_manual_gears(void)
+{
+	return console_can_pause() && CAR(SCREEN_1 + SCREEN_CAR)->transmission == TRANSMISSION_MANUAL;
 }
 
 void console_quit_game(void)

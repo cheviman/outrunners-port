@@ -64,6 +64,7 @@ static const char *const options_items[] = { "CONTROLS", "DIFFICULTY", "TIME", "
 static const char *const time_stages[TIME_STAGES] = { "PRE-STAGE", "STAGE 1", "STAGE 2", "STAGE 3", "STAGE 4",
 	"FINAL STAGE" };
 static const char *const pixel_kinds[PIXELS_KINDS] = { "SHARP", "SMOOTH", "BILINEAR", "CRT" };
+static const char *const wide_kinds[WIDE_KINDS] = { "OFF", "16:9", "20:9" };
 static const char *const control_names[CONTROLS] = { "STEER LEFT", "STEER RIGHT", "GAS", "BRAKE", "SHIFT UP",
 	"SHIFT DOWN", "MUSIC", "SONG <<", "SONG >>", "START" };
 /* the test mode's GAME DIFFICULTY, from EASY to HARD on its bar of 8 (the fourth, the game's own) */
@@ -150,7 +151,7 @@ static void page_heading(const char *heading)
 
 static void darken_page(void)
 {
-	const int side = console_wide_now() ? S32_VIDEO_WIDE_SIDE : 0;    /* (WIDE: the screen's sides too) */
+	const int side = console_wide_side();    /* (WIDE: the screen's sides too) */
 
 	console_shade(-side, 0, SCREEN_WIDTH + 2 * side, 224);
 }
@@ -404,7 +405,7 @@ static void video_frame(uint32_t pressed)
 				window->changed = true;
 				break;
 			case VIDEO_WIDE:
-				window->wide = !window->wide;
+				window->wide = step(window->wide, by ? by : 1, 0, WIDE_KINDS - 1);
 				window->changed = true;
 				break;
 			case VIDEO_TWO_PLAYERS:
@@ -425,7 +426,8 @@ static void video_frame(uint32_t pressed)
 	line(VIDEO_FULL_SCREEN, "FULL SCREEN", window->full_screen ? "< ON >" : "< OFF >");
 	snprintf(value, sizeof(value), "< %s >", pixel_kinds[window->pixels]);
 	line(VIDEO_PIXELS, "PIXELS", value);
-	line(VIDEO_WIDE, "WIDE", window->wide ? "< ON >" : "< OFF >");
+	snprintf(value, sizeof(value), "< %s >", wide_kinds[window->wide]);
+	line(VIDEO_WIDE, "WIDE", value);
 	line(VIDEO_TWO_PLAYERS, "2 PLAYERS", window->vertical ? "< VERTICAL >" : "< HORIZONTAL >");
 	line(VIDEO_BACK, "BACK", NULL);
 	darken_page();

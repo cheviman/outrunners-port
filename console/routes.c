@@ -53,6 +53,7 @@
 #define LAST_FORK_STAGE     0x14         /* the last stage with a fork of the game's */
 #define GOALS               10
 #define GOAL_CHECKPOINT     5            /* the game's checkpoints: the forks 0-4, then the goal */
+#define REVERSE_START_EXTRA 59           /* REVERSE's start: 99 seconds, the clock's most beside FINAL STAGE */
 #define GOAL_FORK           1792         /* a goal stage's goal, where the routes fork */
 #define STAGE_FORK          1664         /* the other stages' fork */
 #define FORK_OBJECTS_FROM   1408         /* stage 1's stream: its fork camera on */
@@ -108,6 +109,9 @@ static struct
 	uint8_t parents[STAGES][2];        /* REVERSE's: by branch (the same twice for one parent) */
 	int running;                       /* ROUTE_* of the game started */
 	int goal;                          /* REVERSE: the picked goal's stage */
+	bool time_given;                   /* REVERSE: the start's time is in the race's time_left */
+	int8_t start_difficulty;           /* REVERSE: the TIME setting of the start (the race's master_time_difficulty
+	                                      0), while the start's own time is in its place */
 	int folded_stage;                  /* FULL: the stage the game's counts were last taken back for */
 	uint32_t time_base;                /* FULL: the race's time taken out of it, in hundredths */
 	bool total_shown;                  /* FULL: the goal's time is the total */
@@ -500,7 +504,31 @@ void console_reverse_start(void)
 {
 	build_reverse();
 	routes.goal = 0;    /* (picked on the route map, once the car select is over) */
+	routes.time_given = true;    /* (nothing in the setting until the goal is picked) */
 	routes.running = ROUTE_REVERSE;
+}
+
+/* What a REVERSE checkpoint gives in the game's own race, in frames: the time of the stage it leads to (one of
+   each level, from the last fork's down to the pre-stage's) and that checkpoint's TIME setting */
+static int reverse_checkpoint_given(int checkpoint)
+{
+	static const uint8_t level_stages[GOAL_CHECKPOINT] = { 0x0D, 0x07, 0x03, 0x01, 0x00 };
+
+	return (stage_start_times[level_stages[checkpoint]] + master_time_difficulty[checkpoint]) * 0x1E;
+}
+
+/* REVERSE's time at a checkpoint: the game's, less what the start gave beyond the game's start
+   (REVERSE_START_EXTRA), taken back from the last checkpoints (the pre-stage's first): the race's whole
+   time the game's own, its margin at the start, where the longest course is, and not at the end */
+static int reverse_checkpoint_time(int checkpoint)
+{
+	int later = 0, owed;
+	const int given = reverse_checkpoint_given(checkpoint);
+
+	for (int after = checkpoint + 1; after < GOAL_CHECKPOINT; after++)
+		later += reverse_checkpoint_given(after);
+	owed = REVERSE_START_EXTRA * 0x1E - later;
+	return owed <= 0 ? given : (owed >= given ? 0 : given - owed);
 }
 
 void console_full_start(void)
@@ -675,6 +703,10 @@ bool console_routes_frame(uint32_t mode, uint32_t pressed)
 		{
 			case ROUTE_SELECT_START:
 				routes.goal = FIRST_GOAL + console_route_select_goal();
+				/* (the race's start: REVERSE_START_EXTRA more in the setting the car adds to its 40 seconds) */
+				routes.start_difficulty = master_time_difficulty[0];
+				master_time_difficulty[0] = (int8_t)(master_time_difficulty[0] + REVERSE_START_EXTRA);
+				routes.time_given = false;
 				break;
 			case ROUTE_SELECT_BACK:
 				console_quit_game();
@@ -774,7 +806,9 @@ void race_background_update(void)
 
 /* The race's checkpoints: the time a fork adds the route's next stage's (the game's is by the stage its
    forward fork leads to, and has no goal stage's), from a goal stage as from the last fork's (the game
-   reads its forks by the stage) */
+   reads its forks by the stage). REVERSE's time is the game's turned round (Sebas): the whole race's at the
+   start, its first course a goal's, the longest, and nothing at the checkpoints, as the game's own race
+   gathers it course by course */
 void race_progress_update(void)
 {
 	const uint32_t race = SCREEN(screen)->race, race_copy = SCREEN(screen)->race_copy;
@@ -784,6 +818,13 @@ void race_progress_update(void)
 	{
 		original_race_progress_update();
 		return;
+	}
+	if (routes.running == ROUTE_REVERSE && !routes.time_given && RACE(race)->time_left != 0u)
+	{
+		/* (the start's time set by the car, player_car_update, with REVERSE_START_EXTRA in the setting: the
+		   setting back) */
+		master_time_difficulty[0] = routes.start_difficulty;
+		routes.time_given = true;
 	}
 	stage = RACE(race_copy)->stage;
 	read_stage = stage <= LAST_FORK_STAGE ? stage : LAST_FORK_STAGE;
@@ -800,7 +841,8 @@ void race_progress_update(void)
 		const int next = routes.running == ROUTE_FULL ? stage + 1 : routes.parents[stage][branch & 1u];
 		const int given = (int8_t)(stage_start_times[fork_next_stages[read_stage * 2 + branch]]
 			+ master_time_difficulty[checkpoint]) * 0x1E;
-		const int due = (int8_t)(stage_start_times[next] + master_time_difficulty[checkpoint]) * 0x1E;
+		const int due = routes.running == ROUTE_REVERSE ? reverse_checkpoint_time(checkpoint)
+			: (int8_t)(stage_start_times[next] + master_time_difficulty[checkpoint]) * 0x1E;
 
 		RACE(race)->time_left = (uint16_t)(RACE(race)->time_left + due - given);
 	}

@@ -156,6 +156,26 @@ merged here; this repository adds console/, the ports and their documents.
 - OutRunners Anbernic (ports/anbernic/maker), as OutRunners NSP (Sebas): PORTS for the handheld's card from
   the game's Anbernic build (build/bin/anbernic, no assets in it) and the player's ROM set, written beside
   the tool or straight into the card's Roms.
+- Android (ports/android): libmain.so and the APKs with the NDK and the SDK's tools, without Gradle; the touch
+  controls (ports/sdl2/touch.c: the wheel, GAS, BRAKE, START, the gears with the manual transmission alone,
+  MUSIC a small oval at the bottom); OutRunners APK, SegaSonic APK's with the pack made from the ROM set.
+- The project's icon (tools/make_icon.py): a steering wheel on a sunset, for the builds without a picture of
+  the player's own. Sebas's own (local/, never committed): the car for the computer, the flyer for the
+  Switch, the title's oval for Android.
+- REVERSE's map: no pause over it (it is the race's step 5), so START confirms the goal.
+- WIDE 16:9 and 20:9 (Sebas): OPTIONS > VIDEO's WIDE OFF, 16:9 (48 columns more at each side, 416) or 20:9
+  (88, 496); Android takes 20:9 where its screen is twice as wide as high or more, the Switch 16:9. 16:9's
+  frames the same as before (but VIDEO's line); REVERSE's map kept within its right edge at 20:9.
+- REVERSE's time turned round (Sebas: its first course, a goal's, the longest, ran out at 40 seconds): the
+  start 99 seconds, the clock's most beside FINAL STAGE (the setting the car adds to its 40, for that one
+  start), and the 59 more taken back from the last checkpoints (the pre-stage's gives nothing, the first
+  level's 13): the race's whole time the game's own, its margin at the start.
+
+## To do
+
+- 2 PLAYERS on the Switch up to 4 players a console (Sebas, 30-10-2026), the screen in four, with the
+  network's multiplayer.
+- The car (Sebas's local/icon_pc.png) as the computer's window icon, from the player's own picture.
 
 ## Order
 
