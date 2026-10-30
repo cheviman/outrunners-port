@@ -18,7 +18,8 @@
  *    up from the start, then each level's stage across the map and the branch road after it up or down by
  *    the fork's branch, as far as the left car is into its stage (its course, then its branch road) and
  *    at most a step a frame, as the game's map drives; the car waits at a checkpoint until the fork is
- *    decided. The port draws the screen in the room (console_side_map_shown).
+ *    decided. The port draws the screen in the room, the part around the car (console_side_map_shown,
+ *    console_side_map_car).
  */
 #include "console.h"
 #include "console_internal.h"
@@ -317,6 +318,12 @@ void side_map_sign_update(void)
 bool console_side_map_running(void)
 {
 	return side.running;
+}
+
+void console_side_map_car(int *x, int *y)
+{
+	*x = side.at.car_x;
+	*y = side.at.car_y;
 }
 
 int console_side_map_frame(bool due)

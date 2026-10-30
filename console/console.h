@@ -51,9 +51,13 @@ bool console_quit_requested(void);
 bool console_can_pause(void);
 void console_quit_game(void);
 
-/* True while the left seat races with the manual transmission (the car select's choice): the touch controls'
-   gear buttons are shown then alone */
-bool console_manual_gears(void);
+/* True while player 'player''s seat (0 the left) races with the manual transmission (the car select's
+   choice): the touch controls' gear buttons are shown then alone */
+bool console_manual_gears(int player);
+
+/* 2 PLAYERS in the title's menu where the build has none (a phone's): the port offers it each frame where it
+   can show both players (a tablet's screen, the two facing each other) */
+void console_offer_two_players(bool offered);
 
 
 /* The pause's words, PAUSE and its lines (CONTINUE, QUIT GAME), in the game's letters: sprite entries for
@@ -72,6 +76,9 @@ size_t console_pause_sprites(uint8_t *list, size_t room, int choice);
    its screen is shown there while true */
 void console_side_map_wanted(bool wanted);
 bool console_side_map_shown(void);
+
+/* Where the car is on it, in the board's pixels of the screen (for the port to show the part around it) */
+void console_side_map_car(int *x, int *y);
 
 /* CLASSIC: true while the right seat may join the race being entered with its START, its screen unseen */
 bool console_right_seat_joins(void);

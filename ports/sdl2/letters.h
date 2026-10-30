@@ -40,4 +40,8 @@ void letters_draw(SDL_Renderer *renderer, const letters *font, const char *text,
 void letters_draw_at(SDL_Renderer *renderer, const letters *font, const char *text, int centre_x, int y, int scale,
 	SDL_Color colour);
 
+/* ... turned half round about 'about': for a player across the screen */
+void letters_draw_turned(SDL_Renderer *renderer, const letters *font, const char *text, int centre_x, int y, int scale,
+	SDL_Color colour, SDL_Point about);
+
 #endif

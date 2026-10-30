@@ -223,11 +223,38 @@ static int screens_shown(void)
 #endif
 }
 
-/* One screen over the other (the console's 2 PLAYERS, VERTICAL) */
+#ifdef ORUNNERS_TOUCH
+#define TABLET_SIDE_INCHES 4.0    /* a tablet's screen (an open Fold's too): its short side at least this long */
+
+static bool tablet;               /* the screen is a tablet's: 2 PLAYERS there, the two screens facing each other */
+
+/* A tablet's screen, by its pixels and their density */
+static bool tablet_screen(int width, int height)
+{
+	float horizontal = 0.0f, vertical = 0.0f;
+
+	if (SDL_GetDisplayDPI(SDL_GetWindowDisplayIndex(window), NULL, &horizontal, &vertical) != 0 || horizontal <= 0.0f
+		|| vertical <= 0.0f)
+		return false;
+	return SDL_min(width / horizontal, height / vertical) >= TABLET_SIDE_INCHES;
+}
+#endif
+
+/* 2 PLAYERS on a tablet: the screens facing each other, the second turned for the player across */
+static bool screens_facing(void)
+{
+#ifdef ORUNNERS_TOUCH
+	return screens_shown() == 2 && tablet;
+#else
+	return false;
+#endif
+}
+
+/* One screen over the other (the console's 2 PLAYERS, VERTICAL, or facing each other) */
 static bool screens_stacked(void)
 {
 #ifdef ORUNNERS_CONSOLE
-	return screens_shown() == 2 && console_window_settings.vertical;
+	return screens_shown() == 2 && (console_window_settings.vertical || screens_facing());
 #else
 	return false;
 #endif
@@ -330,6 +357,7 @@ static int pause_widths[2];
 /* The route map beside the race (console_side_map_shown): the right screen's frame, its board's columns, in
    the texture's corner the screens leave free */
 #define SIDE_MAP_WIDTH 320
+#define SIDE_MAP_CAR_HEIGHT 16    /* the car on the map, above its place */
 
 static const SDL_Rect side_map_source = { S32_VIDEO_MAX_WIDTH, S32_VIDEO_HEIGHT, SIDE_MAP_WIDTH, S32_VIDEO_HEIGHT };
 
@@ -343,41 +371,60 @@ static void upload_side_map(void)
 	SDL_UpdateTexture(texture, &side_map_source, pixels, S32_VIDEO_MAX_WIDTH * (int)sizeof(uint32_t));
 }
 
-/* And in the room the controls leave for it, as large as it fits with its proportions */
+/* And filling the room under the picture, behind the controls (Sebas: none of it black): as large as it
+   takes, the part of it shown the one around the car */
 static void present_side_map(const SDL_Rect *room)
 {
-	const double scale = SDL_min((double)room->w / side_map_source.w, (double)room->h / side_map_source.h);
-	SDL_Rect shown;
+	const double scale = SDL_max((double)room->w / side_map_source.w, (double)room->h / side_map_source.h);
+	SDL_Rect part;
+	int car_x, car_y;
 
-	shown.w = (int)(side_map_source.w * scale);
-	shown.h = (int)(side_map_source.h * scale);
-	shown.x = room->x + (room->w - shown.w) / 2;
-	shown.y = room->y + (room->h - shown.h) / 2;
-	SDL_RenderCopy(renderer, texture, &side_map_source, &shown);
+	console_side_map_car(&car_x, &car_y);
+	part.w = SDL_min(side_map_source.w, (int)lround(room->w / scale));
+	part.h = SDL_min(side_map_source.h, (int)lround(room->h / scale));
+	part.x = side_map_source.x + SDL_clamp(car_x - part.w / 2, 0, side_map_source.w - part.w);
+	part.y = side_map_source.y + SDL_clamp(car_y - SIDE_MAP_CAR_HEIGHT / 2 - part.h / 2, 0, side_map_source.h - part.h);
+	SDL_RenderCopy(renderer, texture, &part, room);
 }
 #endif
 
-/* The picture (its part 'source' of 'texture') in the window, as large as it fits with its proportions */
+/* The picture (its part 'source' of 'texture') in the window, as large as it fits with its proportions; with
+   the screens facing each other, each screen on its half, the second turned half round */
 static void present(SDL_Rect source)
 {
 	const int kind = pixels_kind();
-	SDL_Rect shown;
+	SDL_Rect shown[2], from[2];
+	int pictures = 1;
 	int out_width = 0, out_height = 0;
 	double scale;
 #ifdef ORUNNERS_TOUCH
 	SDL_Rect map_room;
-	bool map_room_there;
+	bool map_room_there = false;
 #endif
 
 	SDL_GetRendererOutputSize(renderer, &out_width, &out_height);
 	scale = SDL_min((double)out_width / source.w, (double)out_height / source.h);
-	shown.w = (int)(source.w * scale);
-	shown.h = (int)(source.h * scale);
-	shown.x = (out_width - shown.w) / 2;
-	shown.y = (out_height - shown.h) / 2;
+	shown[0].w = (int)(source.w * scale);
+	shown[0].h = (int)(source.h * scale);
+	shown[0].x = (out_width - shown[0].w) / 2;
+	shown[0].y = (out_height - shown[0].h) / 2;
+	from[0] = source;
 #ifdef ORUNNERS_TOUCH
-	touch_layout(out_width, out_height, &shown);    /* (a tall screen: the picture at the top, the controls under it) */
-	map_room_there = touch_map_room(&map_room);
+	tablet = tablet_screen(out_width, out_height);
+	console_offer_two_players(tablet);
+	if (screens_facing())
+	{
+		touch_layout_facing(out_width, out_height, source.w, S32_VIDEO_HEIGHT, shown);
+		for (int screen = 0; screen < 2; screen++)
+			from[screen] = (SDL_Rect){ source.x, source.y + screen * S32_VIDEO_HEIGHT, source.w, S32_VIDEO_HEIGHT };
+		pictures = 2;
+		scale = (double)shown[0].w / source.w;
+	}
+	else
+	{
+		touch_layout(out_width, out_height, &shown[0]);    /* (a tall screen: the picture at the top, the controls under it) */
+		map_room_there = touch_map_room(&map_room);
+	}
 	console_side_map_wanted(map_room_there);    /* (and between them the route map, from the game's next frame) */
 #endif
 	SDL_SetTextureScaleMode(texture, kind == 2 ? SDL_ScaleModeLinear : SDL_ScaleModeNearest);
@@ -403,25 +450,40 @@ static void present(SDL_Rect source)
 			SDL_RenderCopy(renderer, texture, &source, &whole);
 			SDL_SetRenderTarget(renderer, NULL);
 			SDL_RenderClear(renderer);
-			SDL_RenderCopy(renderer, scaled, &whole, &shown);
+			for (int picture = 0; picture < pictures; picture++)
+			{
+				const SDL_Rect part = { (from[picture].x - source.x) * times, (from[picture].y - source.y) * times,
+					from[picture].w * times, from[picture].h * times };
+
+				SDL_RenderCopyEx(renderer, scaled, &part, &shown[picture], picture == 1 ? 180.0 : 0.0, NULL,
+					SDL_FLIP_NONE);
+			}
 		}
 		if (kind == 3)
-		{
-			make_crt_overlay(shown.w, shown.h, source.h);
-			if (crt_overlay)
-				SDL_RenderCopy(renderer, crt_overlay, NULL, &shown);
-		}
+			for (int picture = 0; picture < pictures; picture++)
+			{
+				make_crt_overlay(shown[picture].w, shown[picture].h, from[picture].h);
+				if (crt_overlay)
+					SDL_RenderCopyEx(renderer, crt_overlay, NULL, &shown[picture], picture == 1 ? 180.0 : 0.0, NULL,
+						SDL_FLIP_NONE);
+			}
 	}
 	else
-		SDL_RenderCopy(renderer, texture, &source, &shown);
+		for (int picture = 0; picture < pictures; picture++)
+			SDL_RenderCopyEx(renderer, texture, &from[picture], &shown[picture], picture == 1 ? 180.0 : 0.0, NULL,
+				SDL_FLIP_NONE);
 #ifdef ORUNNERS_TOUCH
 	if (map_room_there && console_side_map_shown())
 		present_side_map(&map_room);
+	{
 #ifdef ORUNNERS_TOUCH_TEST
-	touch_draw(renderer, true);    /* (a computer's check: the gears' buttons always, to see them) */
+		const bool gears[TOUCH_PLAYERS] = { true, true };    /* (a computer's check: the gears' buttons always, to see them) */
 #else
-	touch_draw(renderer, console_manual_gears());    /* (the gears' buttons with the manual transmission) */
+		const bool gears[TOUCH_PLAYERS] = { console_manual_gears(0), console_manual_gears(1) };    /* (the manual transmission's) */
 #endif
+
+		touch_draw(renderer, gears);
+	}
 #endif
 	SDL_RenderPresent(renderer);
 }
@@ -983,12 +1045,12 @@ static int trigger_pedal(SDL_GameController *pad, SDL_GameControllerAxis axis)
 
 /* the state of every control once a frame, where the board reads them (VBLANK) */
 #ifdef ORUNNERS_CONSOLE
-/* True while one of the player's keys or controller's buttons for 'control' is held, or for player 1 a finger
-   on the touch controls (Android's) */
+/* True while one of the player's keys or controller's buttons for 'control' is held, or a finger on the
+   player's touch controls (Android's) */
 static bool holds(int player, SDL_GameController *pad, int control)
 {
 #ifdef ORUNNERS_TOUCH
-	if (player == 0 && touch_holds(control))
+	if (player < TOUCH_PLAYERS && touch_holds(player, control))
 		return true;
 #endif
 	return controls_holds(player, pad, control);
@@ -1087,9 +1149,9 @@ static void on_controls_update(void)
 		gases[player] = gas[player];
 		brakes[player] = brake[player];
 #ifdef ORUNNERS_TOUCH
-		if (player == 0 && touch_wheel() != 0)    /* (the touch wheel, as far as it turns) */
-			wheels[0] = clamp(WHEEL_CENTRE + touch_wheel() * (WHEEL_RIGHT - WHEEL_CENTRE) / TOUCH_WHEEL_FULL, WHEEL_LEFT,
-				WHEEL_RIGHT);
+		if (player < TOUCH_PLAYERS && touch_wheel(player) != 0)    /* (the touch wheel, as far as it turns) */
+			wheels[player] = clamp(WHEEL_CENTRE + touch_wheel(player) * (WHEEL_RIGHT - WHEEL_CENTRE) / TOUCH_WHEEL_FULL,
+				WHEEL_LEFT, WHEEL_RIGHT);
 #endif
 		if (!pad)
 			continue;

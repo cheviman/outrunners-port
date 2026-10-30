@@ -186,14 +186,17 @@ merged here; this repository adds console/, the ports and their documents.
   screen there; a phone's screen as before. ORUNNERS_TOUCH_TEST: the touch controls in a computer's window,
   the mouse a finger; the headless build's --side-map.
 
+- The route map fills the room under the picture, behind the controls (Sebas: none of it black), the part
+  around the car. 2 PLAYERS on a tablet or an open Fold (Sebas): offered in the title's menu where the screen's
+  short side is 4 inches or more, the two screens facing each other, the first player's on the bottom half
+  and the second's on the top one turned half round, each with its own touch controls, turned with it.
+
 ## To do
 
 - The decompilation's new version merged (Sebas: before the network).
 - The network, last (Sebas).
 - 2 PLAYERS on the Switch up to 4 players a console (Sebas, 30-10-2026), the screen in four, with the
   network's multiplayer.
-- 2 PLAYERS on a tablet or an open Fold (Sebas, 30-10-2026): the two screens facing each other, the far one
-  turned round, each player's touch controls on their side.
 
 ## Order
 

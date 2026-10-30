@@ -362,9 +362,12 @@ bool console_can_pause(void)
 	return SCREEN(SCREEN_1)->game_mode == GAME_MODE_PLAY && racing(SCREEN_1) && !console_route_select_running();
 }
 
-bool console_manual_gears(void)
+bool console_manual_gears(int player)
 {
-	return console_can_pause() && CAR(SCREEN_1 + SCREEN_CAR)->transmission == TRANSMISSION_MANUAL;
+	const uint32_t seat = player == 0 ? SCREEN_1 : SCREEN_2;
+
+	return SCREEN(seat)->game_mode == GAME_MODE_PLAY && racing(seat) && !console_route_select_running()
+		&& CAR(seat + SCREEN_CAR)->transmission == TRANSMISSION_MANUAL;
 }
 
 void console_quit_game(void)

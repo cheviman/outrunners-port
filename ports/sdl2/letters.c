@@ -70,9 +70,9 @@ int letters_width(const letters *font, const char *text, int scale)
 	return width > 0 ? width - FONT_SPACING * scale : 0;
 }
 
-/* The line with its left at x */
+/* The line with its left at x, upright or turned half round about 'about' */
 static void draw_from(SDL_Renderer *renderer, const letters *font, const char *text, int x, int y, int scale,
-	SDL_Color colour)
+	SDL_Color colour, const SDL_Point *about)
 {
 	SDL_SetTextureColorMod(font->sheet, colour.r, colour.g, colour.b);
 	for (; *text; text++)
@@ -91,8 +91,13 @@ static void draw_from(SDL_Renderer *renderer, const letters *font, const char *t
 		to.y = y;
 		to.w = from.w * scale;
 		to.h = LETTERS_CELL * scale;
+		if (about)
+		{
+			to.x = 2 * about->x - to.x - to.w;
+			to.y = 2 * about->y - to.y - to.h;
+		}
 		if (*text != ' ')
-			SDL_RenderCopy(renderer, font->sheet, &from, &to);
+			SDL_RenderCopyEx(renderer, font->sheet, &from, &to, about ? 180.0 : 0.0, NULL, SDL_FLIP_NONE);
 		x += (font->widths[index] + FONT_SPACING) * scale;
 	}
 }
@@ -100,11 +105,17 @@ static void draw_from(SDL_Renderer *renderer, const letters *font, const char *t
 void letters_draw(SDL_Renderer *renderer, const letters *font, const char *text, int y, int scale, SDL_Color colour,
 	int width)
 {
-	draw_from(renderer, font, text, (width - letters_width(font, text, scale)) / 2, y, scale, colour);
+	draw_from(renderer, font, text, (width - letters_width(font, text, scale)) / 2, y, scale, colour, NULL);
 }
 
 void letters_draw_at(SDL_Renderer *renderer, const letters *font, const char *text, int centre_x, int y, int scale,
 	SDL_Color colour)
 {
-	draw_from(renderer, font, text, centre_x - letters_width(font, text, scale) / 2, y, scale, colour);
+	draw_from(renderer, font, text, centre_x - letters_width(font, text, scale) / 2, y, scale, colour, NULL);
+}
+
+void letters_draw_turned(SDL_Renderer *renderer, const letters *font, const char *text, int centre_x, int y, int scale,
+	SDL_Color colour, SDL_Point about)
+{
+	draw_from(renderer, font, text, centre_x - letters_width(font, text, scale) / 2, y, scale, colour, &about);
 }

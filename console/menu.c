@@ -82,17 +82,29 @@ enum { OPTIONS_CONTROLS, OPTIONS_DIFFICULTY, OPTIONS_TIME, OPTIONS_VIDEO, OPTION
    (ORUNNERS_HANDHELD) has no VIDEO, its picture fixed (ports/sdl2/main.c); nor CONTROLS where its controls are
    fixed (the Switch's), but where they may need putting right (ORUNNERS_CONTROLS_PAGE: a handheld's own
    buttons); nor 2 PLAYERS but where a second player has a controller of their own (ORUNNERS_TWO_PLAYERS: the
-   Switch's, side by side); nor EXIT where the system leaves games (ORUNNERS_SYSTEM_EXIT: the Switch's HOME) */
-static const int menu_lines[] = {
-	MENU_ARCADE,
+   Switch's, side by side) or the port offers it (console_offer_two_players: a tablet's screen, the two facing
+   each other); nor EXIT where the system leaves games (ORUNNERS_SYSTEM_EXIT: the Switch's HOME) */
+static int menu_lines[MENU_EXIT + 1];
+static int menu_line_count;
 #if !defined(ORUNNERS_HANDHELD) || defined(ORUNNERS_TWO_PLAYERS)
-	MENU_TWO_PLAYERS,
+static bool two_players_offered = true;
+#else
+static bool two_players_offered;
 #endif
-	MENU_DELUXE, MENU_OPTIONS,
+
+static void set_menu_lines(void)
+{
+	menu_line_count = 0;
+	menu_lines[menu_line_count++] = MENU_ARCADE;
+	if (two_players_offered)
+		menu_lines[menu_line_count++] = MENU_TWO_PLAYERS;
+	menu_lines[menu_line_count++] = MENU_DELUXE;
+	menu_lines[menu_line_count++] = MENU_OPTIONS;
 #ifndef ORUNNERS_SYSTEM_EXIT
-	MENU_EXIT,
+	menu_lines[menu_line_count++] = MENU_EXIT;
 #endif
-};
+}
+
 static const int options_lines[] = {
 #if !defined(ORUNNERS_HANDHELD) || defined(ORUNNERS_CONTROLS_PAGE)
 	OPTIONS_CONTROLS,
@@ -198,7 +210,7 @@ static int lines_of(int page)
 {
 	switch (page)
 	{
-		case PAGE_MENU: return COUNT(menu_lines);
+		case PAGE_MENU: return menu_line_count;
 		case PAGE_DELUXE: return COUNT(deluxe_items);
 		case PAGE_OPTIONS: return COUNT(options_lines);
 		case PAGE_TIME: return TIME_STAGES + 1;
@@ -224,7 +236,7 @@ static int line_of(const int *lines, int count, int item)
 	return 0;
 }
 
-#define MENU_LINE(item)    line_of(menu_lines, COUNT(menu_lines), item)
+#define MENU_LINE(item)    line_of(menu_lines, menu_line_count, item)
 
 static int step(int value, int by, int low, int high)
 {
@@ -602,11 +614,20 @@ static void draw_signature(void)
 		}
 }
 
+void console_offer_two_players(bool offered)
+{
+	two_players_offered = offered;
+}
+
 int console_menu_frame(uint32_t mode)
 {
 	const uint32_t pressed = console.pressed;
-	const int lines = lines_of(menu.page);
+	int lines;
 
+	set_menu_lines();
+	lines = lines_of(menu.page);
+	if (menu.page == PAGE_MENU && menu.choice >= lines)
+		menu.choice = lines - 1;    /* (2 PLAYERS gone from it) */
 	console.pressed = 0;
 	if (mode == GAME_MODE_PLAY || mode == GAME_MODE_POWER_ON || mode == GAME_MODE_RESTART)
 	{
@@ -692,7 +713,7 @@ int console_menu_frame(uint32_t mode)
 						console.quit = true;
 						return MENU_NOTHING;
 				}
-			list_frame(menu_items, menu_lines, COUNT(menu_lines));
+			list_frame(menu_items, menu_lines, menu_line_count);
 			return MENU_NOTHING;
 		case PAGE_DELUXE:
 			hold_title(false);
