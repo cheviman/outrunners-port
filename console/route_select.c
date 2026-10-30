@@ -89,7 +89,7 @@ static int car_place_x(int goal)
 
 static const struct route_map_registers *map_registers(void)
 {
-	return ROUTE_MAP_REGISTERS(route_map_register_sets_ADDRESS + ((uint32_t)SCREEN(screen)->index << 6));
+	return ROUTE_MAP_REGISTERS(route_map_register_sets_ADDRESS + ((uint32_t)screen->index << 6));
 }
 
 /* The map's scroll (the routes' tilemap and the world's under it, as route_map_update has them) and the
@@ -104,7 +104,7 @@ static void map_scroll(int scroll)
 	VIDEO_REGISTER_WORDS(registers->register_scroll_x_address)[0] = (uint16_t)scroll;
 	VIDEO_REGISTER_WORDS(registers->second_scroll_x_address)[0] = (uint16_t)(scroll - 0x88);
 	VIDEO_REGISTER_WORDS(registers->second_register_scroll_x_address)[0] = (uint16_t)(scroll - 0x88);
-	send_video_registers = 0xFFu;
+	game->send_video_registers = 0xFFu;
 	if (panel)
 		OBJECT(panel)->x = (uint16_t)(PANEL_X - scroll);
 }
@@ -113,10 +113,10 @@ static void map_scroll(int scroll)
    (states 0, 1 and 16), the sea black, the WEST / EAST panel */
 static void map_set_up(int side)
 {
-	const uint32_t index = SCREEN(screen)->index;
+	const uint32_t index = screen->index;
 	const struct route_map_registers *registers = map_registers();
 
-	SCREEN(screen)->route_branches[0] = (uint8_t)side;    /* (the panel's first place) */
+	screen->route_branches[0] = (uint8_t)side;    /* (the panel's first place) */
 	set_up_background(0x4868u + (index * 10u + (uint32_t)side * 5u) * 4u);
 	queue_palette(route_map_background_palette);
 	io_write16(route_map_sea_colour_addresses[index], 0u);
@@ -130,7 +130,7 @@ static void map_set_up(int side)
 	VIDEO_REGISTER_WORDS(registers->register_scroll_y_address)[0] = 0x70u;
 	VIDEO_REGISTER_WORDS(registers->second_scroll_y_address)[0] = 0u;
 	VIDEO_REGISTER_WORDS(registers->second_register_scroll_y_address)[0] = 0u;
-	OBJECT(start_object())->handler = route_map_direction_sign_show_ADDRESS;
+	start_object()->handler = route_map_direction_sign_show_ADDRESS;
 	map_scroll(route_map_whole_scroll_xs[side]);
 }
 
@@ -138,18 +138,18 @@ static void map_set_up(int side)
 
 void route_select_car_update(void)
 {
-	if (OBJECT(current_object)->state == 0u)
+	if (current_object->state == 0u)
 	{
-		OBJECT(current_object)->draw_mode = 0xAu;
+		current_object->draw_mode = 0xAu;
 		animation_start(route_map_car_animations[pick.model]);
-		OBJECT(current_object)->palette = route_map_car_palettes[pick.model];
-		OBJECT(current_object)->width_scale = CAR_SIZE;
-		OBJECT(current_object)->height_scale = CAR_SIZE;
-		OBJECT(current_object)->frame = CAR_FRAME;
-		OBJECT(current_object)->state++;
+		current_object->palette = route_map_car_palettes[pick.model];
+		current_object->width_scale = CAR_SIZE;
+		current_object->height_scale = CAR_SIZE;
+		current_object->frame = CAR_FRAME;
+		current_object->state++;
 	}
-	OBJECT(current_object)->x = (uint16_t)(pick.car_x - pick.scroll);
-	OBJECT(current_object)->y = (uint16_t)pick.car_y;
+	current_object->x = (uint16_t)(pick.car_x - pick.scroll);
+	current_object->y = (uint16_t)pick.car_y;
 	map_depth_from_y();
 	draw_object(0u);
 }
@@ -190,12 +190,12 @@ int console_route_select_frame(uint32_t pressed)
 		map_set_up(side);
 		pick.car_x = car_place_x(pick.goal);
 		pick.car_y = goal_places[pick.goal][1];
-		OBJECT(start_object())->handler = CONSOLE_CODE_ROUTE_CAR;
-		SCREEN(screen)->fade_kind = 1u;
-		SCREEN(screen)->flags |= 1u;
+		start_object()->handler = CONSOLE_CODE_ROUTE_CAR;
+		screen->fade_kind = 1u;
+		screen->flags |= 1u;
 		return ROUTE_SELECT_NOTHING;
 	}
-	if (pick.leaving != ROUTE_SELECT_NOTHING && (SCREEN(screen)->flags & 1u) == 0u)
+	if (pick.leaving != ROUTE_SELECT_NOTHING && (screen->flags & 1u) == 0u)
 	{
 		/* (the fade out over: the map's objects go, the game goes on) */
 		pick.running = false;
@@ -207,8 +207,8 @@ int console_route_select_frame(uint32_t pressed)
 	{
 		queue_sound(MENU_SOUND);
 		pick.leaving = (pressed & ACTION_BIT(ACTION_BACK)) ? ROUTE_SELECT_BACK : ROUTE_SELECT_START;
-		SCREEN(screen)->fade_kind = 0u;
-		SCREEN(screen)->flags |= 1u;
+		screen->fade_kind = 0u;
+		screen->flags |= 1u;
 		pressed = 0;
 	}
 	if (pick.leaving != ROUTE_SELECT_NOTHING)

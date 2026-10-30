@@ -223,7 +223,11 @@ merged here; this repository adds console/, the ports and their documents.
   some phones drop them without a multicast lock, then a room's address typed in); the pause in a network
   race without holding the game (today the pause holds this device's car, the others race on); the entries
   of a race whose machine 1 is gone mid-entries (counted down only).
-- The decompilation's new version merged (Sebas: before the network; then the network went first).
+- (done after 1.0) The decompilation's new version merged (2b4e7a0: the game's state as one structure, C
+  pointers into it and into the program ROM's records): the core's console-original at arcade-decomp
+  82aadc8 with CONSOLE_ORIGINAL; console/ reads the state through game-> and the pointers screen,
+  current_object and player_car; data_elsewhere has its way back (address_elsewhere) and rom_pointer reads
+  it, for FULL's and REVERSE's courses. The console's frames the same as before it.
 - 2 PLAYERS on the Switch up to 4 players a console (Sebas, 30-10-2026), the screen in four, with the
   network's multiplayer (two cabinets in one device).
 

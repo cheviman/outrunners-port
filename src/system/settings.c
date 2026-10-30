@@ -3,7 +3,7 @@
  *    Description: the settings in the EEPROM: loading, checking and saving them, and the EEPROM's serial lines
  *    Version:     0.1.0
  *    Created:     12-10-2026
- *    Modified:    29-10-2026
+ *    Modified:    30-10-2026
  *    Author:      Sebastian Toyos
  *
  *    OutRunners (arcade, Sega System Multi 32): the game's V70 program decompiled into C by
@@ -21,105 +21,106 @@
 void CONSOLE_ORIGINAL(load_settings)(uint32_t checksum)
 {
 	uint16_t new_checksum = 0, write_count = 0;
-	uint32_t settings = 0, settings_length = 0;
+	uint32_t settings_length = 0;
+	struct settings_copy *settings = NULL;
 
 	eeprom_read_settings(checksum);
-	if (settings_magic == 0x41474553u)
+	if (game->settings_magic == 0x41474553u)
 	{
 		bookkeeping_reset(checksum);
 		move_halfwords(settings_magic_ADDRESS, default_settings_ADDRESS, 0x40u);
-		eeprom_write_count = 0x64u;
-		backup_eeprom_write_count = 0x64u;
+		game->eeprom_write_count = 0x64u;
+		game->backup_eeprom_write_count = 0x64u;
 		new_checksum = signature_checksum();
-		settings_signature = new_checksum;
-		settings = eeprom_write_count_ADDRESS;
+		game->settings_signature = new_checksum;
+		settings = pointer_to(eeprom_write_count_ADDRESS);
 		settings_length = 0x3Au;
-		new_checksum = crc16(settings, settings_length);
-		settings_checksum = new_checksum;
-		backup_settings_checksum = new_checksum;
+		new_checksum = crc16(address_of(settings), settings_length);
+		game->settings_checksum = new_checksum;
+		game->backup_settings_checksum = new_checksum;
 		eeprom_write_settings();
 		return;
 	}
-	if (settings_magic != 0x41323353u)
+	if (game->settings_magic != 0x41323353u)
 	{
 		bookkeeping_reset(checksum);
 		move_halfwords(settings_magic_ADDRESS, default_settings_ADDRESS, 0x40u);
 		new_checksum = signature_checksum();
-		settings_signature = new_checksum;
-		settings = eeprom_write_count_ADDRESS;
+		game->settings_signature = new_checksum;
+		settings = pointer_to(eeprom_write_count_ADDRESS);
 		settings_length = 0x3Au;
-		new_checksum = crc16(settings, settings_length);
-		settings_checksum = new_checksum;
-		backup_settings_checksum = new_checksum;
+		new_checksum = crc16(address_of(settings), settings_length);
+		game->settings_checksum = new_checksum;
+		game->backup_settings_checksum = new_checksum;
 		eeprom_write_settings();
 		return;
 	}
 	new_checksum = signature_checksum();
-	if (settings_signature != new_checksum || settings_signature != new_checksum)
+	if (game->settings_signature != new_checksum || game->settings_signature != new_checksum)
 	{
-		settings_signature = new_checksum;
+		game->settings_signature = new_checksum;
 		bookkeeping_reset(new_checksum);
-		settings = eeprom_write_count_ADDRESS;
+		settings = pointer_to(eeprom_write_count_ADDRESS);
 		settings_length = 0x3Au;
-		new_checksum = crc16(settings, settings_length);
-		settings = settings_checksum_ADDRESS;
-		if (settings_checksum == new_checksum)
+		new_checksum = crc16(address_of(settings), settings_length);
+		settings = pointer_to(settings_checksum_ADDRESS);
+		if (game->settings_checksum == new_checksum)
 		{
-			write_count = SETTINGS_COPY(settings)->write_count;
+			write_count = settings->write_count;
 			move_halfwords(settings_magic_ADDRESS, default_settings_ADDRESS, 0x40u);
-			eeprom_write_count = write_count;
-			backup_eeprom_write_count = write_count;
+			game->eeprom_write_count = write_count;
+			game->backup_eeprom_write_count = write_count;
 			new_checksum = signature_checksum();
-			settings_signature = new_checksum;
-			settings = eeprom_write_count_ADDRESS;
+			game->settings_signature = new_checksum;
+			settings = pointer_to(eeprom_write_count_ADDRESS);
 			settings_length = 0x3Au;
-			new_checksum = crc16(settings, settings_length);
-			settings_checksum = new_checksum;
-			backup_settings_checksum = new_checksum;
+			new_checksum = crc16(address_of(settings), settings_length);
+			game->settings_checksum = new_checksum;
+			game->backup_settings_checksum = new_checksum;
 			eeprom_write_settings();
 			return;
 		}
-		settings = backup_eeprom_write_count_ADDRESS;
+		settings = pointer_to(backup_eeprom_write_count_ADDRESS);
 		settings_length = 0x3Au;
-		checksum = crc16(settings, settings_length);
-		settings = backup_settings_checksum_ADDRESS;
-		if (backup_settings_checksum != checksum)
+		checksum = crc16(address_of(settings), settings_length);
+		settings = pointer_to(backup_settings_checksum_ADDRESS);
+		if (game->backup_settings_checksum != checksum)
 		{
 			bookkeeping_reset(checksum);
 			move_halfwords(settings_magic_ADDRESS, default_settings_ADDRESS, 0x40u);
 			new_checksum = signature_checksum();
-			settings_signature = new_checksum;
-			settings = eeprom_write_count_ADDRESS;
+			game->settings_signature = new_checksum;
+			settings = pointer_to(eeprom_write_count_ADDRESS);
 			settings_length = 0x3Au;
-			new_checksum = crc16(settings, settings_length);
-			settings_checksum = new_checksum;
-			backup_settings_checksum = new_checksum;
+			new_checksum = crc16(address_of(settings), settings_length);
+			game->settings_checksum = new_checksum;
+			game->backup_settings_checksum = new_checksum;
 			eeprom_write_settings();
 			return;
 		}
-		write_count = SETTINGS_COPY(settings)->write_count;
+		write_count = settings->write_count;
 		move_halfwords(settings_magic_ADDRESS, default_settings_ADDRESS, 0x40u);
-		eeprom_write_count = write_count;
-		backup_eeprom_write_count = write_count;
+		game->eeprom_write_count = write_count;
+		game->backup_eeprom_write_count = write_count;
 		new_checksum = signature_checksum();
-		settings_signature = new_checksum;
-		settings = eeprom_write_count_ADDRESS;
+		game->settings_signature = new_checksum;
+		settings = pointer_to(eeprom_write_count_ADDRESS);
 		settings_length = 0x3Au;
-		new_checksum = crc16(settings, settings_length);
-		settings_checksum = new_checksum;
-		backup_settings_checksum = new_checksum;
+		new_checksum = crc16(address_of(settings), settings_length);
+		game->settings_checksum = new_checksum;
+		game->backup_settings_checksum = new_checksum;
 		eeprom_write_settings();
 		return;
 	}
-	settings = eeprom_write_count_ADDRESS;
+	settings = pointer_to(eeprom_write_count_ADDRESS);
 	settings_length = 0x3Au;
-	new_checksum = crc16(settings, settings_length);
-	if (settings_checksum != new_checksum)
+	new_checksum = crc16(address_of(settings), settings_length);
+	if (game->settings_checksum != new_checksum)
 	{
-		settings = backup_eeprom_write_count_ADDRESS;
+		settings = pointer_to(backup_eeprom_write_count_ADDRESS);
 		settings_length = 0x3Au;
-		checksum = crc16(settings, settings_length);
-		if (backup_settings_checksum == checksum)
+		checksum = crc16(address_of(settings), settings_length);
+		if (game->backup_settings_checksum == checksum)
 		{
 			move_halfwords(settings_checksum_ADDRESS, backup_settings_checksum_ADDRESS, 0x1Eu);
 			eeprom_write_settings();
@@ -128,19 +129,19 @@ void CONSOLE_ORIGINAL(load_settings)(uint32_t checksum)
 		bookkeeping_reset(checksum);
 		move_halfwords(settings_magic_ADDRESS, default_settings_ADDRESS, 0x40u);
 		new_checksum = signature_checksum();
-		settings_signature = new_checksum;
-		settings = eeprom_write_count_ADDRESS;
+		game->settings_signature = new_checksum;
+		settings = pointer_to(eeprom_write_count_ADDRESS);
 		settings_length = 0x3Au;
-		new_checksum = crc16(settings, settings_length);
-		settings_checksum = new_checksum;
-		backup_settings_checksum = new_checksum;
+		new_checksum = crc16(address_of(settings), settings_length);
+		game->settings_checksum = new_checksum;
+		game->backup_settings_checksum = new_checksum;
 		eeprom_write_settings();
 		return;
 	}
-	settings = backup_eeprom_write_count_ADDRESS;
+	settings = pointer_to(backup_eeprom_write_count_ADDRESS);
 	settings_length = 0x3Au;
-	new_checksum = crc16(settings, settings_length);
-	if (settings_checksum != new_checksum || backup_settings_checksum != new_checksum)
+	new_checksum = crc16(address_of(settings), settings_length);
+	if (game->settings_checksum != new_checksum || game->backup_settings_checksum != new_checksum)
 	{
 		move_halfwords(backup_settings_checksum_ADDRESS, settings_checksum_ADDRESS, 0x1Eu);
 		eeprom_write_settings();
@@ -152,9 +153,9 @@ void CONSOLE_ORIGINAL(load_settings)(uint32_t checksum)
    EEPROM's limit of 10,000 writes is reached). */
 void count_eeprom_write(void)
 {
-	eeprom_write_count++;
-	if (eeprom_write_count >= 0x2710u)
-		eeprom_write_count = 0x2710u;
+	game->eeprom_write_count++;
+	if (game->eeprom_write_count >= 0x2710u)
+		game->eeprom_write_count = 0x2710u;
 }
 
 /* Locks the EEPROM against writes (command 00, the 93C46's write disable) and turns the interrupts back
@@ -165,7 +166,7 @@ void eeprom_lock(void)
 	uint32_t lines = 0, lines_port = 0;
 
 	command = 0u;
-	eeprom_begin(&lines, &lines_port);
+	eeprom_begin(&lines, &r12, &lines_port);
 	eeprom_send_command((uint8_t)lines, command, lines_port);
 	interrupts_on();
 }
@@ -177,8 +178,8 @@ void eeprom_read_one_word(uint8_t command)
 	uint32_t ignored = 0, lines = 0, lines_port = 0;
 
 	command |= 0x80u;
-	eeprom_begin(&lines, &lines_port);
-	eeprom_read_word(command, lines_port, &ignored, &lines);
+	eeprom_begin(&lines, &r12, &lines_port);
+	eeprom_read_word(command, r12, lines_port, &ignored, &lines);
 	interrupts_on();
 }
 
@@ -200,10 +201,10 @@ void eeprom_read_settings(uint32_t eeprom_word)
 	settings = settings_magic_ADDRESS;
 	command = 0x80u;
 	word_count = 0x40u;
-	eeprom_begin(&lines, &lines_port);
+	eeprom_begin(&lines, &r12, &lines_port);
 	do
 	{
-		eeprom_read_word(command, lines_port, &eeprom_word, &lines);
+		eeprom_read_word(command, r12, lines_port, &eeprom_word, &lines);
 		command++;
 		SETTINGS_WORDS(settings)[0] = eeprom_word;
 		word_count--;
@@ -218,8 +219,8 @@ void eeprom_write_one_word(uint16_t eeprom_word, uint8_t command)
 	uint32_t lines = 0, lines_port = 0;
 
 	command |= 0x40u;
-	eeprom_begin(&lines, &lines_port);
-	eeprom_write_word(eeprom_word, (uint8_t)lines, command, lines_port);
+	eeprom_begin(&lines, &r12, &lines_port);
+	eeprom_write_word(eeprom_word, (uint8_t)lines, command, r12, lines_port);
 	interrupts_on();
 }
 
@@ -251,20 +252,20 @@ void eeprom_write_settings(void)
 	settings = eeprom_write_count_ADDRESS;
 	settings_length = 0x3Au;
 	checksum = crc16(settings, settings_length);
-	settings_checksum = checksum;
+	game->settings_checksum = checksum;
 	move_halfwords(backup_settings_checksum_ADDRESS, settings_checksum_ADDRESS, 0x1Eu);
 	command = 0x30u;
-	eeprom_begin(&lines, &lines_port);
+	eeprom_begin(&lines, &r12, &lines_port);
 	eeprom_send_command((uint8_t)lines, command, lines_port);
 	settings = settings_magic_ADDRESS;
 	command = 0x40u;
 	word_count = 0x40u;
-	eeprom_begin(&lines, &lines_port);
+	eeprom_begin(&lines, &r12, &lines_port);
 	do
 	{
 		eeprom_word = SETTINGS_WORDS(settings)[0];
 		settings += 2u;
-		lines = eeprom_write_word(eeprom_word, (uint8_t)lines, command, lines_port);
+		lines = eeprom_write_word(eeprom_word, (uint8_t)lines, command, r12, lines_port);
 		command++;
 		word_count--;
 	} while (word_count != 0u);
@@ -272,7 +273,7 @@ void eeprom_write_settings(void)
 
 /* Reads the EEPROM word of read command R4 (eeprom_send_command): 18 clock pulses collecting the data
    out (bit 7 of R12, port F of the second I/O chip), the 16-bit word into R0; then chip select off. */
-void eeprom_read_word(uint8_t command, uint32_t lines_port, uint32_t *p_eeprom_word, uint32_t *p_lines)
+void eeprom_read_word(uint8_t command, uint32_t eeprom_port, uint32_t lines_port, uint32_t *p_eeprom_word, uint32_t *p_lines)
 {
 	uint32_t eeprom_word = *p_eeprom_word;
 	uint8_t lines = (uint8_t)*p_lines;
@@ -284,7 +285,7 @@ void eeprom_read_word(uint8_t command, uint32_t lines_port, uint32_t *p_eeprom_w
 	do
 	{
 		lines = eeprom_set_lines(lines, lines_port);
-		eeprom_word = (eeprom_word & ~0xFFu) | io_read8(r12);
+		eeprom_word = (eeprom_word & ~0xFFu) | io_read8(eeprom_port);
 		eeprom_word = eeprom_word * 2u;
 		lines ^= 0x40u;
 		lines = eeprom_set_lines(lines, lines_port);
@@ -301,7 +302,7 @@ void eeprom_read_word(uint8_t command, uint32_t lines_port, uint32_t *p_eeprom_w
 /* Writes R0 into the EEPROM word of write command R4 (eeprom_send_command): its 16 bits high first, chip
    select dropped to start the write, then waits, clocking, until the data out (bit 7 of R12) says it is
    done. */
-uint8_t eeprom_write_word(uint16_t eeprom_word, uint8_t lines, uint8_t command, uint32_t lines_port)
+uint8_t eeprom_write_word(uint16_t eeprom_word, uint8_t lines, uint8_t command, uint32_t eeprom_port, uint32_t lines_port)
 {
 	uint8_t data_bit = 0, data_out = 0;
 	uint16_t word_bits = 0;
@@ -335,7 +336,7 @@ uint8_t eeprom_write_word(uint16_t eeprom_word, uint8_t lines, uint8_t command, 
 	{
 		lines |= 0x20u;
 		lines = eeprom_set_lines(lines, lines_port);
-		data_out = io_read8(r12);
+		data_out = io_read8(eeprom_port);
 		lines ^= 0x40u;
 		lines = eeprom_set_lines(lines, lines_port);
 	} while ((int8_t)data_out >= 0);
@@ -382,12 +383,12 @@ uint8_t eeprom_send_command(uint8_t lines, uint8_t command, uint32_t lines_port)
 
 /* Starts an EEPROM access: the interrupts off, R13 the EEPROM's lines (C8000E, port H of the second I/O
    chip), R12 its data out (C8000A, port F, bit 7), R2 the lines' present value. */
-void eeprom_begin(uint32_t *p_lines, uint32_t *p_lines_port)
+void eeprom_begin(uint32_t *p_lines, uint32_t *p_eeprom_port, uint32_t *p_lines_port)
 {
 	uint8_t lines_now = 0;
 
 	*p_lines_port = IO_2_PORT_H;
-	r12 = IO_2_PORT_F;
+	*p_eeprom_port = IO_2_PORT_F;
 	lines_now = io_read8(IO_2_PORT_H);
 	interrupts_off();
 	*p_lines = (*p_lines & 0xFFFFFF00u) | lines_now;

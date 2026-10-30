@@ -191,12 +191,12 @@ void console_ghost_start(void)
    goal the run written if it was the goal's fastest */
 void console_ghost_frame(void)
 {
-	const uint32_t own = SCREEN(screen)->race_copy;
+	const uint32_t own = screen->race_copy;
 	const uint32_t record = race_copy_offsets[GHOST_PLAYER] + GAME_VARIABLES;
 
-	if (!ghost.recording.data || SCREEN(screen)->game_mode != GAME_MODE_PLAY)
+	if (!ghost.recording.data || screen->game_mode != GAME_MODE_PLAY)
 		return;
-	if (!ghost.started && SCREEN(screen)->race_started != 0u)
+	if (!ghost.started && screen->race_started != 0u)
 		ghost.started = true;
 	if (!ghost.started)
 		;    /* (before the start: nothing kept yet; the ghost waits on its first frame, below) */
@@ -208,7 +208,7 @@ void console_ghost_frame(void)
 	else if (RACE(own)->finished != 0u && ghost.recording.frames)
 	{
 		/* at the goal: the goal's fastest? */
-		const int goal = SCREEN(screen)->built_stage - (int)FIRST_GOAL;
+		const int goal = screen->built_stage - (int)FIRST_GOAL;
 		ghost_run *kept = goal >= 0 && goal < GOALS ? &ghost.runs[goal] : NULL;
 		const uint32_t time = RACE(own)->race_time;
 
@@ -238,8 +238,8 @@ void console_ghost_frame(void)
 		bool on_route = stage == RACE(own)->stage;
 
 		/* on the player's route: the stage the player is on, or one the player has taken (behind) */
-		for (uint32_t taken = 0; taken <= CAR(player_car)->forks_taken && taken < 6u && !on_route; taken++)
-			on_route = CAR(player_car)->stage_history[taken] == stage;
+		for (uint32_t taken = 0; taken <= player_car->forks_taken && taken < 6u && !on_route; taken++)
+			on_route = player_car->stage_history[taken] == stage;
 		memcpy(ram(record + RECORDED_FROM), run->data[at], RECORDED_BYTES);
 		if (!on_route)
 			RACE(record)->segment = (uint16_t)(RACE(own)->segment - FAR_BEHIND);    /* (another route: not drawn) */
@@ -269,11 +269,11 @@ void race_cars_start(void)
 	uint32_t car, object, model, car_number, rider_places;
 
 	original_race_cars_start();
-	if (!console.time_attack || ghost.raced < 0 || SCREEN(screen)->index != LEFT_SEAT)
+	if (!console.time_attack || ghost.raced < 0 || screen->index != LEFT_SEAT)
 		return;
 	model = RACE(record)->model & 7u;
 	car_number = RACE(record)->car_number & 7u;
-	car = start_object();
+	car = address_of(start_object());
 	OBJECT(car)->handler = race_car_draw_ADDRESS;
 	OBJECT(car)->race_car.player = GHOST_PLAYER;
 	OBJECT(car)->race_car.record = record;
@@ -302,15 +302,15 @@ void race_cars_start(void)
 	OBJECT(car)->race_car.tag_animation = race_car_tag_animations[car_number];
 	OBJECT(car)->race_car.tag_palette = race_car_tag_palettes[model];
 	OBJECT(car)->race_car.blink_counter = race_car_blink_starts[car_number];
-	OBJECT(car)->race_car.rival = car_number - RACE(SCREEN(screen)->race_copy)->car_number;
+	OBJECT(car)->race_car.rival = car_number - RACE(screen->race_copy)->car_number;
 	keep_object(car);
-	object = start_object();
+	object = address_of(start_object());
 	OBJECT(object)->handler = race_car_driver_handlers[model];
 	OBJECT(object)->race_car_occupant.car = car;
 	OBJECT(object)->race_car_occupant.occupant = (uint8_t)model;
 	OBJECT(object)->race_car_occupant.body_back = 0xFFu;
 	keep_object(object);
-	object = start_object();
+	object = address_of(start_object());
 	OBJECT(object)->handler = race_car_passenger_handlers[model];
 	OBJECT(object)->race_car_occupant.car = car;
 	OBJECT(object)->race_car_occupant.occupant = (uint8_t)(model + 8u);
@@ -318,7 +318,7 @@ void race_cars_start(void)
 	keep_object(object);
 	for (uint32_t rider = model; rider <= model + 8u; rider += 8u)
 	{
-		object = start_object();
+		object = address_of(start_object());
 		OBJECT(object)->handler = rider_gesture_update_ADDRESS;
 		OBJECT(object)->rider_gesture.car = car;
 		OBJECT(object)->rider_gesture.rider = (uint8_t)rider;
@@ -331,21 +331,21 @@ void race_cars_start(void)
 /* One of the ghost's objects: its own handler, then the sprites it put in the list marked as a ghost */
 void ghost_object_update(void)
 {
-	const uint32_t first = SCREEN(screen)->sprite_list_last + 0x10u;
+	const uint32_t first = screen->sprite_list_last + 0x10u;
 
 	for (int index = 0; index < ghost.object_count; index++)
-		if (ghost.objects[index] == current_object)
+		if (ghost.objects[index] == address_of(current_object))
 		{
-			OBJECT(current_object)->handler = ghost.handlers[index];
+			current_object->handler = ghost.handlers[index];
 			call_code(ghost.handlers[index]);
-			if ((OBJECT(current_object)->flags & 1u) != 0u)
+			if ((current_object->flags & 1u) != 0u)
 			{
-				ghost.handlers[index] = OBJECT(current_object)->handler;    /* (a handler it took on) */
-				OBJECT(current_object)->handler = CONSOLE_CODE_GHOST;
+				ghost.handlers[index] = current_object->handler;    /* (a handler it took on) */
+				current_object->handler = CONSOLE_CODE_GHOST;
 			}
 			break;
 		}
-	for (uint32_t sprite = first; sprite <= SCREEN(screen)->sprite_list_last; sprite += 0x10u)
+	for (uint32_t sprite = first; sprite <= screen->sprite_list_last; sprite += 0x10u)
 		if ((SPRITE_WORDS(sprite)[0] >> 14) == 0u)    /* (a sprite, not the group's jump) */
 		{
 			SPRITE_WORDS(sprite)[7] |= S32_SPRITE_GHOST;

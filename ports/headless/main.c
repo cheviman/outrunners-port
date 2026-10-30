@@ -177,7 +177,7 @@ static void write_file(const char *name, const void *data, size_t size)
 
 static void dump_state(void)
 {
-	write_file("work_ram.bin", s32_board.work_ram, sizeof(s32_board.work_ram));
+	write_file("work_ram.bin", s32_board.work_ram, S32_WORK_RAM_SIZE);
 	write_file("video_ram.bin", s32_board.video_ram, sizeof(s32_board.video_ram));
 	write_file("sprite_ram.bin", s32_board.sprite_ram, sizeof(s32_board.sprite_ram));
 	write_file("palette.bin", s32_board.palette, sizeof(s32_board.palette));

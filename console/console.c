@@ -37,25 +37,25 @@ void load_settings(uint32_t checksum)
 	uint32_t setting;
 
 	original_load_settings(checksum);
-	if (free_play != 0u)
+	if (game->free_play != 0u)
 		return;
 	for (setting = 0; setting < COIN_SETTINGS - 1u; setting++)
 		if ((int8_t)COIN_SETTING_RECORD(coin_setting_records_ADDRESS + setting * 4u)->coins < 0)
 			break;
-	coin_setting = (uint8_t)setting;
-	coins_per_credit = 1u;
-	bonus_adder = 0xFFu;
-	first_chute_multiplier = 1u;
-	second_chute_multiplier = 1u;
-	free_play = 0xFFu;
+	game->coin_setting = (uint8_t)setting;
+	game->coins_per_credit = 1u;
+	game->bonus_adder = 0xFFu;
+	game->first_chute_multiplier = 1u;
+	game->second_chute_multiplier = 1u;
+	game->free_play = 0xFFu;
 	eeprom_write_settings();
 }
 
 /* The credits line under the prompt: none (with free play the game's says FREE PLAY) */
 void credit_display_update(void)
 {
-	OBJECT(current_object)->flags = 0u;
-	OBJECT(current_object)->flags_high = 0u;
+	current_object->flags = 0u;
+	current_object->flags_high = 0u;
 }
 
 /* The prompt's message (INSERT COIN(S), TURN THE IGNITION KEY) and the ignition key's picture, which the
@@ -63,14 +63,14 @@ void credit_display_update(void)
    car that crosses the prompt still does */
 void coin_prompt_message_update(void)
 {
-	OBJECT(current_object)->flags = 0u;
-	OBJECT(current_object)->flags_high = 0u;
+	current_object->flags = 0u;
+	current_object->flags_high = 0u;
 }
 
 void ignition_key_prompt_update(void)
 {
-	OBJECT(current_object)->flags = 0u;
-	OBJECT(current_object)->flags_high = 0u;
+	current_object->flags = 0u;
+	current_object->flags_high = 0u;
 }
 
 /* ---- the machine ---- */
@@ -81,24 +81,24 @@ void console_settings_to_race(void)
 {
 	const uint32_t race = RACE_1;
 
-	RACE(race)->master_game_difficulty = game_difficulty;
-	RACE(race)->master_time_difficulty_0 = time_difficulty[0];
-	RACE(race)->master_time_difficulty_1 = (uint8_t)time_difficulty[1];
-	RACE(race)->master_time_difficulty_2_5 = (uint8_t)time_difficulty[2] | ((uint32_t)(uint8_t)time_difficulty[3] << 8u)
-		| ((uint32_t)(uint8_t)time_difficulty[4] << 16u) | ((uint32_t)(uint8_t)time_difficulty[5] << 24u);
+	RACE(race)->master_game_difficulty = game->game_difficulty;
+	RACE(race)->master_time_difficulty_0 = game->time_difficulty[0];
+	RACE(race)->master_time_difficulty_1 = (uint8_t)game->time_difficulty[1];
+	RACE(race)->master_time_difficulty_2_5 = (uint8_t)game->time_difficulty[2] | ((uint32_t)(uint8_t)game->time_difficulty[3] << 8u)
+		| ((uint32_t)(uint8_t)game->time_difficulty[4] << 16u) | ((uint32_t)(uint8_t)game->time_difficulty[5] << 24u);
 }
 
 void console_master_settings(void)
 {
 	const uint32_t race = RACE_1;
 
-	RACE(race)->master_advertise_sound = advertise_sound;
-	RACE(race)->master_steering_wheel_reaction = steering_wheel_reaction;
-	RACE(race)->master_coins_per_credit = coins_per_credit;
-	RACE(race)->master_first_chute_multiplier = first_chute_multiplier;
-	RACE(race)->master_bonus_adder = bonus_adder;
-	RACE(race)->master_coin_setting = coin_setting;
-	RACE(race)->master_free_play = free_play;
+	RACE(race)->master_advertise_sound = game->advertise_sound;
+	RACE(race)->master_steering_wheel_reaction = game->steering_wheel_reaction;
+	RACE(race)->master_coins_per_credit = game->coins_per_credit;
+	RACE(race)->master_first_chute_multiplier = game->first_chute_multiplier;
+	RACE(race)->master_bonus_adder = game->bonus_adder;
+	RACE(race)->master_coin_setting = game->coin_setting;
+	RACE(race)->master_free_play = game->free_play;
 	console_settings_to_race();
 }
 
@@ -109,9 +109,9 @@ void network_check_stand_alone(void)
 {
 	const uint32_t race = RACE_1;
 
-	link_off = 1u;
-	player_count = 2u;
-	machine_count = 1u;
+	game->link_off = 1u;
+	game->player_count = 2u;
+	game->machine_count = 1u;
 	SCREEN(SCREEN_1)->car_number = 0u;
 	RACE(RACE_1)->car_number = 0u;
 	SCREEN(SCREEN_2)->car_number = 1u;
@@ -138,9 +138,9 @@ void network_check_stand_alone(void)
    entry countdown's DJ, its attract mode) is not heard and takes none of the 24 voices the two seats share */
 void send_sound_requests(void)
 {
-	if (SCREEN(screen)->index != LEFT_SEAT && SCREEN(screen)->game_mode != GAME_MODE_PLAY)
+	if (screen->index != LEFT_SEAT && screen->game_mode != GAME_MODE_PLAY)
 	{
-		SCREEN(screen)->sound_queue_read = SCREEN(screen)->sound_queue_write;
+		screen->sound_queue_read = screen->sound_queue_write;
 		return;
 	}
 	original_send_sound_requests();
@@ -152,7 +152,7 @@ void send_sound_requests(void)
    with free play it starts a game there (game mode 6), or joins the race being entered from game mode 7 */
 static uint32_t press_start(uint32_t mode, uint32_t seat_credits)
 {
-	SCREEN(screen)->buttons_pressed |= START_BUTTON;
+	screen->buttons_pressed |= START_BUTTON;
 	return original_check_game_start(mode, seat_credits);
 }
 
@@ -183,24 +183,24 @@ static bool side_map_due(uint32_t mode)
    title's menu, whose ARCADE and 2 PLAYERS start the game as the arcade's START does (menu.c) */
 uint32_t check_game_start(uint32_t mode, uint32_t seat_credits)
 {
-	if (console.quit_seats & (1u << SCREEN(screen)->index))
+	if (console.quit_seats & (1u << screen->index))
 	{
 		/* (the pause's QUIT GAME: a game being played ends, back to the title) */
-		console.quit_seats &= (uint8_t)~(1u << SCREEN(screen)->index);
+		console.quit_seats &= (uint8_t)~(1u << screen->index);
 		if (mode == GAME_MODE_PLAY)
 		{
-			AS32(SCREEN(screen)->game_mode) = GAME_MODE_RESTART;
+			AS32(screen->game_mode) = GAME_MODE_RESTART;
 			return GAME_MODE_RESTART;
 		}
 	}
-	if (SCREEN(screen)->index != LEFT_SEAT)
+	if (screen->index != LEFT_SEAT)
 	{
 		switch (console_side_map_frame(side_map_due(mode)))
 		{
 			case SIDE_MAP_ON:
 				return GAME_MODE_CONSOLE_SCENE;
 			case SIDE_MAP_OVER:
-				AS32(SCREEN(screen)->game_mode) = GAME_MODE_RESTART;
+				AS32(screen->game_mode) = GAME_MODE_RESTART;
 				return GAME_MODE_RESTART;
 			default:
 				break;
@@ -229,7 +229,7 @@ uint32_t check_game_start(uint32_t mode, uint32_t seat_credits)
 		   end's); over with the game */
 		if (mode == GAME_MODE_PLAY)
 		{
-			RACE(SCREEN(screen)->race)->time_left = TIME_ATTACK_TIME_LEFT;
+			RACE(screen->race)->time_left = TIME_ATTACK_TIME_LEFT;
 			console_ghost_frame();
 		}
 		else
@@ -279,7 +279,7 @@ uint32_t check_game_start(uint32_t mode, uint32_t seat_credits)
 			console_reverse_start();
 			return press_start(mode, seat_credits);
 		case MENU_TITLE:
-			AS32(SCREEN(screen)->game_mode) = GAME_MODE_RESTART;
+			AS32(screen->game_mode) = GAME_MODE_RESTART;
 			return GAME_MODE_RESTART;
 		default:
 			return mode;
@@ -298,8 +298,8 @@ void waiting_banner_show(void)
 	}
 	if (RACE(RACE_1)->entry_frames > 1u)
 		RACE(RACE_1)->entry_frames = 1u;
-	OBJECT(current_object)->flags = 0u;
-	OBJECT(current_object)->flags_high = 0u;
+	current_object->flags = 0u;
+	current_object->flags_high = 0u;
 }
 
 /* ---- the port ---- */

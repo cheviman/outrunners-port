@@ -89,7 +89,7 @@ static struct
 
 static const struct route_map_registers *map_registers(void)
 {
-	return ROUTE_MAP_REGISTERS(route_map_register_sets_ADDRESS + ((uint32_t)SCREEN(screen)->index << 6));
+	return ROUTE_MAP_REGISTERS(route_map_register_sets_ADDRESS + ((uint32_t)screen->index << 6));
 }
 
 /* ---- the drive ---- */
@@ -200,15 +200,15 @@ static int race_progress(void)
 /* The close-up map as route_map_update's state 3 sets it up, the first branch's, its car and landmarks */
 static void map_set_up(void)
 {
-	const uint32_t index = SCREEN(screen)->index;
+	const uint32_t index = screen->index;
 	const struct route_map_registers *registers = map_registers();
 	uint32_t object;
 
 	clear_objects();
 	reset_tile_layers();
 	clear_sprite_group_count();
-	SCREEN(screen)->route_branches[0] = (uint8_t)side.first_branch;    /* (the landmarks' set) */
-	SCREEN(screen)->route_map_signals = 0u;
+	screen->route_branches[0] = (uint8_t)side.first_branch;    /* (the landmarks' set) */
+	screen->route_map_signals = 0u;
 	set_up_background(0x4868u + (index * 10u + (uint32_t)side.first_branch * 5u) * 4u);
 	queue_palette(route_map_background_palette);
 	io_write16(route_map_sea_colour_addresses[index], SEA_COLOUR);
@@ -218,16 +218,16 @@ static void map_set_up(void)
 	VIDEO_REGISTER_WORDS(registers->zoom_y_address)[0] = 0x200u;
 	VIDEO_REGISTER_WORDS(registers->zoom_center_x_address)[0] = 0u;
 	VIDEO_REGISTER_WORDS(registers->zoom_center_y_address)[0] = 0u;
-	SCREEN(screen)->skip_scroll_update = 0xFFu;
-	side.map = start_object();
+	screen->skip_scroll_update = 0xFFu;
+	side.map = address_of(start_object());
 	OBJECT(side.map)->handler = CONSOLE_CODE_SIDE_MAP;
-	object = start_object();
+	object = address_of(start_object());
 	OBJECT(object)->handler = CONSOLE_CODE_SIDE_MAP_CAR;
 	OBJECT(object)->route_map_car.model = (uint8_t)CAR(SCREEN_1 + SCREEN_CAR)->model;
 	OBJECT(object)->route_map_car.route_map = side.map;
 	for (uint32_t landmark = 0u; landmark < LANDMARKS; landmark++)
 	{
-		object = start_object();
+		object = address_of(start_object());
 		OBJECT(object)->handler = route_map_landmark_update_ADDRESS;
 		OBJECT(object)->route_map_landmark.index_then_half_rate = (uint8_t)landmark;
 		OBJECT(object)->route_map_landmark.route_map = side.map;
@@ -250,13 +250,13 @@ static void map_show(void)
 		VIDEO_REGISTER_WORDS(registers->register_scroll_x_address)[0] = (uint16_t)side.at.scroll_x;
 		VIDEO_REGISTER_WORDS(registers->scroll_y_address)[0] = (uint16_t)side.at.scroll_y;
 		VIDEO_REGISTER_WORDS(registers->register_scroll_y_address)[0] = (uint16_t)side.at.scroll_y;
-		send_video_registers = 0xFFu;
+		game->send_video_registers = 0xFFu;
 	}
 	OBJECT(side.map)->x = (uint16_t)side.at.map_x;
 	OBJECT(side.map)->y = (uint16_t)side.at.map_y;
 	for (; side.signs < side.checkpoints; side.signs++)
 	{
-		const uint32_t sign = start_object();
+		const uint32_t sign = address_of(start_object());
 
 		OBJECT(sign)->handler = CONSOLE_CODE_SIDE_MAP_SIGN;
 		OBJECT(sign)->route_map_sign.route_map = side.map;
@@ -274,20 +274,20 @@ void side_map_update(void)
 
 void side_map_car_update(void)
 {
-	if (OBJECT(current_object)->state == 0u)
+	if (current_object->state == 0u)
 	{
-		const uint32_t model = OBJECT(current_object)->route_map_car.model & 7u;
+		const uint32_t model = current_object->route_map_car.model & 7u;
 
-		OBJECT(current_object)->draw_mode = 0xAu;
+		current_object->draw_mode = 0xAu;
 		animation_start(route_map_car_animations[model]);
-		OBJECT(current_object)->palette = route_map_car_palettes[model];
-		OBJECT(current_object)->width_scale = CAR_SIZE;
-		OBJECT(current_object)->height_scale = CAR_SIZE;
-		OBJECT(current_object)->state++;
+		current_object->palette = route_map_car_palettes[model];
+		current_object->width_scale = CAR_SIZE;
+		current_object->height_scale = CAR_SIZE;
+		current_object->state++;
 	}
-	OBJECT(current_object)->x = (uint16_t)side.at.car_x;
-	OBJECT(current_object)->y = (uint16_t)side.at.car_y;
-	OBJECT(current_object)->frame = side.at.frame;
+	current_object->x = (uint16_t)side.at.car_x;
+	current_object->y = (uint16_t)side.at.car_y;
+	current_object->frame = side.at.frame;
 	map_depth_from_y();
 	draw_object(0u);
 }
@@ -295,20 +295,20 @@ void side_map_car_update(void)
 /* A C.P sign (route_map_sign_update's kind 0), its place of the map set when it starts */
 void side_map_sign_update(void)
 {
-	const uint32_t map = OBJECT(current_object)->route_map_sign.route_map;
+	const uint32_t map = current_object->route_map_sign.route_map;
 
-	if (OBJECT(current_object)->state == 0u)
+	if (current_object->state == 0u)
 	{
-		OBJECT(current_object)->draw_mode = 0xAu;
+		current_object->draw_mode = 0xAu;
 		animation_start(route_map_sign_animations[0]);
-		OBJECT(current_object)->palette = route_map_sign_palettes[0];
-		OBJECT(current_object)->width_scale = SIGN_SIZE;
-		OBJECT(current_object)->height_scale = SIGN_SIZE;
-		OBJECT(current_object)->depth_layer = SIGN_DEPTH;
-		OBJECT(current_object)->state++;
+		current_object->palette = route_map_sign_palettes[0];
+		current_object->width_scale = SIGN_SIZE;
+		current_object->height_scale = SIGN_SIZE;
+		current_object->depth_layer = SIGN_DEPTH;
+		current_object->state++;
 	}
-	OBJECT(current_object)->x = (uint16_t)(OBJECT(map)->x + OBJECT(current_object)->route_map_sign.x_offset);
-	OBJECT(current_object)->y = (uint16_t)(OBJECT(map)->y + OBJECT(current_object)->route_map_sign.y_offset);
+	current_object->x = (uint16_t)(OBJECT(map)->x + current_object->route_map_sign.x_offset);
+	current_object->y = (uint16_t)(OBJECT(map)->y + current_object->route_map_sign.y_offset);
 	animation_advance(0u);
 	draw_object(0u);
 }
@@ -343,8 +343,8 @@ int console_side_map_frame(bool due)
 		if (!side.running)
 		{
 			side.progress = 0;
-			SCREEN(screen)->fade_kind = 1u;    /* (from black) */
-			SCREEN(screen)->flags |= 1u;
+			screen->fade_kind = 1u;    /* (from black) */
+			screen->flags |= 1u;
 		}
 		side.running = true;
 		side.first_branch = first_branch;

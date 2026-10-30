@@ -66,19 +66,19 @@ static struct
 /* The SEGA: the title's picture, scaled up and centred; black over its part not lit yet */
 void presentation_logo_update(void)
 {
-	if (OBJECT(current_object)->state == 0u)
+	if (current_object->state == 0u)
 	{
 		const uint32_t picture = title_pictures_ADDRESS + (LOGO_PICTURE << 4);
 
-		OBJECT(current_object)->draw_mode = 0u;
+		current_object->draw_mode = 0u;
 		animation_start(PICTURE_RECORD(picture)->animation);
-		OBJECT(current_object)->palette = PICTURE_RECORD(picture)->palette;
-		OBJECT(current_object)->width_scale = LOGO_SCALE;
-		OBJECT(current_object)->height_scale = LOGO_SCALE;
-		OBJECT(current_object)->x = LOGO_X;
-		OBJECT(current_object)->y = LOGO_Y;
-		OBJECT(current_object)->depth_layer = LOGO_LAYER;
-		OBJECT(current_object)->state++;
+		current_object->palette = PICTURE_RECORD(picture)->palette;
+		current_object->width_scale = LOGO_SCALE;
+		current_object->height_scale = LOGO_SCALE;
+		current_object->x = LOGO_X;
+		current_object->y = LOGO_Y;
+		current_object->depth_layer = LOGO_LAYER;
+		current_object->state++;
 	}
 	draw_object(0u);
 	if (scene.lit_to < SCREEN_WIDTH)
@@ -90,10 +90,10 @@ void presentation_logo_update(void)
    before), a model at random */
 void presentation_car_update(void)
 {
-	const int index = OBJECT(current_object)->title_logo_car.index;
+	const int index = current_object->title_logo_car.index;
 	int x;
 
-	switch (OBJECT(current_object)->state)
+	switch (current_object->state)
 	{
 		case 0:
 			if (scene.frame < AT_CARS + index * 5)
@@ -101,27 +101,27 @@ void presentation_car_update(void)
 			{
 				const uint32_t model = random_number() & 7u;
 
-				OBJECT(current_object)->draw_mode = 0xAu;
+				current_object->draw_mode = 0xAu;
 				animation_start(title_car_animations[model]);
-				OBJECT(current_object)->palette = title_logo_car_palettes[model];
-				OBJECT(current_object)->x = (uint16_t)CAR_START_X;
-				OBJECT(current_object)->y = (uint16_t)car_rows[index];
-				OBJECT(current_object)->width_scale = CAR_SCALE;
-				OBJECT(current_object)->height_scale = CAR_SCALE;
-				OBJECT(current_object)->frame = CAR_FRAME;
-				OBJECT(current_object)->depth_layer = CAR_LAYER;
-				OBJECT(current_object)->state++;
+				current_object->palette = title_logo_car_palettes[model];
+				current_object->x = (uint16_t)CAR_START_X;
+				current_object->y = (uint16_t)car_rows[index];
+				current_object->width_scale = CAR_SCALE;
+				current_object->height_scale = CAR_SCALE;
+				current_object->frame = CAR_FRAME;
+				current_object->depth_layer = CAR_LAYER;
+				current_object->state++;
 			}
 			break;
 		case 1:
-			x = (int16_t)OBJECT(current_object)->x + CAR_SPEED;
-			OBJECT(current_object)->x = (uint16_t)x;
+			x = (int16_t)current_object->x + CAR_SPEED;
+			current_object->x = (uint16_t)x;
 			if (x > scene.lit_to)
 				scene.lit_to = x;
 			if (x > CAR_END_X)
 			{
-				OBJECT(current_object)->flags = 0u;
-				OBJECT(current_object)->flags_high = 0u;
+				current_object->flags = 0u;
+				current_object->flags_high = 0u;
 				return;
 			}
 			break;
@@ -133,7 +133,7 @@ void presentation_car_update(void)
 
 static void start(uint32_t handler, uint8_t index)
 {
-	const uint32_t object = start_object();
+	const uint32_t object = address_of(start_object());
 
 	OBJECT(object)->handler = handler;
 	OBJECT(object)->title_logo_car.index = index;
@@ -151,8 +151,8 @@ bool console_presentation_frame(uint32_t pressed)
 		clear_sprite_group_count();
 		clear_text_layer();
 		queue_palette(title_palette);
-		SCREEN(screen)->fade_kind = 1u;
-		SCREEN(screen)->flags |= 1u;
+		screen->fade_kind = 1u;
+		screen->flags |= 1u;
 		scene.lit_to = (SCREEN_WIDTH - LOGO_WIDTH) / 2 - DARK_MARGIN;
 		start(CONSOLE_CODE_PRESENTATION_LOGO, 0u);
 		for (uint8_t car = 0; car < CARS; car++)
@@ -170,10 +170,10 @@ bool console_presentation_frame(uint32_t pressed)
 	}
 	if (scene.frame == AT_FADE_OUT)
 	{
-		SCREEN(screen)->fade_kind = 0u;
-		SCREEN(screen)->flags |= 1u;
+		screen->fade_kind = 0u;
+		screen->flags |= 1u;
 	}
-	if (++scene.frame >= AT_END && (SCREEN(screen)->flags & 1u) == 0u)
+	if (++scene.frame >= AT_END && (screen->flags & 1u) == 0u)
 	{
 		scene.done = true;
 		queue_sound(FIRST_SET);    /* (the game's sounds from set 0, as at power-on) */

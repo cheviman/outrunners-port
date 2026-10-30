@@ -4,7 +4,7 @@
  *                 reaches (game/assets.h)
  *    Version:     0.1.0
  *    Created:     27-10-2026
- *    Modified:    29-10-2026
+ *    Modified:    30-10-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
@@ -915,6 +915,7 @@ static uint32_t folded(uint32_t address)
 }
 
 const uint8_t *(*data_elsewhere)(uint32_t address);
+uint32_t (*address_elsewhere)(const void *pointer);
 
 const uint8_t *data_at(uint32_t address)
 {
@@ -932,6 +933,58 @@ const uint8_t *data_at(uint32_t address)
 	if (!(found = find(&program, folded(place))))
 		data_outside(address);
 	return found;
+}
+
+/* the pieces of the program's data by where their bytes are, for program_data_address (made once the
+   pieces are loaded) */
+static const piece **by_place;
+static size_t by_place_count;
+
+static int compare_places(const void *a, const void *b)
+{
+	const uintptr_t left = (uintptr_t)(*(const piece *const *)a)->data;
+	const uintptr_t right = (uintptr_t)(*(const piece *const *)b)->data;
+	return left < right ? -1 : left > right;
+}
+
+int program_data_address(const void *pointer, uint32_t *address)
+{
+	size_t low = 0, high = program.count;
+
+	if (by_place_count != program.count)
+	{
+		const piece **made = program.count ? malloc(program.count * sizeof *made) : NULL;
+		if (!made)
+			return 0;
+		for (size_t index = 0; index < program.count; index++)
+			made[index] = &program.pieces[index];
+		qsort(made, program.count, sizeof *made, compare_places);
+		free((void *)by_place);
+		by_place = made;
+		by_place_count = program.count;
+	}
+	while (low < high)
+	{
+		const size_t middle = (low + high) / 2;
+
+		if ((uintptr_t)by_place[middle]->data <= (uintptr_t)pointer)
+			low = middle + 1;
+		else
+			high = middle;
+	}
+	if (low == 0 || (uintptr_t)pointer - (uintptr_t)by_place[low - 1]->data >= by_place[low - 1]->size)
+		return 0;
+	*address = by_place[low - 1]->address + (uint32_t)((uintptr_t)pointer - (uintptr_t)by_place[low - 1]->data);
+	return 1;
+}
+
+const uint8_t *data_if_any(uint32_t address)
+{
+	const uint32_t place = address & 0xffffff;
+
+	if (place >= 0x200000 && (place & 0xf00000) != 0xf00000)
+		return NULL;
+	return find(&program, folded(place));
 }
 
 const uint8_t *assets_sound_data(uint32_t offset)

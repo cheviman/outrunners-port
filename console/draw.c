@@ -49,15 +49,15 @@ static void put_entry(uint32_t sprite, const uint16_t words[8])
    finish_sprite_list chains it on to the next layer) */
 static void link_group(uint32_t first, uint32_t end)
 {
-	const uint16_t head = SCREEN(screen)->text_depth_list_head;
+	const uint16_t head = screen->text_depth_list_head;
 
 	if (head == 0u)
-		SCREEN(screen)->text_depth_list_tail = (uint16_t)end;
+		screen->text_depth_list_tail = (uint16_t)end;
 	AS32(SPRITE_WORDS(end)[0]) = head;
 	AS32(SPRITE_WORDS(end + HALFWAY_COPY)[0]) = (uint16_t)(head + 0x300u);
-	SCREEN(screen)->sprite_list_last = end;
-	SCREEN(screen)->text_depth_list_head = (uint16_t)((first >> 4) | 0x8000u);
-	SCREEN(screen)->sprite_groups++;
+	screen->sprite_list_last = end;
+	screen->text_depth_list_head = (uint16_t)((first >> 4) | 0x8000u);
+	screen->sprite_groups++;
 }
 
 /* One pen of graphics stretched over the rectangle, through a table of its own (the two entries after it)
@@ -65,11 +65,11 @@ static void link_group(uint32_t first, uint32_t end)
    table's, 0) covers it, from the extra palette (where it is black) */
 static void put_rectangle(int x, int y, int width, int height, bool shadow)
 {
-	const uint32_t first = SCREEN(screen)->sprite_list_last + 0x10u;
-	const uint32_t size = text_sprite_size | ((uint32_t)SCREEN(screen)->sprite_screen_bit << 16);
+	const uint32_t first = screen->sprite_list_last + 0x10u;
+	const uint32_t size = text_sprite_size | ((uint32_t)screen->sprite_screen_bit << 16);
 	uint16_t words[8] = { 0 };
 
-	if (width <= 0 || height <= 0 || SCREEN(screen)->sprite_list_limit <= first + 0x30u)
+	if (width <= 0 || height <= 0 || screen->sprite_list_limit <= first + 0x30u)
 		return;
 	words[0] = shadow ? 0x3B0Au : 0x330Au;    /* indirect (13), its table inline (12), a shadow (11), opaque (8),
 	                                             by its top left */
@@ -81,7 +81,7 @@ static void put_rectangle(int x, int y, int width, int height, bool shadow)
 	if (!shadow)
 	{
 		words[1] |= S32_SPRITE_EXTRA_PALETTE;
-		s32_video_extra_colour(SCREEN(screen)->index, 0u, 0x0000u);
+		s32_video_extra_colour(screen->index, 0u, 0x0000u);
 	}
 	put_entry(first, words);
 	words[0] = words[1] = words[2] = words[3] = words[4] = words[5] = 0u;
@@ -102,8 +102,8 @@ void console_black(int x, int y, int width, int height)
 
 void console_text(int x, int y, int scale, uint16_t colour, const char *text)
 {
-	const uint32_t first = SCREEN(screen)->sprite_list_last + 0x10u;
-	const uint32_t size = text_sprite_size | ((uint32_t)SCREEN(screen)->sprite_screen_bit << 16);
+	const uint32_t first = screen->sprite_list_last + 0x10u;
+	const uint32_t size = text_sprite_size | ((uint32_t)screen->sprite_screen_bit << 16);
 	uint32_t sprite = first;
 	uint16_t words[8];
 
@@ -111,7 +111,7 @@ void console_text(int x, int y, int scale, uint16_t colour, const char *text)
 		return;
 	for (const char *letter = text; *letter; letter++, x += LETTER * scale)
 	{
-		if (SCREEN(screen)->sprite_list_limit <= sprite + 0x10u)    /* (room for the group's jump after it) */
+		if (screen->sprite_list_limit <= sprite + 0x10u)    /* (room for the group's jump after it) */
 			break;
 		words[0] = (uint16_t)text_sprite_words_0_1;
 		words[1] = (uint16_t)(text_sprite_words_0_1 >> 16);

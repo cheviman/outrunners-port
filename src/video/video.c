@@ -3,7 +3,7 @@
  *    Description: the video chips set up and cleared: the screens, the tile layers, the sprite chip and its lists, the mixer, the I/O chips
  *    Version:     0.1.0
  *    Created:     12-10-2026
- *    Modified:    29-10-2026
+ *    Modified:    30-10-2026
  *    Author:      Sebastian Toyos
  *
  *    OutRunners (arcade, Sega System Multi 32): the game's V70 program decompiled into C by
@@ -23,37 +23,38 @@ uint32_t init_screen(void)
 {
 	uint16_t course_length = 0, section_length = 0;
 	uint32_t command_routine = 0, courses_left = 0, index = 0, length = 0, length_place = 0, screen_hardware = 0, stage_course = 0;
+	const struct course_entry *course_entry = NULL;
 	uint32_t command = 0;
 
-	index = screen >> 16;
+	index = address_of(screen) >> 16;
 	index = index & 1u;
-	SCREEN(screen)->index = index;
+	screen->index = index;
 	screen_hardware = screen_hardware_records[index];
-	SCREEN(screen)->sprite_screen_bit = SCREEN_HARDWARE(screen_hardware)->sprite_screen_bit;
+	screen->sprite_screen_bit = SCREEN_HARDWARE(screen_hardware)->sprite_screen_bit;
 	screen_hardware += 2u;
-	SCREEN(screen)->palette_ram = SCREEN_HARDWARE(screen_hardware - 0x2u)->palette_ram;
+	screen->palette_ram = SCREEN_HARDWARE(screen_hardware - 0x2u)->palette_ram;
 	screen_hardware += 4u;
-	SCREEN(screen)->mixer = SCREEN_HARDWARE(screen_hardware - 0x6u)->mixer;
-	SCREEN(screen)->io_chip = SCREEN_HARDWARE(screen_hardware - 0x6u)->io_chip;
-	SCREEN(screen)->draw_distance = DRAW_DISTANCE_LIST(screen_view_defaults[0].draw_distances)[1];
-	SCREEN(screen)->eye_distance = screen_view_defaults[0].eye_distance;
-	SCREEN(screen)->sprite_origin_x = screen_view_defaults[0].sprite_origin_x;
-	SCREEN(screen)->sprite_origin_y = screen_view_defaults[0].sprite_origin_y;
-	SCREEN(screen)->view_pitch_base = screen_view_defaults[0].view_pitch_bases[0];
+	screen->mixer = SCREEN_HARDWARE(screen_hardware - 0x6u)->mixer;
+	screen->io_chip = SCREEN_HARDWARE(screen_hardware - 0x6u)->io_chip;
+	screen->draw_distance = DRAW_DISTANCE_LIST(screen_view_defaults[0].draw_distances)[1];
+	screen->eye_distance = screen_view_defaults[0].eye_distance;
+	screen->sprite_origin_x = screen_view_defaults[0].sprite_origin_x;
+	screen->sprite_origin_y = screen_view_defaults[0].sprite_origin_y;
+	screen->view_pitch_base = screen_view_defaults[0].view_pitch_bases[0];
 	stage_course = stage_courses_ADDRESS;
-	length_place = screen + 0x700u;
+	length_place = address_of(screen) + 0x700u;
 	courses_left = 0x1Fu;
 	do
 	{
-		r12 = COURSE_POINTER(stage_course)[0];
+		course_entry = rom_pointer(COURSE_POINTER(stage_course)[0]);
 		section_length = 0u;
 		course_length = 0u;
 		stage_course += 4u;
 		course_length += section_length;
 		for (;;)
 		{
-			length = COURSE_ENTRY(r12)->length;
-			r12 += 6u;
+			length = course_entry->length;
+			course_entry = course_entry + 1;
 			if ((int16_t)length >= 0)
 			{
 				course_length += length;
@@ -67,10 +68,11 @@ uint32_t init_screen(void)
 			case 4:
 				continue;
 			case 0:
-				r12 = COURSE_ENTRY(r12)[-1].jump;
+				course_entry = rom_pointer(address_of(course_entry) - 4u);
+				course_entry = rom_pointer((course_entry->length | ((uint32_t)(course_entry->jump & 0xFFFFu) << 16u)));
 				continue;
 			case 3:
-				r12 -= 2u;
+				course_entry = rom_pointer(address_of(course_entry) - 2u);
 				continue;
 			case 1:
 			case 5:
@@ -92,7 +94,7 @@ void clear_screen_ram(void)
 {
 	uint32_t block = 0, block_halfwords = 0, blocks_left = 0;
 
-	block = screen - 0x8000u;
+	block = address_of(screen) - 0x8000u;
 	blocks_left = 0x38u;
 	block_halfwords = 0x200u;
 	do
@@ -112,11 +114,11 @@ uint16_t init_video(void)
 	clear_video_ram();
 	load_text_font();
 	VIDEO_CONTROL = video_control_default;
-	video_registers[0] = video_control_default;
-	if (flip_screen != 0u)
+	game->video_registers[0] = video_control_default;
+	if (game->flip_screen != 0u)
 	{
 		VIDEO_CONTROL |= 0x200u;
-		video_registers[0] |= 0x200u;
+		game->video_registers[0] |= 0x200u;
 	}
 	move_halfwords(scroll_targets_ADDRESS, zero_block_ADDRESS, 0x10u);
 	move_halfwords(VIDEO_RAM + 0x1FF02u, video_register_defaults_ADDRESS, 0x47u);
@@ -133,14 +135,14 @@ uint16_t reset_tile_layers(void)
 	uint32_t index = 0;
 
 	VIDEO_CONTROL &= 0xFFFu;
-	video_registers[0] &= 0xFFFu;
-	index = SCREEN(screen)->index;
-	AS32(video_registers[32 + index * 2u]) = 0u;
-	AS32(video_registers[36 + index * 2u]) = 0u;
-	scroll_targets[index * 2u] = 0u;
-	scroll_targets[1 + index * 2u] = 0u;
-	scroll_targets[4 + index * 2u] = 0u;
-	scroll_targets[5 + index * 2u] = 0u;
+	game->video_registers[0] &= 0xFFFu;
+	index = screen->index;
+	AS32(game->video_registers[32 + index * 2u]) = 0u;
+	AS32(game->video_registers[36 + index * 2u]) = 0u;
+	game->scroll_targets[index * 2u] = 0u;
+	game->scroll_targets[1 + index * 2u] = 0u;
+	game->scroll_targets[4 + index * 2u] = 0u;
+	game->scroll_targets[5 + index * 2u] = 0u;
 	return index;
 }
 
@@ -213,7 +215,7 @@ void init_sprite_chip(void)
 	control_register = SPRITE_CONTROL + 0x4u;
 	control_flip = sprite_control_flip;
 	control_values = sprite_control_rest_ADDRESS;
-	if (flip_screen != 0u)
+	if (game->flip_screen != 0u)
 		control_flip = control_flip ^ 3u;
 	io_write16(control_register, control_flip);
 	control_register += 2u;
@@ -237,10 +239,10 @@ void init_sprite_chip(void)
 void init_sprite_lists(void)
 {
 	move_halfwords(SPRITE_RAM, sprite_ram_start_entries_ADDRESS, 0x28u);
-	SCREEN(SCREEN_1)->sprite_list_last = SPRITE_LIST_1_A_ADDRESS;
-	SCREEN(SCREEN_2)->sprite_list_last = SPRITE_LIST_2_A_ADDRESS;
-	SCREEN(SCREEN_1)->next_sprite_place = 0x20C000u;
-	SCREEN(SCREEN_2)->next_sprite_place = 0x21C000u;
+	game->screen_1.sprite_list_last = SPRITE_LIST_1_A_ADDRESS;
+	game->screen_2.sprite_list_last = SPRITE_LIST_2_A_ADDRESS;
+	game->screen_1.next_sprite_place = 0x20C000u;
+	game->screen_2.next_sprite_place = 0x21C000u;
 	SPRITE_LIST_1_A = 0xFFFFu;
 	SPRITE_LIST_1_A_HALFWAY = 0xFFFFu;
 	SPRITE_LIST_1_B = 0xFFFFu;
@@ -249,10 +251,10 @@ void init_sprite_lists(void)
 	SPRITE_LIST_2_A_HALFWAY = 0xFFFFu;
 	SPRITE_LIST_2_B = 0xFFFFu;
 	SPRITE_LIST_2_B_HALFWAY = 0xFFFFu;
-	sprite_lists_set_up = 1u;
-	sprite_list_buffers = 0u;
-	SCREEN(SCREEN_1)->sprite_groups &= 0xFF00u;
-	SCREEN(SCREEN_2)->sprite_groups &= 0xFF00u;
+	game->sprite_lists_set_up = 1u;
+	game->sprite_list_buffers = 0u;
+	game->screen_1.sprite_groups &= 0xFF00u;
+	game->screen_2.sprite_groups &= 0xFF00u;
 }
 
 /* Sets the count of sprite groups drawn this frame (sprite_groups) to 0: unless something is drawn after
@@ -260,7 +262,7 @@ void init_sprite_lists(void)
    as the game modes start. */
 void clear_sprite_group_count(void)
 {
-	SCREEN(screen)->sprite_groups = 0u;
+	screen->sprite_groups = 0u;
 }
 
 /* Sets the screen's mixer (registers 00-4E at mixer) and its two copies in the screen's block
@@ -269,21 +271,22 @@ void clear_sprite_group_count(void)
    RAM, each showing two of the four layers). */
 void init_mixer(void)
 {
-	uint32_t first_layer = 0, hidden_layer_pair = 0, mixer = 0, second_layer = 0;
+	uint32_t first_layer = 0, mixer = 0, second_layer = 0;
+	const struct hidden_layer_pair *hidden_layer_pair = NULL;
 
-	mixer = SCREEN(screen)->mixer;
+	mixer = screen->mixer;
 	move_halfwords_backward(mixer, mixer_register_defaults_ADDRESS, 0x28u);
-	move_halfwords(screen + 0x160u, mixer_register_defaults_ADDRESS, 0x28u);
-	move_halfwords(screen + 0x1B0u, mixer_register_defaults_ADDRESS, 0x28u);
-	hidden_layer_pair = hidden_layer_pairs_ADDRESS + SCREEN(screen)->index * 2u;
-	first_layer = HIDDEN_LAYER_PAIR(hidden_layer_pair)->first_layer;
-	second_layer = HIDDEN_LAYER_PAIR(hidden_layer_pair)->second_layer;
+	move_halfwords(address_of(screen) + 0x160u, mixer_register_defaults_ADDRESS, 0x28u);
+	move_halfwords(address_of(screen) + 0x1B0u, mixer_register_defaults_ADDRESS, 0x28u);
+	hidden_layer_pair = rom_pointer(hidden_layer_pairs_ADDRESS + screen->index * 2u);
+	first_layer = hidden_layer_pair->first_layer;
+	second_layer = hidden_layer_pair->second_layer;
 	io_write16(mixer + first_layer * 2u, 0u);
 	io_write16(mixer + second_layer * 2u, 0u);
-	SCREEN(screen)->mixer_values[(int32_t)first_layer] = 0u;
-	SCREEN(screen)->mixer_values[(int32_t)second_layer] = 0u;
-	SCREEN(screen)->mixer_defaults[(int32_t)first_layer] = 0u;
-	SCREEN(screen)->mixer_defaults[(int32_t)second_layer] = 0u;
+	screen->mixer_values[(int32_t)first_layer] = 0u;
+	screen->mixer_values[(int32_t)second_layer] = 0u;
+	screen->mixer_defaults[(int32_t)first_layer] = 0u;
+	screen->mixer_defaults[(int32_t)second_layer] = 0u;
 }
 
 /* Sets up the two I/O chips at boot: ports D, G and H outputs and cleared (the coin meters, lamps, LCD,

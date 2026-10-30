@@ -132,6 +132,14 @@ static const uint8_t *route_data(uint32_t address)
 	return address >= ROUTE_DATA && offset < routes.used ? &routes.data[offset] : NULL;
 }
 
+/* (and back: the address of a place of it a pointer the C keeps points at) */
+static uint32_t route_address(const void *pointer)
+{
+	const uintptr_t offset = (uintptr_t)pointer - (uintptr_t)routes.data;
+
+	return offset < routes.used ? ROUTE_DATA + (uint32_t)offset : 0u;
+}
+
 static uint32_t here(void)
 {
 	return ROUTE_DATA + routes.used;
@@ -399,6 +407,7 @@ static void build_shared(void)
 		return;
 	routes.shared_built = true;
 	data_elsewhere = route_data;
+	address_elsewhere = route_address;
 	for (int branch = 0; branch < 2; branch++)
 		routes.branch_streams[branch] = branch_stream(branch, GOAL_FORK - STAGE_FORK);
 }
@@ -491,8 +500,8 @@ static void build_full(void)
 
 static bool route_here(void)
 {
-	return routes.running != ROUTE_NONE && SCREEN(screen)->index == LEFT_SEAT
-		&& SCREEN(screen)->game_mode == GAME_MODE_PLAY;
+	return routes.running != ROUTE_NONE && screen->index == LEFT_SEAT
+		&& screen->game_mode == GAME_MODE_PLAY;
 }
 
 static const route *route_running(void)
@@ -519,7 +528,7 @@ static int reverse_checkpoint_given(int checkpoint)
 {
 	static const uint8_t level_stages[GOAL_CHECKPOINT] = { 0x0D, 0x07, 0x03, 0x01, 0x00 };
 
-	return (stage_start_times[level_stages[checkpoint]] + master_time_difficulty[checkpoint]) * 0x1E;
+	return (stage_start_times[level_stages[checkpoint]] + game->master_time_difficulty[checkpoint]) * 0x1E;
 }
 
 /* REVERSE's time at a checkpoint: the game's, less what the start gave beyond the game's start
@@ -576,8 +585,8 @@ static void start_line_colours(void)
    put in the list) marked for the extra palette, where the pre-stage's colours are */
 void presentation_start_line_update(void)
 {
-	const uint32_t record = OBJECT(current_object)->parameter;
-	const uint32_t first = SCREEN(screen)->sprite_list_last + 0x10u;
+	const uint32_t record = current_object->parameter;
+	const uint32_t first = screen->sprite_list_last + 0x10u;
 
 	for (int kind = 0; kind < routes.start_line_kinds; kind++)
 		if (routes.start_line[kind].record == record)
@@ -585,7 +594,7 @@ void presentation_start_line_update(void)
 			call_code(routes.start_line[kind].handler);
 			break;
 		}
-	for (uint32_t sprite = first; sprite <= SCREEN(screen)->sprite_list_last; sprite += 0x10u)
+	for (uint32_t sprite = first; sprite <= screen->sprite_list_last; sprite += 0x10u)
 		if ((SPRITE_WORDS(sprite)[0] >> 14) == 0u)    /* (a sprite, not the group's jump) */
 		{
 			SPRITE_WORDS(sprite)[1] |= S32_SPRITE_EXTRA_PALETTE;
@@ -611,13 +620,13 @@ static void fold_objects(uint32_t handler, uint32_t offset, int fold)
    the race's time to the last checkpoint taken out into FULL's total */
 static void full_fold(void)
 {
-	const uint32_t race = SCREEN(screen)->race, race_copy = SCREEN(screen)->race_copy;
-	const int stage = SCREEN(screen)->route_stage;
-	const uint8_t player = SCREEN(screen)->player;
+	const uint32_t race = screen->race, race_copy = screen->race_copy;
+	const int stage = screen->route_stage;
+	const uint8_t player = screen->player;
 	uint32_t time;
 	int fold;
 
-	if (SCREEN(screen)->current_stage != stage || stage == routes.folded_stage)
+	if (screen->current_stage != stage || stage == routes.folded_stage)
 		return;
 	routes.folded_stage = stage;
 	/* (the START banner and its lights never end, and the race's segments, which the game compares as 16 bits
@@ -634,30 +643,30 @@ static void full_fold(void)
 		RACE(race)->stage_count -= (uint8_t)fold;
 		if (race_copy != race)
 			RACE(race_copy)->stage_count -= (uint8_t)fold;
-		SCREEN(screen)->counted_stages[player] -= (uint8_t)fold;
-		SCREEN(screen)->checkpoints_passed[player] -= (uint8_t)fold;
-		SCREEN(screen)->forks_decided -= (uint8_t)fold;
-		SCREEN(screen)->route_stage_level -= (uint8_t)fold;
-		CAR(player_car)->forks_reached -= (uint8_t)fold;
-		CAR(player_car)->forks_taken -= (uint8_t)fold;
-		CAR(player_car)->extensions_shown -= (uint8_t)fold;
+		screen->counted_stages[player] -= (uint8_t)fold;
+		screen->checkpoints_passed[player] -= (uint8_t)fold;
+		screen->forks_decided -= (uint8_t)fold;
+		screen->route_stage_level -= (uint8_t)fold;
+		player_car->forks_reached -= (uint8_t)fold;
+		player_car->forks_taken -= (uint8_t)fold;
+		player_car->extensions_shown -= (uint8_t)fold;
 		fold_objects(lap_timer_update_ADDRESS, offsetof(struct object, lap_timer.checkpoints), fold);
 		fold_objects(checkpoint_board_update_ADDRESS, offsetof(struct object, checkpoint_board.checkpoints_seen), fold);
 		fold_objects(stage_end_sounds_update_ADDRESS, offsetof(struct object, stage_end_sounds.stage), fold);
 		for (int checkpoint = checkpoint_of(stage); checkpoint <= GOAL_CHECKPOINT; checkpoint++)
 		{
-			SCREEN(screen)->counted_passes[checkpoint] = 0u;
-			SCREEN(screen)->checkpoint_passes[checkpoint] = 0u;
+			screen->counted_passes[checkpoint] = 0u;
+			screen->checkpoint_passes[checkpoint] = 0u;
 		}
 	}
 	/* (the race's time in thousandths, its checkpoints' in hundredths: the split times stay as they were) */
-	time = CAR(player_car)->checkpoint_time;
+	time = player_car->checkpoint_time;
 	routes.time_base += time;
 	RACE(race)->race_time -= time * 10u;
 	if (race_copy != race)
 		RACE(race_copy)->race_time -= time * 10u;
-	CAR(player_car)->race_time -= time * 10u;
-	CAR(player_car)->checkpoint_time = 0u;
+	player_car->race_time -= time * 10u;
+	player_car->checkpoint_time = 0u;
 }
 
 /* FULL at its goal: the time under CONGRATULATIONS the whole race's (goal_update has written the last
@@ -672,7 +681,7 @@ static void full_total(void)
 	if (routes.total_shown || !goal || OBJECT(goal)->state < 2u)
 		return;
 	routes.total_shown = true;
-	time = routes.time_base + SCREEN(screen)->checkpoint_times_by_player[SCREEN(screen)->player + 0x28u];
+	time = routes.time_base + screen->checkpoint_times_by_player[screen->player + 0x28u];
 	letters = snprintf(text, sizeof text, "%u'%02u\"%02u", (unsigned)(time / 6000u), (unsigned)(time / 100u % 60u),
 		(unsigned)(time % 100u));
 	for (int letter = 0; letter <= letters; letter++)
@@ -698,19 +707,19 @@ bool console_routes_frame(uint32_t mode, uint32_t pressed)
 		full_total();
 		return false;
 	}
-	if (SCREEN(screen)->game_step != 5u || (SCREEN(screen)->flags & 1u) != 0u)
+	if (screen->game_step != 5u || (screen->flags & 1u) != 0u)
 		return false;
 	if (routes.goal == 0)
 	{
 		if (!console_route_select_running())
-			console_route_select_start(RACE(SCREEN(screen)->race)->model);
+			console_route_select_start(RACE(screen->race)->model);
 		switch (console_route_select_frame(pressed))
 		{
 			case ROUTE_SELECT_START:
 				routes.goal = FIRST_GOAL + console_route_select_goal();
 				/* (the race's start: REVERSE_START_EXTRA more in the setting the car adds to its 40 seconds) */
-				routes.start_difficulty = master_time_difficulty[0];
-				master_time_difficulty[0] = (int8_t)(master_time_difficulty[0] + REVERSE_START_EXTRA);
+				routes.start_difficulty = game->master_time_difficulty[0];
+				game->master_time_difficulty[0] = (int8_t)(game->master_time_difficulty[0] + REVERSE_START_EXTRA);
 				routes.time_given = false;
 				break;
 			case ROUTE_SELECT_BACK:
@@ -720,9 +729,9 @@ bool console_routes_frame(uint32_t mode, uint32_t pressed)
 				return true;
 		}
 	}
-	SCREEN(screen)->first_stage = (uint8_t)routes.goal;
-	SCREEN(screen)->route_stage = (uint8_t)routes.goal;
-	SCREEN(screen)->built_stage = (uint8_t)routes.goal;
+	screen->first_stage = (uint8_t)routes.goal;
+	screen->route_stage = (uint8_t)routes.goal;
+	screen->built_stage = (uint8_t)routes.goal;
 	start_line_colours();
 	return false;
 }
@@ -741,19 +750,19 @@ void player_car_start_course(void)
 		return;
 	}
 	/* (as the game's, from the route's course) */
-	move_halfwords(screen + 0x2000u, zero_block_ADDRESS, 0x200u);
-	course = route_running()->courses[SCREEN(screen)->first_stage];
-	CAR(player_car)->course = course;
+	move_halfwords(address_of(screen) + 0x2000u, zero_block_ADDRESS, 0x200u);
+	course = route_running()->courses[screen->first_stage];
+	player_car->course = course;
 	width_code = COURSE_START(course)->width_code;
-	CAR(player_car)->width_code = (uint8_t)width_code;
-	CAR(player_car)->road_width = width_code * 0xB0u;
-	CAR(player_car)->prebuilt_segments = SCREEN(screen)->draw_distance >> 7;
+	player_car->width_code = (uint8_t)width_code;
+	player_car->road_width = width_code * 0xB0u;
+	player_car->prebuilt_segments = screen->draw_distance >> 7;
 	do
 	{
 		player_car_build_segment(0xFFFu);
-	} while ((int16_t)CAR(player_car)->built_segments < (int16_t)CAR(player_car)->prebuilt_segments);
-	SCREEN(screen)->current_stage_level = SCREEN(screen)->built_stage_level;
-	CAR(player_car)->stage_history[0] = SCREEN(screen)->route_stage;
+	} while ((int16_t)player_car->built_segments < (int16_t)player_car->prebuilt_segments);
+	screen->current_stage_level = screen->built_stage_level;
+	player_car->stage_history[0] = screen->route_stage;
 }
 
 /* The roadside objects: REVERSE's goal stage, where it starts, from its own stream; its pre-stage, where it
@@ -761,21 +770,21 @@ void player_car_start_course(void)
    stream), from theirs */
 void road_object_stream_read(void)
 {
-	const int stage = SCREEN(screen)->built_stage;
+	const int stage = screen->built_stage;
 	const bool reverse = route_here() && routes.running == ROUTE_REVERSE;
 	const bool full = route_here() && routes.running == ROUTE_FULL;
 
-	if (reverse && OBJECT(current_object)->state == 0u && stage >= FIRST_GOAL && stage < STAGES)
+	if (reverse && current_object->state == 0u && stage >= FIRST_GOAL && stage < STAGES)
 	{
-		OBJECT(current_object)->state = 1u;
-		OBJECT(current_object)->road_object_stream.stream = routes.reverse.goal_streams[stage - FIRST_GOAL];
+		current_object->state = 1u;
+		current_object->road_object_stream.stream = routes.reverse.goal_streams[stage - FIRST_GOAL];
 	}
-	if (OBJECT(current_object)->state == 2u && OBJECT(current_object)->road_object_stream.stage == stage
+	if (current_object->state == 2u && current_object->road_object_stream.stage == stage
 		&& ((reverse && stage == 0) || (full && stage >= FIRST_GOAL && stage < LAST_STAGE)))
 	{
-		OBJECT(current_object)->state = 1u;
-		OBJECT(current_object)->road_object_stream.stage_start = CAR(player_car)->built_segments;
-		OBJECT(current_object)->road_object_stream.stream = reverse ? routes.finish_stream
+		current_object->state = 1u;
+		current_object->road_object_stream.stage_start = player_car->built_segments;
+		current_object->road_object_stream.stream = reverse ? routes.finish_stream
 			: routes.full.goal_streams[stage - FIRST_GOAL];
 	}
 	original_road_object_stream_read();
@@ -785,28 +794,28 @@ void road_object_stream_read(void)
    branch, which lead forward to its own choice), and none new for the pre-stage, which has none */
 void race_background_update(void)
 {
-	const uint8_t built_stage = SCREEN(screen)->built_stage;
-	const uint8_t branch = CAR(player_car)->branch;
+	const uint8_t built_stage = screen->built_stage;
+	const uint8_t branch = player_car->branch;
 	uint8_t background;
 
-	if (!route_here() || OBJECT(current_object)->state != 1u || SCREEN(screen)->stage_background_change != 0u
-		|| CAR(player_car)->new_branch == 0u)
+	if (!route_here() || current_object->state != 1u || screen->stage_background_change != 0u
+		|| player_car->new_branch == 0u)
 	{
 		original_race_background_update();
 		return;
 	}
-	if (SCREEN(screen)->route_stage == 0u)
+	if (screen->route_stage == 0u)
 	{
-		CAR(player_car)->new_branch = 0u;
+		player_car->new_branch = 0u;
 		original_race_background_update();
 		return;
 	}
-	background = stage_backgrounds[SCREEN(screen)->route_stage];
-	SCREEN(screen)->built_stage = background >> 1;    /* (the game's choice is built_stage * 2 + branch) */
-	CAR(player_car)->branch = background & 1u;
+	background = stage_backgrounds[screen->route_stage];
+	screen->built_stage = background >> 1;    /* (the game's choice is built_stage * 2 + branch) */
+	player_car->branch = background & 1u;
 	original_race_background_update();
-	SCREEN(screen)->built_stage = built_stage;
-	CAR(player_car)->branch = branch;
+	screen->built_stage = built_stage;
+	player_car->branch = branch;
 }
 
 /* The race's checkpoints: the time a fork adds the route's next stage's (the game's is by the stage its
@@ -814,40 +823,40 @@ void race_background_update(void)
    reads its forks by the stage). REVERSE's time is the game's turned round (Sebas): the whole race's at the
    start, its first course a goal's, the longest, and nothing at the checkpoints, as the game's own race
    gathers it course by course */
-void race_progress_update(void)
+void race_progress_update(uint32_t *p_host_record, uint32_t *p_racer_copy)
 {
-	const uint32_t race = SCREEN(screen)->race, race_copy = SCREEN(screen)->race_copy;
+	const uint32_t race = screen->race, race_copy = screen->race_copy;
 	uint8_t stage, read_stage, passes;
 
 	if (!route_here())
 	{
-		original_race_progress_update();
+		original_race_progress_update(p_host_record, p_racer_copy);
 		return;
 	}
 	if (routes.running == ROUTE_REVERSE && !routes.time_given && RACE(race)->time_left != 0u)
 	{
 		/* (the start's time set by the car, player_car_update, with REVERSE_START_EXTRA in the setting: the
 		   setting back) */
-		master_time_difficulty[0] = routes.start_difficulty;
+		game->master_time_difficulty[0] = routes.start_difficulty;
 		routes.time_given = true;
 	}
 	stage = RACE(race_copy)->stage;
 	read_stage = stage <= LAST_FORK_STAGE ? stage : LAST_FORK_STAGE;
 	passes = RACE(race)->pass_count;
 	RACE(race_copy)->stage = read_stage;
-	original_race_progress_update();
+	original_race_progress_update(p_host_record, p_racer_copy);
 	RACE(race_copy)->stage = stage;
-	if (SCREEN(screen)->leader_stage == read_stage)
-		SCREEN(screen)->leader_stage = stage;    /* (one player: the leader) */
+	if (screen->leader_stage == read_stage)
+		screen->leader_stage = stage;    /* (one player: the leader) */
 	if (RACE(race)->pass_count != passes && RACE(race)->pass_order == 0u && RACE(race)->pass_checkpoint != GOAL_CHECKPOINT
 		&& stage < STAGES)
 	{
 		const uint8_t checkpoint = RACE(race)->pass_checkpoint, branch = RACE(race)->pass_branch;
 		const int next = routes.running == ROUTE_FULL ? stage + 1 : routes.parents[stage][branch & 1u];
 		const int given = (int8_t)(stage_start_times[fork_next_stages[read_stage * 2 + branch]]
-			+ master_time_difficulty[checkpoint]) * 0x1E;
+			+ game->master_time_difficulty[checkpoint]) * 0x1E;
 		const int due = routes.running == ROUTE_REVERSE ? reverse_checkpoint_time(checkpoint)
-			: (int8_t)(stage_start_times[next] + master_time_difficulty[checkpoint]) * 0x1E;
+			: (int8_t)(stage_start_times[next] + game->master_time_difficulty[checkpoint]) * 0x1E;
 
 		RACE(race)->time_left = (uint16_t)(RACE(race)->time_left + due - given);
 	}
@@ -861,7 +870,7 @@ void stage_indicator_draw(void)
 		original_stage_indicator_draw();
 		return;
 	}
-	draw_text(stage_level_texts[level_of(SCREEN(screen)->route_stage)]);
+	draw_text(rom_pointer(stage_level_texts[level_of(screen->route_stage)]));
 	draw_object(0u);
 }
 
@@ -873,11 +882,11 @@ void route_map_update(void)
 		original_route_map_update();
 		return;
 	}
-	if (SCREEN(screen)->game_step == 14u)
+	if (screen->game_step == 14u)
 	{
-		SCREEN(screen)->game_step = 16u;
-		OBJECT(current_object)->flags = 0u;
-		OBJECT(current_object)->flags_high = 0u;
+		screen->game_step = 16u;
+		current_object->flags = 0u;
+		current_object->flags_high = 0u;
 	}
 }
 
@@ -888,8 +897,7 @@ uint32_t course_record_beaten(void)
 	return route_here() ? 1u : original_course_record_beaten();
 }
 
-void course_records_update(void)
+uint32_t course_records_update(uint32_t record_entry)
 {
-	if (routes.running == ROUTE_NONE)
-		original_course_records_update();
+	return routes.running == ROUTE_NONE ? original_course_records_update(record_entry) : record_entry;
 }

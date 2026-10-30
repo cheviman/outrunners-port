@@ -3,7 +3,7 @@
  *    Description: the title screen: the cars and riders, the palms, the logo, the seagull, the pictures
  *    Version:     0.1.0
  *    Created:     12-10-2026
- *    Modified:    29-10-2026
+ *    Modified:    30-10-2026
  *    Author:      Sebastian Toyos
  *
  *    OutRunners (arcade, Sega System Multi 32): the game's V70 program decompiled into C by
@@ -25,80 +25,76 @@
 void title_screen_update(void)
 {
 	uint8_t next_attract_car = 0, object_index = 0;
-	uint32_t background_setup = 0, object = 0, objects_left = 0, title_screen_layer_setup = 0;
+	uint32_t background_setup = 0, objects_left = 0;
+	struct object *object = NULL;
+	const struct title_screen_layer_setup *title_screen_layer_setup = NULL;
 	uint8_t frames = 0;
 	uint32_t scroll_x_address = 0, scroll_x_address_2 = 0, second_scroll_x_address = 0, scroll_x_address_3 = 0, second_scroll_x_address_2 = 0;
 
-	switch (OBJECT(current_object)->state)
+	switch (current_object->state)
 	{
 	case 0:
-		SCREEN(screen)->route_map_signals &= 0xFFFFFF00u;
-		SCREEN(screen)->title_logo_shine = 0u;
-		title_screen_layer_setup = title_screen_layer_setups_ADDRESS + ((uint32_t)SCREEN(screen)->index << 3) * 4u;
-		OBJECT(current_object)->title_screen.tile_bank_address = TITLE_SCREEN_LAYER_SETUP(title_screen_layer_setup)->tile_bank_address;
-		title_screen_layer_setup += 4u;
-		OBJECT(current_object)->title_screen.pages_address = TITLE_SCREEN_LAYER_SETUP(title_screen_layer_setup - 0x4u)->pages_address;
-		title_screen_layer_setup += 4u;
-		OBJECT(current_object)->title_screen.scroll_x_address = TITLE_SCREEN_LAYER_SETUP(title_screen_layer_setup - 0x8u)->scroll_x_address;
-		title_screen_layer_setup += 4u;
-		OBJECT(current_object)->title_screen.scroll_y_address = TITLE_SCREEN_LAYER_SETUP(title_screen_layer_setup - 0xCu)->scroll_y_address;
-		title_screen_layer_setup += 4u;
-		OBJECT(current_object)->title_screen.second_tile_bank_address = TITLE_SCREEN_LAYER_SETUP(title_screen_layer_setup - 0x10u)->second_tile_bank_address;
-		title_screen_layer_setup += 4u;
-		OBJECT(current_object)->title_screen.second_pages_address = TITLE_SCREEN_LAYER_SETUP(title_screen_layer_setup - 0x14u)->second_pages_address;
-		title_screen_layer_setup += 4u;
-		OBJECT(current_object)->title_screen.second_scroll_x_address = TITLE_SCREEN_LAYER_SETUP(title_screen_layer_setup - 0x18u)->second_scroll_x_address;
-		OBJECT(current_object)->title_screen.second_scroll_y_address = TITLE_SCREEN_LAYER_SETUP(title_screen_layer_setup - 0x18u)->second_scroll_y_address;
-		background_setup = title_background_setups_ADDRESS + SCREEN(screen)->index * 5u * 4u;
+		screen->route_map_signals &= 0xFFFFFF00u;
+		screen->title_logo_shine = 0u;
+		title_screen_layer_setup = rom_pointer(title_screen_layer_setups_ADDRESS + ((uint32_t)screen->index << 3) * 4u);
+		current_object->title_screen.tile_bank_address = title_screen_layer_setup->tile_bank_address;
+		current_object->title_screen.pages_address = title_screen_layer_setup->pages_address;
+		current_object->title_screen.scroll_x_address = title_screen_layer_setup->scroll_x_address;
+		current_object->title_screen.scroll_y_address = title_screen_layer_setup->scroll_y_address;
+		current_object->title_screen.second_tile_bank_address = title_screen_layer_setup->second_tile_bank_address;
+		current_object->title_screen.second_pages_address = title_screen_layer_setup->second_pages_address;
+		current_object->title_screen.second_scroll_x_address = title_screen_layer_setup->second_scroll_x_address;
+		current_object->title_screen.second_scroll_y_address = title_screen_layer_setup->second_scroll_y_address;
+		background_setup = title_background_setups_ADDRESS + screen->index * 5u * 4u;
 		set_up_background(background_setup);
-		VIDEO_REGISTER_WORDS(OBJECT(current_object)->title_screen.second_scroll_y_address)[0] = 0xFFF0u;
-		VIDEO_REGISTER_WORDS(OBJECT(current_object)->title_screen.scroll_x_address)[0] = 0x360u;
-		scroll_x_address = OBJECT(current_object)->title_screen.scroll_x_address;
-		VIDEO_REGISTER_WORDS(scroll_x_address)[0] += (SCREEN(screen)->car_number * 5u) << 6;
-		VIDEO_REGISTER_WORDS(OBJECT(current_object)->title_screen.scroll_y_address)[0] = 0x72u;
-		next_attract_car = SCREEN(screen)->next_attract_car;
-		SCREEN(screen)->attract_car = next_attract_car;
-		SCREEN(screen)->next_attract_car = (next_attract_car + 1u) & 7u;
-		SCREEN(screen)->link_event_data_1 = SCREEN(screen)->attract_car;
-		SCREEN(screen)->link_event = 5u;
+		VIDEO_REGISTER_WORDS(current_object->title_screen.second_scroll_y_address)[0] = 0xFFF0u;
+		VIDEO_REGISTER_WORDS(current_object->title_screen.scroll_x_address)[0] = 0x360u;
+		scroll_x_address = current_object->title_screen.scroll_x_address;
+		VIDEO_REGISTER_WORDS(scroll_x_address)[0] += (screen->car_number * 5u) << 6;
+		VIDEO_REGISTER_WORDS(current_object->title_screen.scroll_y_address)[0] = 0x72u;
+		next_attract_car = screen->next_attract_car;
+		screen->attract_car = next_attract_car;
+		screen->next_attract_car = (next_attract_car + 1u) & 7u;
+		screen->link_event_data_1 = screen->attract_car;
+		screen->link_event = 5u;
 		object = start_object();
-		OBJECT(object)->handler = credit_display_update_ADDRESS;
+		object->handler = credit_display_update_ADDRESS;
 		object = start_object();
-		OBJECT(object)->handler = coin_prompt_update_ADDRESS;
+		object->handler = coin_prompt_update_ADDRESS;
 		objects_left = 8u;
 		object_index = 0u;
 		do
 		{
 			object = start_object();
-			OBJECT(object)->handler = title_car_drive_ADDRESS;
-			OBJECT(object)->title_car.index = object_index;
+			object->handler = title_car_drive_ADDRESS;
+			object->title_car.index = object_index;
 			object_index++;
 			objects_left--;
 		} while (objects_left != 0u);
-		OBJECT(current_object)->title_screen.frames = 0x2Du;
-		OBJECT(current_object)->state++;
+		current_object->title_screen.frames = 0x2Du;
+		current_object->state++;
 		return;
 	case 1:
 		title_screen_start_palms();
-		scroll_x_address_2 = OBJECT(current_object)->title_screen.scroll_x_address;
+		scroll_x_address_2 = current_object->title_screen.scroll_x_address;
 		VIDEO_REGISTER_WORDS(scroll_x_address_2)[0] += 8u;
-		second_scroll_x_address = OBJECT(current_object)->title_screen.second_scroll_x_address;
+		second_scroll_x_address = current_object->title_screen.second_scroll_x_address;
 		VIDEO_REGISTER_WORDS(second_scroll_x_address)[0] += 0x14u;
-		frames = (uint8_t)OBJECT(current_object)->title_screen.frames;
-		OBJECT(current_object)->title_screen.frames = (OBJECT(current_object)->title_screen.frames & 0xFF00u) | (frames - 1u & 0xFFu);
+		frames = (uint8_t)current_object->title_screen.frames;
+		current_object->title_screen.frames = (current_object->title_screen.frames & 0xFF00u) | (frames - 1u & 0xFFu);
 		if (frames != 1u)
 			return;
 		object = start_object();
-		OBJECT(object)->handler = title_logo_update_ADDRESS;
+		object->handler = title_logo_update_ADDRESS;
 		object = start_object();
-		OBJECT(object)->handler = title_logo_copy_update_ADDRESS;
+		object->handler = title_logo_copy_update_ADDRESS;
 		objects_left = 3u;
 		object_index = 0u;
 		do
 		{
 			object = start_object();
-			OBJECT(object)->handler = title_logo_car_update_ADDRESS;
-			OBJECT(object)->title_logo_car.index = object_index;
+			object->handler = title_logo_car_update_ADDRESS;
+			object->title_logo_car.index = object_index;
 			object_index++;
 			objects_left--;
 		} while (objects_left != 0u);
@@ -107,35 +103,35 @@ void title_screen_update(void)
 		do
 		{
 			object = start_object();
-			OBJECT(object)->handler = title_logo_stripe_update_ADDRESS;
-			OBJECT(object)->title_logo_stripe.index = object_index;
+			object->handler = title_logo_stripe_update_ADDRESS;
+			object->title_logo_stripe.index = object_index;
 			object_index++;
 			objects_left--;
 		} while (objects_left != 0u);
-		OBJECT(current_object)->title_screen.wave_times = title_logo_car_wave_frames_ADDRESS;
-		OBJECT(current_object)->title_screen.frames = 0u;
-		OBJECT(current_object)->state++;
+		current_object->title_screen.wave_times = title_logo_car_wave_frames_ADDRESS;
+		current_object->title_screen.frames = 0u;
+		current_object->state++;
 		return;
 	case 2:
 		title_screen_start_palms();
-		scroll_x_address_3 = OBJECT(current_object)->title_screen.scroll_x_address;
+		scroll_x_address_3 = current_object->title_screen.scroll_x_address;
 		VIDEO_REGISTER_WORDS(scroll_x_address_3)[0] += 8u;
-		second_scroll_x_address_2 = OBJECT(current_object)->title_screen.second_scroll_x_address;
+		second_scroll_x_address_2 = current_object->title_screen.second_scroll_x_address;
 		VIDEO_REGISTER_WORDS(second_scroll_x_address_2)[0] += 0x14u;
-		OBJECT(current_object)->title_screen.frames++;
-		if (OBJECT(current_object)->title_screen.frames != TITLE_WAVE_FRAMES(OBJECT(current_object)->title_screen.wave_times)[0])
+		current_object->title_screen.frames++;
+		if (current_object->title_screen.frames != TITLE_WAVE_FRAMES(current_object->title_screen.wave_times)[0])
 			return;
 		objects_left = 3u;
 		object_index = 0u;
 		do
 		{
 			object = start_object();
-			OBJECT(object)->handler = title_logo_car_update_ADDRESS;
-			OBJECT(object)->title_logo_car.index = object_index;
+			object->handler = title_logo_car_update_ADDRESS;
+			object->title_logo_car.index = object_index;
 			object_index++;
 			objects_left--;
 		} while (objects_left != 0u);
-		OBJECT(current_object)->title_screen.wave_times += 2u;
+		current_object->title_screen.wave_times += 2u;
 		return;
 	}
 }
@@ -150,58 +146,54 @@ void title_screen_update(void)
 void title_car_drive(void)
 {
 	uint16_t bounce = 0;
-	uint32_t animation = 0, model = 0, object = 0, title_car_record = 0;
+	uint32_t animation = 0, model = 0;
+	struct object *object = NULL;
+	const struct title_car_record *title_car_record = NULL;
 
-	switch (OBJECT(current_object)->state)
+	switch (current_object->state)
 	{
 	case 0:
-		OBJECT(current_object)->draw_mode = 0xAu;
-		title_car_record = title_car_records_ADDRESS + ((uint32_t)OBJECT(current_object)->title_car.index << 4);
-		model = TITLE_CAR_RECORD(title_car_record)->model;
+		current_object->draw_mode = 0xAu;
+		title_car_record = rom_pointer(title_car_records_ADDRESS + ((uint32_t)current_object->title_car.index << 4));
+		model = title_car_record->model;
 		animation = title_car_animations[model];
-		title_car_record += 2u;
 		animation_start(animation);
-		OBJECT(current_object)->palette = TITLE_CAR_RECORD(title_car_record - 0x2u)->palette;
-		title_car_record += 2u;
-		OBJECT(current_object)->width_scale = TITLE_CAR_RECORD(title_car_record - 0x4u)->width_scale;
-		title_car_record += 2u;
-		OBJECT(current_object)->height_scale = TITLE_CAR_RECORD(title_car_record - 0x6u)->height_scale;
-		title_car_record += 2u;
-		OBJECT(current_object)->title_car.position = TITLE_CAR_RECORD(title_car_record - 0x8u)->position;
-		title_car_record += 2u;
-		OBJECT(current_object)->y = TITLE_CAR_RECORD(title_car_record - 0xAu)->y;
-		title_car_record += 2u;
-		OBJECT(current_object)->title_car.speed = TITLE_CAR_RECORD(title_car_record - 0xCu)->speed;
-		OBJECT(current_object)->frame = 9u;
-		OBJECT(current_object)->depth_layer = 0x18Fu;
-		OBJECT(current_object)->depth_layer += TITLE_CAR_RECORD(title_car_record - 0xCu)->depth_layer;
+		current_object->palette = title_car_record->palette;
+		current_object->width_scale = title_car_record->width_scale;
+		current_object->height_scale = title_car_record->height_scale;
+		current_object->title_car.position = title_car_record->position;
+		current_object->y = title_car_record->y;
+		current_object->title_car.speed = title_car_record->speed;
+		current_object->frame = 9u;
+		current_object->depth_layer = 0x18Fu;
+		current_object->depth_layer += title_car_record->depth_layer;
 		object = start_object();
-		OBJECT(object)->handler = title_car_passenger_update_ADDRESS;
-		OBJECT(object)->title_car_passenger.car = current_object;
-		OBJECT(object)->title_car_passenger.model = model;
+		object->handler = title_car_passenger_update_ADDRESS;
+		object->title_car_passenger.car = address_of(current_object);
+		object->title_car_passenger.model = model;
 		object = start_object();
-		OBJECT(object)->handler = title_car_driver_update_ADDRESS;
-		OBJECT(object)->title_car_driver.car = current_object;
-		OBJECT(object)->title_car_driver.model = model;
-		OBJECT(current_object)->state++;
+		object->handler = title_car_driver_update_ADDRESS;
+		object->title_car_driver.car = address_of(current_object);
+		object->title_car_driver.model = model;
+		current_object->state++;
 		break;
 	case 1:
 		break;
 	}
-	OBJECT(current_object)->title_car.position += OBJECT(current_object)->title_car.speed;
-	if (OBJECT(current_object)->title_car.position >= 0x1000)
+	current_object->title_car.position += current_object->title_car.speed;
+	if (current_object->title_car.position >= 0x1000)
 	{
-		OBJECT(current_object)->flags &= 0xDFu;
-		OBJECT(current_object)->title_car.position &= 0xFFFu;
+		current_object->flags &= 0xDFu;
+		current_object->title_car.position &= 0xFFFu;
 	}
-	OBJECT(current_object)->x = OBJECT(current_object)->title_car.position;
-	OBJECT(current_object)->x -= title_car_screen_offsets[SCREEN(screen)->car_number];
-	OBJECT(current_object)->title_car.frames++;
-	bounce = OBJECT(current_object)->title_car.frames & 1u;
-	OBJECT(current_object)->title_car.rest_y = OBJECT(current_object)->y;
-	OBJECT(current_object)->y -= bounce;
+	current_object->x = current_object->title_car.position;
+	current_object->x -= title_car_screen_offsets[screen->car_number];
+	current_object->title_car.frames++;
+	bounce = current_object->title_car.frames & 1u;
+	current_object->title_car.rest_y = current_object->y;
+	current_object->y -= bounce;
 	draw_object(model);
-	OBJECT(current_object)->y = OBJECT(current_object)->title_car.rest_y;
+	current_object->y = current_object->title_car.rest_y;
 }
 
 /* The driver of a title car (the blond man at the wheel): sets up its picture by the car's model
@@ -212,19 +204,19 @@ void title_car_driver_update(void)
 {
 	uint32_t animation = 0, model = 0;
 
-	switch (OBJECT(current_object)->state)
+	switch (current_object->state)
 	{
 	case 0:
-		model = OBJECT(current_object)->title_car_driver.model;
-		OBJECT(current_object)->palette = title_driver_palettes[model];
-		OBJECT(current_object)->title_car_driver.x_offset = title_driver_x_offsets[model];
-		OBJECT(current_object)->title_car_driver.y_offset = title_driver_y_offsets[model];
+		model = current_object->title_car_driver.model;
+		current_object->palette = title_driver_palettes[model];
+		current_object->title_car_driver.x_offset = title_driver_x_offsets[model];
+		current_object->title_car_driver.y_offset = title_driver_y_offsets[model];
 		animation = title_driver_animations[model];
 		animation_start(animation);
-		OBJECT(current_object)->state++;
-		OBJECT(current_object)->draw_mode = 0xAu;
-		OBJECT(current_object)->depth_layer = OBJECT(OBJECT(current_object)->title_car_driver.car)->depth_layer;
-		OBJECT(current_object)->depth_layer++;
+		current_object->state++;
+		current_object->draw_mode = 0xAu;
+		current_object->depth_layer = OBJECT(current_object->title_car_driver.car)->depth_layer;
+		current_object->depth_layer++;
 		return;
 	case 1:
 		title_rider_draw();
@@ -240,7 +232,7 @@ void title_car_passenger_update(void)
 {
 	uint32_t animation = 0, model = 0;
 
-	switch (OBJECT(current_object)->state)
+	switch (current_object->state)
 	{
 	case 0:
 		break;
@@ -248,16 +240,16 @@ void title_car_passenger_update(void)
 		title_rider_draw();
 		return;
 	}
-	model = OBJECT(current_object)->title_car_passenger.model;
-	OBJECT(current_object)->palette = title_passenger_palettes[model];
-	OBJECT(current_object)->title_car_passenger.x_offset = title_passenger_x_offsets[model];
-	OBJECT(current_object)->title_car_passenger.y_offset = title_passenger_y_offsets[model];
+	model = current_object->title_car_passenger.model;
+	current_object->palette = title_passenger_palettes[model];
+	current_object->title_car_passenger.x_offset = title_passenger_x_offsets[model];
+	current_object->title_car_passenger.y_offset = title_passenger_y_offsets[model];
 	animation = title_passenger_animations[model];
 	animation_start(animation);
-	OBJECT(current_object)->state++;
-	OBJECT(current_object)->draw_mode = 0xAu;
-	OBJECT(current_object)->depth_layer = OBJECT(OBJECT(current_object)->title_car_passenger.car)->depth_layer;
-	OBJECT(current_object)->depth_layer++;
+	current_object->state++;
+	current_object->draw_mode = 0xAu;
+	current_object->depth_layer = OBJECT(current_object->title_car_passenger.car)->depth_layer;
+	current_object->depth_layer++;
 }
 
 /* Draws a rider of a title car (title_car_driver, title_car_passenger) on its car: at the car's x and y
@@ -267,11 +259,11 @@ void title_rider_draw(void)
 {
 	uint32_t y = 0;
 
-	y = OBJECT(current_object)->title_rider.model;
-	OBJECT(current_object)->width_scale = title_rider_scales[y];
-	OBJECT(current_object)->height_scale = title_rider_scales[y];
-	OBJECT(current_object)->x = OBJECT(OBJECT(current_object)->title_rider.car)->x + OBJECT(current_object)->title_rider.x_offset;
-	OBJECT(current_object)->y = OBJECT(OBJECT(current_object)->title_rider.car)->y + OBJECT(current_object)->title_rider.y_offset - (OBJECT(OBJECT(current_object)->title_rider.car)->title_car.frames & 1u);
+	y = current_object->title_rider.model;
+	current_object->width_scale = title_rider_scales[y];
+	current_object->height_scale = title_rider_scales[y];
+	current_object->x = OBJECT(current_object->title_rider.car)->x + current_object->title_rider.x_offset;
+	current_object->y = OBJECT(current_object->title_rider.car)->y + current_object->title_rider.y_offset - (OBJECT(current_object->title_rider.car)->title_car.frames & 1u);
 	draw_object(y);
 }
 
@@ -279,21 +271,21 @@ void title_rider_draw(void)
    (palm_frames), else a far one (1) every other frame. */
 void title_screen_start_palms(void)
 {
-	uint32_t object = 0;
+	struct object *object = NULL;
 
-	OBJECT(current_object)->title_screen.palm_frames = (OBJECT(current_object)->title_screen.palm_frames & 0xFF00u) | ((uint8_t)OBJECT(current_object)->title_screen.palm_frames + 1u & 0xFFu);
-	if ((OBJECT(current_object)->title_screen.palm_frames & 7u) == 0u)
+	current_object->title_screen.palm_frames = (current_object->title_screen.palm_frames & 0xFF00u) | ((uint8_t)current_object->title_screen.palm_frames + 1u & 0xFFu);
+	if ((current_object->title_screen.palm_frames & 7u) == 0u)
 	{
 		object = start_object();
-		OBJECT(object)->handler = title_palm_tree_update_ADDRESS;
-		OBJECT(object)->title_palm_tree.near_or_far = 0u;
+		object->handler = title_palm_tree_update_ADDRESS;
+		object->title_palm_tree.near_or_far = 0u;
 		return;
 	}
-	if ((OBJECT(current_object)->title_screen.palm_frames & 1u) == 0u)
+	if ((current_object->title_screen.palm_frames & 1u) == 0u)
 	{
 		object = start_object();
-		OBJECT(object)->handler = title_palm_tree_update_ADDRESS;
-		OBJECT(object)->title_palm_tree.near_or_far = 1u;
+		object->handler = title_palm_tree_update_ADDRESS;
+		object->title_palm_tree.near_or_far = 1u;
 		return;
 	}
 }
@@ -305,46 +297,46 @@ void title_palm_tree_update(void)
 {
 	uint32_t animation = 0;
 
-	switch (OBJECT(current_object)->state)
+	switch (current_object->state)
 	{
 	case 0:
-		OBJECT(current_object)->draw_mode = 0xAu;
+		current_object->draw_mode = 0xAu;
 		animation = PALM_TREE;
 		animation_start(animation);
-		OBJECT(current_object)->palette = 0x6Du;
-		if (OBJECT(current_object)->title_palm_tree.near_or_far != 0u)
+		current_object->palette = 0x6Du;
+		if (current_object->title_palm_tree.near_or_far != 0u)
 		{
-			OBJECT(current_object)->width_scale = 0x60u;
-			OBJECT(current_object)->height_scale = 0x60u;
-			OBJECT(current_object)->x = 0x170u;
-			OBJECT(current_object)->y = 0x96u;
-			OBJECT(current_object)->depth_layer = 0x185u;
+			current_object->width_scale = 0x60u;
+			current_object->height_scale = 0x60u;
+			current_object->x = 0x170u;
+			current_object->y = 0x96u;
+			current_object->depth_layer = 0x185u;
 		}
 		else
 		{
-			OBJECT(current_object)->width_scale = 0x100u;
-			OBJECT(current_object)->height_scale = 0x100u;
-			OBJECT(current_object)->x = 0x170u;
-			OBJECT(current_object)->y = 0xF0u;
-			OBJECT(current_object)->depth_layer = 0x194u;
+			current_object->width_scale = 0x100u;
+			current_object->height_scale = 0x100u;
+			current_object->x = 0x170u;
+			current_object->y = 0xF0u;
+			current_object->depth_layer = 0x194u;
 		}
-		OBJECT(current_object)->state++;
+		current_object->state++;
 		break;
 	case 1:
 		break;
 	}
-	if ((int16_t)OBJECT(current_object)->x <= -0x30)
+	if ((int16_t)current_object->x <= -0x30)
 	{
-		OBJECT(current_object)->flags = 0u;
+		current_object->flags = 0u;
 		return;
 	}
-	if (OBJECT(current_object)->title_palm_tree.near_or_far != 0u)
+	if (current_object->title_palm_tree.near_or_far != 0u)
 	{
-		OBJECT(current_object)->x -= 0x12u;
+		current_object->x -= 0x12u;
 		draw_object(0u);
 		return;
 	}
-	OBJECT(current_object)->x -= 0x30u;
+	current_object->x -= 0x30u;
 	draw_object(0u);
 }
 
@@ -356,68 +348,69 @@ void title_palm_tree_update(void)
 void title_logo_update(void)
 {
 	uint8_t object_index = 0;
-	uint32_t animation = 0, object = 0, object_index_2 = 0, objects_left = 0, palette_list = 0;
+	uint32_t animation = 0, object_index_2 = 0, objects_left = 0, palette_list = 0;
+	struct object *object = NULL;
 	uint8_t frames = 0, frames_2 = 0;
 
-	switch (OBJECT(current_object)->state)
+	switch (current_object->state)
 	{
 	case 0:
-		OBJECT(current_object)->draw_mode = 0xAu;
+		current_object->draw_mode = 0xAu;
 		animation = TITLE_LOGO;
 		animation_start(animation);
-		OBJECT(current_object)->palette = 0x26Au;
-		OBJECT(current_object)->x = 0x142u;
-		OBJECT(current_object)->y = 0x47u;
-		OBJECT(current_object)->depth_layer = 0x199u;
-		OBJECT(current_object)->title_logo.frames = 0xBu;
-		OBJECT(current_object)->state++;
+		current_object->palette = 0x26Au;
+		current_object->x = 0x142u;
+		current_object->y = 0x47u;
+		current_object->depth_layer = 0x199u;
+		current_object->title_logo.frames = 0xBu;
+		current_object->state++;
 		break;
 	case 1:
 		break;
 	case 2:
-		frames = OBJECT(current_object)->title_logo.frames;
-		OBJECT(current_object)->title_logo.frames = frames - 1u;
+		frames = current_object->title_logo.frames;
+		current_object->title_logo.frames = frames - 1u;
 		if (frames == 1u)
 		{
-			OBJECT(current_object)->state++;
-			OBJECT(current_object)->palette = 0x269u;
+			current_object->state++;
+			current_object->palette = 0x269u;
 			animation_advance(0u);
 			draw_object(0u);
 			return;
 		}
-		palette_list = OBJECT(current_object)->title_logo.palette_list;
-		OBJECT(current_object)->palette = TITLE_LOGO_PALETTES(palette_list)[0];
-		OBJECT(current_object)->title_logo.palette_list = palette_list + 2u;
+		palette_list = current_object->title_logo.palette_list;
+		current_object->palette = TITLE_LOGO_PALETTES(palette_list)[0];
+		current_object->title_logo.palette_list = palette_list + 2u;
 		draw_object(0u);
 		return;
 	case 3:
-		if (SCREEN(screen)->title_logo_shine != 0u)
+		if (screen->title_logo_shine != 0u)
 		{
-			OBJECT(current_object)->frame = 1u;
-			OBJECT(current_object)->frame_time = 2u;
-			OBJECT(current_object)->frame_countdown = 2;
+			current_object->frame = 1u;
+			current_object->frame_time = 2u;
+			current_object->frame_countdown = 2;
 		}
 		animation_advance(0u);
 		draw_object(0u);
 		return;
 	}
-	frames_2 = OBJECT(current_object)->title_logo.frames;
-	OBJECT(current_object)->title_logo.frames = frames_2 - 1u;
+	frames_2 = current_object->title_logo.frames;
+	current_object->title_logo.frames = frames_2 - 1u;
 	if (frames_2 != 1u)
 	{
-		OBJECT(current_object)->x -= 0x10u;
+		current_object->x -= 0x10u;
 		draw_object(0u);
 		return;
 	}
 	object = start_object();
-	OBJECT(object)->handler = title_board_palms_update_ADDRESS;
+	object->handler = title_board_palms_update_ADDRESS;
 	objects_left = 2u;
 	object_index = 0u;
 	do
 	{
 		object = start_object();
-		OBJECT(object)->handler = title_seagull_fly_ADDRESS;
-		OBJECT(object)->title_seagull.index = object_index;
+		object->handler = title_seagull_fly_ADDRESS;
+		object->title_seagull.index = object_index;
 		object_index++;
 		objects_left--;
 	} while (objects_left != 0u);
@@ -426,14 +419,14 @@ void title_logo_update(void)
 	do
 	{
 		object = start_object();
-		OBJECT(object)->handler = title_picture_draw_ADDRESS;
-		OBJECT(object)->title_picture.index = object_index_2;
+		object->handler = title_picture_draw_ADDRESS;
+		object->title_picture.index = object_index_2;
 		object_index_2 = (uint8_t)(object_index_2 + 1u);
 		objects_left--;
 	} while (objects_left != 0u);
-	OBJECT(current_object)->title_logo.palette_list = title_logo_flash_palettes_ADDRESS;
-	OBJECT(current_object)->title_logo.frames = 6u;
-	OBJECT(current_object)->state++;
+	current_object->title_logo.palette_list = title_logo_flash_palettes_ADDRESS;
+	current_object->title_logo.frames = 6u;
+	current_object->state++;
 	draw_object(object_index_2);
 }
 
@@ -444,46 +437,46 @@ void title_logo_copy_update(void)
 	uint32_t animation = 0, palette_list = 0;
 	uint8_t frames = 0, frames_2 = 0;
 
-	switch (OBJECT(current_object)->state)
+	switch (current_object->state)
 	{
 	case 0:
-		OBJECT(current_object)->draw_mode = 0xAu;
+		current_object->draw_mode = 0xAu;
 		animation = TITLE_LOGO_COPY;
 		animation_start(animation);
-		OBJECT(current_object)->palette = 0x26Du;
-		OBJECT(current_object)->x = 2u;
-		OBJECT(current_object)->y = 0x47u;
-		OBJECT(current_object)->depth_layer = 0x199u;
-		OBJECT(current_object)->title_logo_copy.frames = 0xBu;
-		OBJECT(current_object)->state++;
+		current_object->palette = 0x26Du;
+		current_object->x = 2u;
+		current_object->y = 0x47u;
+		current_object->depth_layer = 0x199u;
+		current_object->title_logo_copy.frames = 0xBu;
+		current_object->state++;
 		break;
 	case 1:
 		break;
 	case 2:
-		frames = OBJECT(current_object)->title_logo_copy.frames;
-		OBJECT(current_object)->title_logo_copy.frames = frames - 1u;
+		frames = current_object->title_logo_copy.frames;
+		current_object->title_logo_copy.frames = frames - 1u;
 		if (frames == 1u)
 		{
-			OBJECT(current_object)->flags = 0u;
+			current_object->flags = 0u;
 			return;
 		}
-		palette_list = OBJECT(current_object)->title_logo_copy.palette_list;
-		OBJECT(current_object)->palette = TITLE_LOGO_PALETTES(palette_list)[0];
-		OBJECT(current_object)->title_logo_copy.palette_list = palette_list + 2u;
+		palette_list = current_object->title_logo_copy.palette_list;
+		current_object->palette = TITLE_LOGO_PALETTES(palette_list)[0];
+		current_object->title_logo_copy.palette_list = palette_list + 2u;
 		draw_object(0u);
 		return;
 	}
-	frames_2 = OBJECT(current_object)->title_logo_copy.frames;
-	OBJECT(current_object)->title_logo_copy.frames = frames_2 - 1u;
+	frames_2 = current_object->title_logo_copy.frames;
+	current_object->title_logo_copy.frames = frames_2 - 1u;
 	if (frames_2 == 1u)
 	{
-		OBJECT(current_object)->title_logo_copy.palette_list = title_logo_copy_flash_palettes_ADDRESS;
-		OBJECT(current_object)->title_logo_copy.frames = 6u;
-		OBJECT(current_object)->state++;
+		current_object->title_logo_copy.palette_list = title_logo_copy_flash_palettes_ADDRESS;
+		current_object->title_logo_copy.frames = 6u;
+		current_object->state++;
 		draw_object(0u);
 		return;
 	}
-	OBJECT(current_object)->x += 0x10u;
+	current_object->x += 0x10u;
 	draw_object(0u);
 }
 
@@ -494,70 +487,71 @@ void title_logo_copy_update(void)
    title_logo_shine for a frame), and it ends. */
 void title_logo_car_update(void)
 {
-	uint32_t animation = 0, model = 0, place = 0;
+	uint32_t animation = 0, model = 0;
+	const struct title_place *place = NULL;
 	uint8_t delay = 0;
 
-	switch (OBJECT(current_object)->state)
+	switch (current_object->state)
 	{
 	case 0:
-		OBJECT(current_object)->title_logo_car.delay = ((uint32_t)OBJECT(current_object)->title_logo_car.index << 2) + 1u;
-		OBJECT(current_object)->state++;
-		delay = OBJECT(current_object)->title_logo_car.delay;
-		OBJECT(current_object)->title_logo_car.delay = delay - 1u;
+		current_object->title_logo_car.delay = ((uint32_t)current_object->title_logo_car.index << 2) + 1u;
+		current_object->state++;
+		delay = current_object->title_logo_car.delay;
+		current_object->title_logo_car.delay = delay - 1u;
 		if (delay != 1u)
 			return;
-		OBJECT(current_object)->draw_mode = 0xAu;
+		current_object->draw_mode = 0xAu;
 		model = random_number();
 		model &= 7u;
 		animation = title_car_animations[model];
 		animation_start(animation);
-		OBJECT(current_object)->palette = title_logo_car_palettes[model];
-		place = title_logo_car_places_ADDRESS + ((uint32_t)OBJECT(current_object)->title_logo_car.index << 2);
-		OBJECT(current_object)->x = TITLE_PLACE(place)->x;
-		OBJECT(current_object)->y = TITLE_PLACE(place)->y;
-		OBJECT(current_object)->width_scale = 0x40u;
-		OBJECT(current_object)->height_scale = 0x40u;
-		OBJECT(current_object)->frame = 9u;
-		OBJECT(current_object)->depth_layer = 0x19Au;
-		OBJECT(current_object)->state++;
+		current_object->palette = title_logo_car_palettes[model];
+		place = rom_pointer(title_logo_car_places_ADDRESS + ((uint32_t)current_object->title_logo_car.index << 2));
+		current_object->x = place->x;
+		current_object->y = place->y;
+		current_object->width_scale = 0x40u;
+		current_object->height_scale = 0x40u;
+		current_object->frame = 9u;
+		current_object->depth_layer = 0x19Au;
+		current_object->state++;
 		draw_object(model);
 		return;
 	case 1:
-		delay = OBJECT(current_object)->title_logo_car.delay;
-		OBJECT(current_object)->title_logo_car.delay = delay - 1u;
+		delay = current_object->title_logo_car.delay;
+		current_object->title_logo_car.delay = delay - 1u;
 		if (delay != 1u)
 			return;
-		OBJECT(current_object)->draw_mode = 0xAu;
+		current_object->draw_mode = 0xAu;
 		model = random_number();
 		model &= 7u;
 		animation = title_car_animations[model];
 		animation_start(animation);
-		OBJECT(current_object)->palette = title_logo_car_palettes[model];
-		place = title_logo_car_places_ADDRESS + ((uint32_t)OBJECT(current_object)->title_logo_car.index << 2);
-		OBJECT(current_object)->x = TITLE_PLACE(place)->x;
-		OBJECT(current_object)->y = TITLE_PLACE(place)->y;
-		OBJECT(current_object)->width_scale = 0x40u;
-		OBJECT(current_object)->height_scale = 0x40u;
-		OBJECT(current_object)->frame = 9u;
-		OBJECT(current_object)->depth_layer = 0x19Au;
-		OBJECT(current_object)->state++;
+		current_object->palette = title_logo_car_palettes[model];
+		place = rom_pointer(title_logo_car_places_ADDRESS + ((uint32_t)current_object->title_logo_car.index << 2));
+		current_object->x = place->x;
+		current_object->y = place->y;
+		current_object->width_scale = 0x40u;
+		current_object->height_scale = 0x40u;
+		current_object->frame = 9u;
+		current_object->depth_layer = 0x19Au;
+		current_object->state++;
 		draw_object(model);
 		return;
 	case 2:
-		OBJECT(current_object)->x += 0x10u;
-		if ((int16_t)OBJECT(current_object)->x <= 0x148)
+		current_object->x += 0x10u;
+		if ((int16_t)current_object->x <= 0x148)
 		{
 			draw_object(0u);
 			return;
 		}
-		if (OBJECT(current_object)->title_logo_car.index == 0u)
-			SCREEN(screen)->title_logo_shine = 1u;
-		OBJECT(current_object)->state++;
+		if (current_object->title_logo_car.index == 0u)
+			screen->title_logo_shine = 1u;
+		current_object->state++;
 		draw_object(0u);
 		return;
 	case 3:
-		SCREEN(screen)->title_logo_shine = 0u;
-		OBJECT(current_object)->flags = 0u;
+		screen->title_logo_shine = 0u;
+		current_object->flags = 0u;
 		return;
 	}
 }
@@ -567,65 +561,66 @@ void title_logo_car_update(void)
    logo (its animation from frame 0 when screen title_logo_shine is set). */
 void title_logo_stripe_update(void)
 {
-	uint32_t animation = 0, place = 0;
+	uint32_t animation = 0;
+	const struct title_place *place = NULL;
 	uint8_t frames = 0, frames_2 = 0;
 
-	switch (OBJECT(current_object)->state)
+	switch (current_object->state)
 	{
 	case 0:
-		OBJECT(current_object)->title_logo_stripe.frames = ((uint32_t)OBJECT(current_object)->title_logo_stripe.index << 2) + 1u;
-		OBJECT(current_object)->state++;
+		current_object->title_logo_stripe.frames = ((uint32_t)current_object->title_logo_stripe.index << 2) + 1u;
+		current_object->state++;
 		break;
 	case 1:
 		break;
 	case 2:
-		frames = OBJECT(current_object)->title_logo_stripe.frames;
-		OBJECT(current_object)->title_logo_stripe.frames = frames - 1u;
+		frames = current_object->title_logo_stripe.frames;
+		current_object->title_logo_stripe.frames = frames - 1u;
 		if (frames == 1u)
 		{
-			OBJECT(current_object)->draw_mode = 0xAu;
-			OBJECT(current_object)->state++;
+			current_object->draw_mode = 0xAu;
+			current_object->state++;
 			draw_object(0u);
 			return;
 		}
-		OBJECT(current_object)->x += 0x10u;
+		current_object->x += 0x10u;
 		draw_object(0u);
 		return;
 	case 3:
-		if (SCREEN(screen)->title_logo_shine != 0u)
+		if (screen->title_logo_shine != 0u)
 		{
-			OBJECT(current_object)->frame = 0u;
-			OBJECT(current_object)->frame_time = 2u;
-			OBJECT(current_object)->frame_countdown = 2;
+			current_object->frame = 0u;
+			current_object->frame_time = 2u;
+			current_object->frame_countdown = 2;
 		}
 		animation_advance(0u);
 		draw_object(0u);
 		return;
 	}
-	frames_2 = OBJECT(current_object)->title_logo_stripe.frames;
-	OBJECT(current_object)->title_logo_stripe.frames = frames_2 - 1u;
+	frames_2 = current_object->title_logo_stripe.frames;
+	current_object->title_logo_stripe.frames = frames_2 - 1u;
 	if (frames_2 != 1u)
 		return;
-	OBJECT(current_object)->draw_mode = 0xAu;
+	current_object->draw_mode = 0xAu;
 	animation = TITLE_LOGO_STRIPE;
 	animation_start(animation);
-	OBJECT(current_object)->palette = 0x270u;
-	place = title_logo_stripe_places_ADDRESS + ((uint32_t)OBJECT(current_object)->title_logo_stripe.index << 2);
-	OBJECT(current_object)->x = TITLE_PLACE(place)->x;
-	OBJECT(current_object)->y = TITLE_PLACE(place)->y;
-	OBJECT(current_object)->depth_layer = 0x198u;
-	OBJECT(current_object)->title_logo_stripe.frames = 0x14u;
-	OBJECT(current_object)->state++;
-	frames = OBJECT(current_object)->title_logo_stripe.frames;
-	OBJECT(current_object)->title_logo_stripe.frames = frames - 1u;
+	current_object->palette = 0x270u;
+	place = rom_pointer(title_logo_stripe_places_ADDRESS + ((uint32_t)current_object->title_logo_stripe.index << 2));
+	current_object->x = place->x;
+	current_object->y = place->y;
+	current_object->depth_layer = 0x198u;
+	current_object->title_logo_stripe.frames = 0x14u;
+	current_object->state++;
+	frames = current_object->title_logo_stripe.frames;
+	current_object->title_logo_stripe.frames = frames - 1u;
 	if (frames == 1u)
 	{
-		OBJECT(current_object)->draw_mode = 0xAu;
-		OBJECT(current_object)->state++;
+		current_object->draw_mode = 0xAu;
+		current_object->state++;
 		draw_object(0u);
 		return;
 	}
-	OBJECT(current_object)->x += 0x10u;
+	current_object->x += 0x10u;
 	draw_object(0u);
 }
 
@@ -636,45 +631,45 @@ void title_board_palms_update(void)
 	uint32_t animation = 0;
 	uint8_t frames = 0;
 
-	switch (OBJECT(current_object)->state)
+	switch (current_object->state)
 	{
 	case 0:
-		OBJECT(current_object)->draw_mode = 0xAu;
+		current_object->draw_mode = 0xAu;
 		animation = TITLE_BOARD_PALMS;
 		animation_start(animation);
-		OBJECT(current_object)->palette = 0x272u;
-		OBJECT(current_object)->width_scale = 0xC0u;
-		OBJECT(current_object)->height_scale = 0xC0u;
-		OBJECT(current_object)->x = 0xE2u;
-		OBJECT(current_object)->y = 0x4Eu;
-		OBJECT(current_object)->depth_layer = 0x198u;
-		OBJECT(current_object)->title_board_palms.frames = 9u;
-		OBJECT(current_object)->state++;
+		current_object->palette = 0x272u;
+		current_object->width_scale = 0xC0u;
+		current_object->height_scale = 0xC0u;
+		current_object->x = 0xE2u;
+		current_object->y = 0x4Eu;
+		current_object->depth_layer = 0x198u;
+		current_object->title_board_palms.frames = 9u;
+		current_object->state++;
 		break;
 	case 1:
 		break;
 	case 2:
-		if (SCREEN(screen)->title_logo_shine != 0u)
+		if (screen->title_logo_shine != 0u)
 		{
-			OBJECT(current_object)->frame = 0u;
-			OBJECT(current_object)->frame_time = 3u;
-			OBJECT(current_object)->frame_countdown = 6;
+			current_object->frame = 0u;
+			current_object->frame_time = 3u;
+			current_object->frame_countdown = 6;
 		}
 		animation_advance(0u);
 		draw_object(0u);
 		return;
 	}
-	frames = OBJECT(current_object)->title_board_palms.frames;
-	OBJECT(current_object)->title_board_palms.frames = frames - 1u;
+	frames = current_object->title_board_palms.frames;
+	current_object->title_board_palms.frames = frames - 1u;
 	if (frames == 1u)
 	{
-		OBJECT(current_object)->draw_mode = 0xAu;
-		OBJECT(current_object)->state++;
+		current_object->draw_mode = 0xAu;
+		current_object->state++;
 		draw_object(0u);
 		return;
 	}
-	OBJECT(current_object)->width_scale += 8u;
-	OBJECT(current_object)->height_scale += 8u;
+	current_object->width_scale += 8u;
+	current_object->height_scale += 8u;
 	draw_object(0u);
 }
 
@@ -684,81 +679,82 @@ void title_board_palms_update(void)
 void title_seagull_fly(void)
 {
 	uint16_t y_wave = 0;
-	uint32_t angle = 0, animation = 0, place = 0;
+	uint32_t angle = 0, animation = 0;
+	const struct title_place *place = NULL;
 	uint8_t frames = 0;
 
-	switch (OBJECT(current_object)->state)
+	switch (current_object->state)
 	{
 	case 0:
-		OBJECT(current_object)->draw_mode = 0xAu;
+		current_object->draw_mode = 0xAu;
 		animation = TITLE_SEAGULL;
 		animation_start(animation);
-		OBJECT(current_object)->palette = 0x272u;
-		OBJECT(current_object)->width_scale = 0xC0u;
-		OBJECT(current_object)->height_scale = 0xC0u;
-		place = title_seagull_places_ADDRESS + ((uint32_t)OBJECT(current_object)->title_seagull.index << 2);
-		OBJECT(current_object)->x = TITLE_PLACE(place)->x;
-		OBJECT(current_object)->y = TITLE_PLACE(place)->y;
-		OBJECT(current_object)->depth_layer = 0x198u;
-		OBJECT(current_object)->title_seagull.frames = 9u;
-		OBJECT(current_object)->state++;
-		frames = OBJECT(current_object)->title_seagull.frames;
-		OBJECT(current_object)->title_seagull.frames = frames - 1u;
+		current_object->palette = 0x272u;
+		current_object->width_scale = 0xC0u;
+		current_object->height_scale = 0xC0u;
+		place = rom_pointer(title_seagull_places_ADDRESS + ((uint32_t)current_object->title_seagull.index << 2));
+		current_object->x = place->x;
+		current_object->y = place->y;
+		current_object->depth_layer = 0x198u;
+		current_object->title_seagull.frames = 9u;
+		current_object->state++;
+		frames = current_object->title_seagull.frames;
+		current_object->title_seagull.frames = frames - 1u;
 		if (frames == 1u)
 		{
-			OBJECT(current_object)->draw_mode = 0xAu;
-			angle = (uint16_t)((uint32_t)OBJECT(current_object)->title_seagull.index << 11);
-			OBJECT(current_object)->title_seagull.x_angle = angle;
-			OBJECT(current_object)->title_seagull.y_angle = angle;
-			OBJECT(current_object)->title_seagull.centre_x = OBJECT(current_object)->x;
-			OBJECT(current_object)->title_seagull.centre_y = OBJECT(current_object)->y;
-			OBJECT(current_object)->state++;
+			current_object->draw_mode = 0xAu;
+			angle = (uint16_t)((uint32_t)current_object->title_seagull.index << 11);
+			current_object->title_seagull.x_angle = angle;
+			current_object->title_seagull.y_angle = angle;
+			current_object->title_seagull.centre_x = current_object->x;
+			current_object->title_seagull.centre_y = current_object->y;
+			current_object->state++;
 			animation_advance(0u);
 			draw_object(angle);
 			return;
 		}
-		OBJECT(current_object)->width_scale += 8u;
-		OBJECT(current_object)->height_scale += 8u;
-		OBJECT(current_object)->x--;
-		OBJECT(current_object)->y -= 5u;
+		current_object->width_scale += 8u;
+		current_object->height_scale += 8u;
+		current_object->x--;
+		current_object->y -= 5u;
 		animation_advance(0u);
 		draw_object(0u);
 		return;
 	case 1:
-		frames = OBJECT(current_object)->title_seagull.frames;
-		OBJECT(current_object)->title_seagull.frames = frames - 1u;
+		frames = current_object->title_seagull.frames;
+		current_object->title_seagull.frames = frames - 1u;
 		if (frames == 1u)
 		{
-			OBJECT(current_object)->draw_mode = 0xAu;
-			angle = (uint16_t)((uint32_t)OBJECT(current_object)->title_seagull.index << 11);
-			OBJECT(current_object)->title_seagull.x_angle = angle;
-			OBJECT(current_object)->title_seagull.y_angle = angle;
-			OBJECT(current_object)->title_seagull.centre_x = OBJECT(current_object)->x;
-			OBJECT(current_object)->title_seagull.centre_y = OBJECT(current_object)->y;
-			OBJECT(current_object)->state++;
+			current_object->draw_mode = 0xAu;
+			angle = (uint16_t)((uint32_t)current_object->title_seagull.index << 11);
+			current_object->title_seagull.x_angle = angle;
+			current_object->title_seagull.y_angle = angle;
+			current_object->title_seagull.centre_x = current_object->x;
+			current_object->title_seagull.centre_y = current_object->y;
+			current_object->state++;
 			animation_advance(0u);
 			draw_object(angle);
 			return;
 		}
-		OBJECT(current_object)->width_scale += 8u;
-		OBJECT(current_object)->height_scale += 8u;
-		OBJECT(current_object)->x--;
-		OBJECT(current_object)->y -= 5u;
+		current_object->width_scale += 8u;
+		current_object->height_scale += 8u;
+		current_object->x--;
+		current_object->y -= 5u;
 		animation_advance(0u);
 		draw_object(0u);
 		return;
 	case 2:
-		OBJECT(current_object)->title_seagull.x_angle += 0x20u;
-		if (OBJECT(current_object)->title_seagull.x_angle >= 0x1000)
-			OBJECT(current_object)->title_seagull.x_angle -= 0x1000u;
-		OBJECT(current_object)->title_seagull.y_angle += 0x40u;
-		if (OBJECT(current_object)->title_seagull.y_angle >= 0x1000)
-			OBJECT(current_object)->title_seagull.y_angle -= 0x1000u;
-		OBJECT(current_object)->x = OBJECT(current_object)->title_seagull.centre_x;
-		OBJECT(current_object)->y = OBJECT(current_object)->title_seagull.centre_y;
-		y_wave = (uint16_t)((int16_t)sine_table[(uint32_t)OBJECT(current_object)->title_seagull.y_angle] >> 12);
-		OBJECT(current_object)->x += (int16_t)sine_table[OBJECT(current_object)->title_seagull.x_angle & 0xFFFu] >> 9;
-		OBJECT(current_object)->y += y_wave;
+		current_object->title_seagull.x_angle += 0x20u;
+		if (current_object->title_seagull.x_angle >= 0x1000)
+			current_object->title_seagull.x_angle -= 0x1000u;
+		current_object->title_seagull.y_angle += 0x40u;
+		if (current_object->title_seagull.y_angle >= 0x1000)
+			current_object->title_seagull.y_angle -= 0x1000u;
+		current_object->x = current_object->title_seagull.centre_x;
+		current_object->y = current_object->title_seagull.centre_y;
+		y_wave = (uint16_t)((int16_t)sine_table[(uint32_t)current_object->title_seagull.y_angle] >> 12);
+		current_object->x += (int16_t)sine_table[current_object->title_seagull.x_angle & 0xFFFu] >> 9;
+		current_object->y += y_wave;
 		animation_advance(0u);
 		draw_object(0u);
 		return;
@@ -770,9 +766,10 @@ void title_seagull_fly(void)
    behind the logo, 2 the SEGA logo. */
 void title_picture_draw(void)
 {
-	uint32_t animation = 0, picture = 0;
+	uint32_t animation = 0;
+	const struct picture_record *picture = NULL;
 
-	switch (OBJECT(current_object)->state)
+	switch (current_object->state)
 	{
 	case 1:
 		draw_object(0u);
@@ -780,21 +777,16 @@ void title_picture_draw(void)
 	case 0:
 		break;
 	}
-	OBJECT(current_object)->draw_mode = 0u;
-	picture = title_pictures_ADDRESS + ((uint32_t)OBJECT(current_object)->title_picture.index << 4);
-	animation = PICTURE_RECORD(picture)->animation;
-	picture += 2u;
+	current_object->draw_mode = 0u;
+	picture = rom_pointer(title_pictures_ADDRESS + ((uint32_t)current_object->title_picture.index << 4));
+	animation = picture->animation;
 	animation_start(animation);
-	OBJECT(current_object)->palette = PICTURE_RECORD(picture - 0x2u)->palette;
-	picture += 2u;
-	OBJECT(current_object)->width_scale = PICTURE_RECORD(picture - 0x4u)->width_scale;
-	picture += 2u;
-	OBJECT(current_object)->height_scale = PICTURE_RECORD(picture - 0x6u)->height_scale;
-	picture += 2u;
-	OBJECT(current_object)->x = PICTURE_RECORD(picture - 0x8u)->x;
-	picture += 2u;
-	OBJECT(current_object)->y = PICTURE_RECORD(picture - 0xAu)->y;
-	OBJECT(current_object)->depth_layer = PICTURE_RECORD(picture - 0xAu)->depth_layer;
-	OBJECT(current_object)->state++;
+	current_object->palette = picture->palette;
+	current_object->width_scale = picture->width_scale;
+	current_object->height_scale = picture->height_scale;
+	current_object->x = picture->x;
+	current_object->y = picture->y;
+	current_object->depth_layer = picture->depth_layer;
+	current_object->state++;
 	draw_object(0u);
 }

@@ -4,7 +4,7 @@
  *                 game holds reaches
  *    Version:     0.1.0
  *    Created:     27-10-2026
- *    Modified:    27-10-2026
+ *    Modified:    30-10-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
@@ -47,6 +47,14 @@ const char *assets_load(const char *folder);
    first MB again from 0xF00000), so those addresses reach the same pieces; an address of the work RAM
    reaches the work RAM, as the bus would send it. Anywhere else, or in code, the program stops. */
 const uint8_t *data_at(uint32_t address);
+
+/* The same for an address of the program's chips without stopping: NULL where no piece has data (the copies
+   of the ROM ram_outside makes, for a pointer the C keeps that may hold an address nothing reads through) */
+const uint8_t *data_if_any(uint32_t address);
+
+/* The address of the program's data a pointer into one of its pieces stands for (1), or 0 where it points
+   into none: the address the original holds for what a pointer the C keeps into the ROM points at */
+int program_data_address(const void *pointer, uint32_t *address);
 
 /* The sound program's data at an offset of its chip (512 KB: the Z80 sees the start at 0000-9FFF and the
    rest through its bank's window at A000-BFFF): the piece's bytes there, NULL where no piece is (its code:

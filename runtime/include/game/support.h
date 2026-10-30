@@ -5,7 +5,7 @@
  *                 and searches
  *    Version:     0.1.0
  *    Created:     11-10-2026
- *    Modified:    29-10-2026
+ *    Modified:    30-10-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
@@ -31,10 +31,14 @@
 extern "C" {
 #endif
 
-/* Work RAM holds the game's variables, at the addresses the original program used, so its state compares
-   byte for byte with the original. A variable is an lvalue of its type at its address; ram.h (written
-   by tools/decompile.py) names them. The V60 is little endian and lets a halfword or word sit at any
-   address, like the targets this runs on; the build turns strict aliasing off for this code. */
+/* The game's state is its work RAM, laid out as the original program had it, so it compares byte for byte
+   with the original's: ram.h's struct game (written by tools/decompile.py), which the code reaches through
+   game (game->game_frame_count) and runtime/src/game.c keeps, the board reading the same bytes. A place the
+   code works out by its address is the byte there (ram()). The V60 is little endian and lets a halfword or
+   word sit at any address, like the targets this runs on; the build turns strict aliasing off for this
+   code. */
+struct game;
+extern struct game *game;
 /* Functions that stop the game: the C compiler knows they do not come back */
 #if defined(_MSC_VER)
 #define GAME_NORETURN __declspec(noreturn)
@@ -55,16 +59,35 @@ extern "C" {
 #define CONSOLE_ORIGINAL(name) name
 #endif
 
-/* a structure pointer that is not in work RAM: in the program ROM (a link left at 0 in an object a
-   scenario crafted), the bus reads the ROM there and drops writes, so it gets a copy of the ROM to read
-   and write; anywhere else the program stops */
+/* a structure pointer that is not in work RAM: 0, no place (NULL, which address_of takes back to 0); in
+   the program ROM (a link left at 0 in an object a scenario crafted), the bus reads the ROM there and drops
+   writes, so it gets a copy of the ROM to read and write; anywhere else the program stops */
 uint8_t *ram_outside(uint32_t address);
 
 static inline uint8_t *ram(uint32_t address)
 {
 	if ((address & 0xf00000) != 0x200000)
 		return ram_outside(address);
-	return &s32_board.work_ram[address & 0x1ffff];
+	return &((uint8_t *)game)[address & 0x1ffff];
+}
+
+/* The address the original holds for the place a pointer the C keeps points at: in the game's state, its
+   work RAM address; in a memory of the board, its address there; in a copy of the ROM ram_outside made,
+   the address it copied from; none (NULL), 0. And the pointer the C keeps where the original holds an
+   address: a place of the game's state or of the board's plain memories, a copy of the ROM, none for 0 */
+uint32_t address_outside(const void *pointer);
+void *pointer_to(uint32_t address);
+
+/* The same for a pointer the C keeps into the program's data, which nothing writes through: the piece of
+   the program's data at a ROM address, read in place */
+const void *rom_pointer(uint32_t address);
+
+static inline uint32_t address_of(const void *pointer)
+{
+	const uintptr_t offset = (uintptr_t)pointer - (uintptr_t)game;
+	if (offset < 0x20000u)
+		return 0x200000u + (uint32_t)offset;
+	return address_outside(pointer);
 }
 
 #define RAM8(address)   (*(uint8_t *)ram(address))
@@ -232,7 +255,13 @@ void frame_end(void);
    when the handler is done, as the V70 returns into it. Each task keeps its own copy of the registers the
    whole program shares (game_context, written by tools/decompile.py) */
 void swap_tasks(void);
-extern uint32_t *const game_context[];
+typedef struct
+{
+	void *variable;     /* the C's global for it */
+	uint8_t pointer;    /* a pointer into the game's state, where the original holds its address; else a
+	                       32-bit number */
+} game_register;
+extern const game_register game_context[];
 extern const uint8_t game_context_registers[];  /* the V70 register each one is */
 extern const size_t game_context_count;
 
@@ -261,8 +290,10 @@ GAME_NORETURN void unknown_code(uint32_t address);    /* a jump or call to an ad
    call_code runs it there, true once run; NULL elsewhere */
 extern bool (*call_code_elsewhere)(uint32_t address);
 /* Data the program does not have, at addresses a port's console build gives its own (its courses and road
-   object streams): data_at reads it there, the place's bytes or NULL; NULL elsewhere */
+   object streams): data_at and rom_pointer read it there, the place's bytes or NULL; NULL elsewhere. And the
+   address back of a pointer into it (address_of): 0 where the pointer is not into it */
 extern const uint8_t *(*data_elsewhere)(uint32_t address);
+extern uint32_t (*address_elsewhere)(const void *pointer);
 /* the default of a switch on a jump table's index: the original checks nothing, and an index past the table
    would jump to 'address', which no case handles */
 GAME_NORETURN void invalid_jump(uint32_t address);

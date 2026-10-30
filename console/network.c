@@ -341,12 +341,12 @@ static void link_set_up(int machine, int machines)
 {
 	const uint32_t first = (uint32_t)(machine - 1) * 2u;
 
-	link_off = 0u;
-	link_failed = 0u;
-	machine_count = (uint8_t)machines;
-	player_count = (uint8_t)(machines * 2);
+	game->link_off = 0u;
+	game->link_failed = 0u;
+	game->machine_count = (uint8_t)machines;
+	game->player_count = (uint8_t)(machines * 2);
 	for (int player = 0; player < SLOTS; player++)
-		car_numbers[player] = (uint8_t)player;
+		game->car_numbers[player] = (uint8_t)player;
 	for (int seat = 0; seat < 2; seat++)
 	{
 		const uint32_t race = seat ? RACE_2 : RACE_1, screen_block = seat ? SCREEN_2 : SCREEN_1;
@@ -386,8 +386,8 @@ static void link_end(void)
 	clear_screen_entries(SCREEN_1);
 	clear_screen_entries(SCREEN_2);
 	memset(RACE(RACE_COPY_1), 0, SLOTS * RECORD_SIZE);
-	car_numbers[0] = 0u;
-	car_numbers[1] = 1u;
+	game->car_numbers[0] = 0u;
+	game->car_numbers[1] = 1u;
 }
 
 /* The machine whose datagrams carry a slot's record: its own, or the first one still heard for one gone */

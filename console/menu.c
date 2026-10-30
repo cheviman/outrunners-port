@@ -223,10 +223,10 @@ static void darken_page(void)
 
 uint32_t console_find_object(uint32_t handler, uint32_t from)
 {
-	const uint32_t pool = screen - 0x7C00u;
+	const uint32_t pool = address_of(screen) - 0x7C00u;
 	uint32_t object = from ? from + 0x100u : pool;
 
-	for (; object < screen; object += 0x100u)
+	for (; object < address_of(screen); object += 0x100u)
 		if ((OBJECT(object)->flags & 1u) != 0u && OBJECT(object)->handler == handler)
 			return object;
 	return 0u;
@@ -236,8 +236,8 @@ uint32_t console_find_object(uint32_t handler, uint32_t from)
    logo */
 static void hold_title(bool opening)
 {
-	if (SCREEN(screen)->mode_step == 2u)
-		SCREEN(screen)->mode_timer = TITLE_TIME;
+	if (screen->mode_step == 2u)
+		screen->mode_timer = TITLE_TIME;
 	if (opening)
 	{
 		const uint32_t title = console_find_object(title_screen_update_ADDRESS, 0u);
@@ -344,7 +344,7 @@ static void options_frame(uint32_t pressed)
 
 	if (by && item == OPTIONS_DIFFICULTY)
 	{
-		game_difficulty = (uint8_t)step(game_difficulty, by, 0, DIFFICULTIES - 1);
+		game->game_difficulty = (uint8_t)step(game->game_difficulty, by, 0, DIFFICULTIES - 1);
 		menu.settings_changed = true;
 	}
 	if (by && item == OPTIONS_VOLUME)
@@ -385,7 +385,7 @@ static void options_frame(uint32_t pressed)
 
 		if (options_lines[index] == OPTIONS_DIFFICULTY)
 		{
-			snprintf(value, sizeof(value), "< %s >", difficulties[game_difficulty & (DIFFICULTIES - 1)]);
+			snprintf(value, sizeof(value), "< %s >", difficulties[game->game_difficulty & (DIFFICULTIES - 1)]);
 			shown = value;
 		}
 		else if (options_lines[index] == OPTIONS_VOLUME)
@@ -405,7 +405,7 @@ static void time_frame(uint32_t pressed)
 
 	if (by && menu.choice < TIME_STAGES)
 	{
-		time_difficulty[menu.choice] = (int8_t)step(time_difficulty[menu.choice], by, -TIME_RANGE, TIME_RANGE);
+		game->time_difficulty[menu.choice] = (int8_t)step(game->time_difficulty[menu.choice], by, -TIME_RANGE, TIME_RANGE);
 		menu.settings_changed = true;
 	}
 	if ((pressed & ACTION_BIT(ACTION_ACCEPT)) && menu.choice == TIME_STAGES)
@@ -416,7 +416,7 @@ static void time_frame(uint32_t pressed)
 	page_heading("TIME");
 	for (int index = 0; index < TIME_STAGES; index++)
 	{
-		snprintf(value, sizeof(value), "< %+d >", time_difficulty[index]);
+		snprintf(value, sizeof(value), "< %+d >", game->time_difficulty[index]);
 		line(index, time_stages[index], value);
 	}
 	line(TIME_STAGES, "BACK", NULL);

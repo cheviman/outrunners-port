@@ -3,7 +3,7 @@
  *    Description: a viewer of kanji texts nothing starts (unused)
  *    Version:     0.1.0
  *    Created:     12-10-2026
- *    Modified:    29-10-2026
+ *    Modified:    30-10-2026
  *    Author:      Sebastian Toyos
  *
  *    OutRunners (arcade, Sega System Multi 32): the game's V70 program decompiled into C by
@@ -28,86 +28,86 @@ void kanji_text_viewer_update(void)
 	uint32_t cell = 0, cursor_cell = 0, line = 0, line_place = 0, text = 0, text_ended = 0;
 	uint32_t video_registers_0_long = 0;
 
-	switch (OBJECT(current_object)->state)
+	switch (current_object->state)
 	{
 	case 0:
-		SCREEN(screen)->unpack_state &= 0xFF00u;
+		screen->unpack_state &= 0xFF00u;
 		init_video();
-		video_registers_0_long = (video_registers[0] | ((uint32_t)video_registers[1] << 16u)) & ~0x800u;
-		video_registers[0] = (uint16_t)video_registers_0_long;
-		video_registers[1] = (uint16_t)(video_registers_0_long >> 16u);
-		video_registers[1] = 0xFu;
-		video_registers[70] = 0xFFu;
-		video_registers[68] = 0u;
-		video_registers[69] = 0u;
-		send_video_registers = 0xFFu;
-		SCREEN(screen)->kanji_text_number = 0u;
-		SCREEN(screen)->kanji_text_units = 0;
-		SCREEN(screen)->kanji_text_tens = 0;
-		SCREEN(screen)->kanji_text_hundreds = 0;
-		OBJECT(current_object)->x = 0xEu;
-		OBJECT(current_object)->state++;
+		video_registers_0_long = (game->video_registers[0] | ((uint32_t)game->video_registers[1] << 16u)) & ~0x800u;
+		game->video_registers[0] = (uint16_t)video_registers_0_long;
+		game->video_registers[1] = (uint16_t)(video_registers_0_long >> 16u);
+		game->video_registers[1] = 0xFu;
+		game->video_registers[70] = 0xFFu;
+		game->video_registers[68] = 0u;
+		game->video_registers[69] = 0u;
+		game->send_video_registers = 0xFFu;
+		screen->kanji_text_number = 0u;
+		screen->kanji_text_units = 0;
+		screen->kanji_text_tens = 0;
+		screen->kanji_text_hundreds = 0;
+		current_object->x = 0xEu;
+		current_object->state++;
 		return;
 	case 1:
-		if ((SCREEN(screen)->buttons_pressed & 8u) != 0u)
-			OBJECT(current_object)->x -= 2u;
-		if ((SCREEN(screen)->buttons_pressed & 4u) != 0u)
-			OBJECT(current_object)->x += 2u;
-		if ((int16_t)OBJECT(current_object)->x < 0xA)
-			OBJECT(current_object)->x = 0xEu;
-		if ((int16_t)OBJECT(current_object)->x > 0xE)
-			OBJECT(current_object)->x = 0xAu;
-		if (OBJECT(current_object)->x == 0xAu)
+		if ((screen->buttons_pressed & 8u) != 0u)
+			current_object->x -= 2u;
+		if ((screen->buttons_pressed & 4u) != 0u)
+			current_object->x += 2u;
+		if ((int16_t)current_object->x < 0xA)
+			current_object->x = 0xEu;
+		if ((int16_t)current_object->x > 0xE)
+			current_object->x = 0xAu;
+		if (current_object->x == 0xAu)
 		{
-			if ((SCREEN(screen)->buttons_pressed & 2u) != 0u)
-				SCREEN(screen)->kanji_text_hundreds++;
-			if ((SCREEN(screen)->buttons_pressed & 1u) != 0u)
-				SCREEN(screen)->kanji_text_hundreds--;
-			if (SCREEN(screen)->kanji_text_hundreds < 0)
-				SCREEN(screen)->kanji_text_hundreds = 9;
-			if (SCREEN(screen)->kanji_text_hundreds > 9)
-				SCREEN(screen)->kanji_text_hundreds = 0;
+			if ((screen->buttons_pressed & 2u) != 0u)
+				screen->kanji_text_hundreds++;
+			if ((screen->buttons_pressed & 1u) != 0u)
+				screen->kanji_text_hundreds--;
+			if (screen->kanji_text_hundreds < 0)
+				screen->kanji_text_hundreds = 9;
+			if (screen->kanji_text_hundreds > 9)
+				screen->kanji_text_hundreds = 0;
 		}
-		else if (OBJECT(current_object)->x == 0xCu)
+		else if (current_object->x == 0xCu)
 		{
-			if ((SCREEN(screen)->buttons_pressed & 2u) != 0u)
-				SCREEN(screen)->kanji_text_tens++;
-			if ((SCREEN(screen)->buttons_pressed & 1u) != 0u)
-				SCREEN(screen)->kanji_text_tens--;
-			if (SCREEN(screen)->kanji_text_tens < 0)
-				SCREEN(screen)->kanji_text_tens = 9;
-			if (SCREEN(screen)->kanji_text_tens > 9)
-				SCREEN(screen)->kanji_text_tens = 0;
+			if ((screen->buttons_pressed & 2u) != 0u)
+				screen->kanji_text_tens++;
+			if ((screen->buttons_pressed & 1u) != 0u)
+				screen->kanji_text_tens--;
+			if (screen->kanji_text_tens < 0)
+				screen->kanji_text_tens = 9;
+			if (screen->kanji_text_tens > 9)
+				screen->kanji_text_tens = 0;
 		}
 		else
 		{
-			if ((SCREEN(screen)->buttons_pressed & 2u) != 0u)
-				SCREEN(screen)->kanji_text_units++;
-			if ((SCREEN(screen)->buttons_pressed & 1u) != 0u)
-				SCREEN(screen)->kanji_text_units--;
-			if (SCREEN(screen)->kanji_text_units < 0)
-				SCREEN(screen)->kanji_text_units = 9;
-			if (SCREEN(screen)->kanji_text_units > 9)
-				SCREEN(screen)->kanji_text_units = 0;
+			if ((screen->buttons_pressed & 2u) != 0u)
+				screen->kanji_text_units++;
+			if ((screen->buttons_pressed & 1u) != 0u)
+				screen->kanji_text_units--;
+			if (screen->kanji_text_units < 0)
+				screen->kanji_text_units = 9;
+			if (screen->kanji_text_units > 9)
+				screen->kanji_text_units = 0;
 		}
-		if (SCREEN(screen)->index == 0u)
+		if (screen->index == 0u)
 		{
-			text_number = (uint16_t)(SCREEN(screen)->kanji_text_units + SCREEN(screen)->kanji_text_tens * 0xAu + SCREEN(screen)->kanji_text_hundreds * 0x64u);
-			SCREEN(screen)->kanji_text_number = text_number;
+			text_number = (uint16_t)(screen->kanji_text_units + screen->kanji_text_tens * 0xAu + screen->kanji_text_hundreds * 0x64u);
+			screen->kanji_text_number = text_number;
 			cell = TEXT_CELL(5, 10);
 			kanji_text_viewer_draw_number(cell, text_number);
-			OBJECT(current_object)->kanji_text_viewer.blink_count++;
-			if ((OBJECT(current_object)->kanji_text_viewer.blink_count & 3u) == 0u)
+			current_object->kanji_text_viewer.blink_count++;
+			if ((current_object->kanji_text_viewer.blink_count & 3u) == 0u)
 			{
-				cursor_cell = TEXT_CELL(0, 10) + OBJECT(current_object)->x;
+				cursor_cell = TEXT_CELL(0, 10) + current_object->x;
 				TEXT_LAYER_CELLS(cursor_cell)[0] = 0x602Au;
 			}
 		}
-		if (SCREEN(screen)->index != 0u)
+		if (screen->index != 0u)
 			return;
 		text_ended = 0u;
 		line = 0u;
-		text = kanji_texts[SCREEN(screen)->kanji_text_number];
+		text = kanji_texts[screen->kanji_text_number];
 		do
 		{
 			line_place = VIDEO_RAM + 0x1040u + line * 0x1000u;
@@ -116,11 +116,11 @@ void kanji_text_viewer_update(void)
 		} while (text_ended == 0u);
 		return;
 	case 2:
-		if (SCREEN(screen)->index != 0u)
+		if (screen->index != 0u)
 			return;
 		text_ended = 0u;
 		line = 0u;
-		text = kanji_texts[SCREEN(screen)->kanji_text_number];
+		text = kanji_texts[screen->kanji_text_number];
 		do
 		{
 			line_place = VIDEO_RAM + 0x1040u + line * 0x1000u;
@@ -151,7 +151,7 @@ void kanji_text_viewer_draw_line(uint32_t place, uint32_t *p_text_ended, uint32_
 			return;
 		}
 		character = kanji_text_viewer_character_address(character);
-		kanji_text_viewer_draw_character(place, character);
+		r12 = kanji_text_viewer_draw_character(place, character);
 		place += 8u;
 	}
 	*p_text_ended = 0xFFFFFFFFu;
@@ -160,34 +160,36 @@ void kanji_text_viewer_draw_line(uint32_t place, uint32_t *p_text_ended, uint32_
 /* Only unused code reaches it (kanji_text_viewer_draw_line): draws a 16x16 character on the bitmap layer
    at R11 from its 32 bytes at R13: four 8x8 quarters (kanji_text_viewer_draw_quarter), upper left, upper
    right, lower left, lower right. */
-void kanji_text_viewer_draw_character(uint32_t place, uint32_t rows)
+uint32_t kanji_text_viewer_draw_character(uint32_t place, uint32_t rows)
 {
-	r12 = place;
-	rows = kanji_text_viewer_draw_quarter(rows);
-	r12 = place + 4u;
-	rows = kanji_text_viewer_draw_quarter(rows);
-	r12 = place + 0x800u;
-	rows = kanji_text_viewer_draw_quarter(rows);
-	r12 = place + 0x804u;
-	kanji_text_viewer_draw_quarter(rows);
+	uint32_t bitmap_place = 0;
+
+	bitmap_place = place;
+	kanji_text_viewer_draw_quarter(&bitmap_place, &rows);
+	bitmap_place = place + 4u;
+	kanji_text_viewer_draw_quarter(&bitmap_place, &rows);
+	bitmap_place = place + 0x800u;
+	kanji_text_viewer_draw_quarter(&bitmap_place, &rows);
+	bitmap_place = place + 0x804u;
+	kanji_text_viewer_draw_quarter(&bitmap_place, &rows);
+	return bitmap_place;
 }
 
 /* Only unused code reaches it (kanji_text_viewer_draw_character): draws eight rows of eight one-bit
    pixels (a byte each, from R13) at R12 on the bitmap layer, 100 bytes a row, each byte spread by the
    table at 1A6340 into eight 4-bit pixels of pen 1. */
-uint32_t kanji_text_viewer_draw_quarter(uint32_t rows)
+void kanji_text_viewer_draw_quarter(uint32_t *p_bitmap_place, uint32_t *p_rows)
 {
 	uint32_t rows_left = 0;
 
 	rows_left = 8u;
 	do
 	{
-		BITMAP_LAYER_WORDS(r12)[0] = byte_swap32(kanji_row_pixels[KANJI_CHARACTER_ROWS(rows)[0]]);
-		r12 += 0x100u;
+		BITMAP_LAYER_WORDS(*p_bitmap_place)[0] = byte_swap32(kanji_row_pixels[KANJI_CHARACTER_ROWS(*p_rows)[0]]);
+		*p_bitmap_place += 0x100u;
 		rows_left--;
-		rows++;
+		(*p_rows)++;
 	} while (rows_left != 0u);
-	return rows;
 }
 
 /* Only unused code reaches it (kanji_text_viewer_draw_line): the address of character R13 of the kanji

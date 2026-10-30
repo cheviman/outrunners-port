@@ -3,7 +3,7 @@
  *    Description: the coins and credits, and the bookkeeping
  *    Version:     0.1.0
  *    Created:     12-10-2026
- *    Modified:    29-10-2026
+ *    Modified:    30-10-2026
  *    Author:      Sebastian Toyos
  *
  *    OutRunners (arcade, Sega System Multi 32): the game's V70 program decompiled into C by
@@ -21,14 +21,14 @@ void init_coins(void)
 	uint8_t chip_2_port_f = 0;
 
 	chip_2_port_f = io_read8(IO_2_PORT_F);
-	second_io_chip_port_f = ~chip_2_port_f & 0xFu;
-	chute_entry_offset = 0u;
-	if (free_play == 0u && second_chute_multiplier == first_chute_multiplier)
-		chute_entry_offset = 0x14u;
-	seat1_credits = (uint8_t)BOOKKEEPING_SEAT_1_CREDITS;
-	seat1_bookkeeping_byte = (uint8_t)BOOKKEEPING_SEAT_1_BYTE;
-	seat2_credits = (uint8_t)BOOKKEEPING_SEAT_2_CREDITS;
-	seat2_bookkeeping_byte = (uint8_t)BOOKKEEPING_SEAT_2_BYTE;
+	game->second_io_chip_port_f = ~chip_2_port_f & 0xFu;
+	game->chute_entry_offset = 0u;
+	if (game->free_play == 0u && game->second_chute_multiplier == game->first_chute_multiplier)
+		game->chute_entry_offset = 0x14u;
+	game->seat1_credits = (uint8_t)BOOKKEEPING_SEAT_1_CREDITS;
+	game->seat1_bookkeeping_byte = (uint8_t)BOOKKEEPING_SEAT_1_BYTE;
+	game->seat2_credits = (uint8_t)BOOKKEEPING_SEAT_2_CREDITS;
+	game->seat2_bookkeeping_byte = (uint8_t)BOOKKEEPING_SEAT_2_BYTE;
 }
 
 /* The coins and service credits, in the vertical blank unless on free play (free_play): queues each
@@ -47,46 +47,46 @@ void update_coins(void)
 	uint32_t saved_screen = 0;
 	uint8_t released_chutes = 0;
 
-	if (free_play != 0u)
+	if (game->free_play != 0u)
 		return;
-	saved_screen = screen;
-	if (seat1_coin_sounds != 0u)
+	saved_screen = address_of(screen);
+	if (game->seat1_coin_sounds != 0u)
 	{
 		sound = 0x4Eu;
-		screen = SCREEN_1;
+		screen = &game->screen_1;
 		queue_sound(sound);
-		seat1_coin_sounds--;
+		game->seat1_coin_sounds--;
 	}
-	if (seat2_coin_sounds != 0u)
+	if (game->seat2_coin_sounds != 0u)
 	{
 		sound = 0x4Eu;
-		screen = SCREEN_2;
+		screen = &game->screen_2;
 		queue_sound(sound);
-		seat2_coin_sounds--;
+		game->seat2_coin_sounds--;
 	}
-	if (seat1_service_sounds != 0u)
+	if (game->seat1_service_sounds != 0u)
 	{
 		sound = 0x50u;
-		screen = SCREEN_1;
+		screen = &game->screen_1;
 		queue_sound(sound);
-		seat1_service_sounds--;
+		game->seat1_service_sounds--;
 	}
-	if (seat2_service_sounds != 0u)
+	if (game->seat2_service_sounds != 0u)
 	{
 		sound = 0x50u;
-		screen = SCREEN_2;
+		screen = &game->screen_2;
 		queue_sound(sound);
-		seat2_service_sounds--;
+		game->seat2_service_sounds--;
 	}
-	screen = saved_screen;
-	pressed_switches = switches_pressed;
+	screen = pointer_to(saved_screen);
+	pressed_switches = game->switches_pressed;
 	credits_given = 0u;
 	if ((pressed_switches & 1u) != 0u)
 	{
 		seat_credits = seat1_credits_ADDRESS;
 		service_sounds = seat1_service_sounds_ADDRESS;
 		r12 = SCREEN_1;
-		credits_given = add_service_credit(credits_given, seat_credits, service_sounds);
+		credits_given = add_service_credit(credits_given, pointer_to(seat_credits), service_sounds);
 		counter = SOUND_RAM + 0x1F04u;
 		bookkeeping_add16(counter, credits_given);
 	}
@@ -96,11 +96,11 @@ void update_coins(void)
 		seat_credits = seat2_credits_ADDRESS;
 		service_sounds = seat2_service_sounds_ADDRESS;
 		r12 = SCREEN_2;
-		credits_given = add_service_credit(credits_given, seat_credits, service_sounds);
+		credits_given = add_service_credit(credits_given, pointer_to(seat_credits), service_sounds);
 		counter = SOUND_RAM + 0x1F04u;
 		bookkeeping_add16(counter, credits_given);
 	}
-	released_chutes = switches_released & 0x3Cu;
+	released_chutes = game->switches_released & 0x3Cu;
 	released_switches = released_chutes;
 	if (released_chutes != 0u)
 	{
@@ -118,35 +118,35 @@ void update_coins(void)
 		counter = SOUND_RAM + 0x1F02u;
 		bookkeeping_add16(counter, credits_given);
 	}
-	if (chute_entry_offset == 0u)
+	if (game->chute_entry_offset == 0u)
 	{
 		coin_meter = 0x20E083u;
 		meter_bit = 1u;
 		r12 = port_d_outputs_ADDRESS;
-		pulse_coin_meter(meter_bit, coin_meter);
+		pulse_coin_meter(meter_bit, coin_meter, r12);
 	}
 	coin_meter = coin_meters_ADDRESS;
 	meter_bit = 0u;
 	r12 = port_d_outputs_ADDRESS;
-	pulse_coin_meter(meter_bit, coin_meter);
-	if (chute_entry_offset == 0u)
+	pulse_coin_meter(meter_bit, coin_meter, r12);
+	if (game->chute_entry_offset == 0u)
 	{
 		coin_meter = 0x20E089u;
 		meter_bit = 1u;
 		r12 = port_d_outputs_ADDRESS + 0x1u;
-		pulse_coin_meter(meter_bit, coin_meter);
+		pulse_coin_meter(meter_bit, coin_meter, r12);
 	}
 	coin_meter = 0x20E086u;
 	meter_bit = 0u;
 	r12 = port_d_outputs_ADDRESS + 0x1u;
-	pulse_coin_meter(meter_bit, coin_meter);
+	pulse_coin_meter(meter_bit, coin_meter, r12);
 }
 
 /* Drives coin meter R1 (its bit in the port D outputs at R12, port_d_outputs: bit 0 a seat's first
    chute's meter, bit 1 its second's) from its record R7 in coin_meters (frames on, frames off, pulses
    owed): when idle with a pulse owed, the bit goes on for 6 vertical blanks and off for 6. Then writes
    the credits into the bookkeeping and its backup (write_bookkeeping_credits) with the checksum. */
-void pulse_coin_meter(uint8_t meter_bit, uint32_t coin_meter)
+void pulse_coin_meter(uint8_t meter_bit, uint32_t coin_meter, uint32_t meter_bits)
 {
 	uint32_t meter_frames = 0;
 	uint8_t frames_on = 0;
@@ -158,83 +158,81 @@ void pulse_coin_meter(uint8_t meter_bit, uint32_t coin_meter)
 		if (COIN_METER(coin_meter - 0x2u)->pulses_owed != 0u)
 		{
 			COIN_METER(coin_meter - 0x2u)->pulses_owed--;
-			PORT_OUTPUT_BITS(r12)[0] |= shift_by(1u, meter_bit, 8);
+			PORT_OUTPUT_BITS(meter_bits)[0] |= shift_by(1u, meter_bit, 8);
 			COIN_METER(coin_meter - 0x2u)->frames = 0x606u;
 		}
-		r12 = BOOKKEEPING_SEAT_1_CREDITS_ADDRESS;
-		write_bookkeeping_credits();
+		meter_bits = BOOKKEEPING_SEAT_1_CREDITS_ADDRESS;
+		write_bookkeeping_credits(meter_bits);
 		bookkeeping_update_checksum((uint16_t)meter_frames);
-		r12 = BOOKKEEPING_BACKUP_SEAT_1_CREDITS_ADDRESS;
-		write_bookkeeping_credits();
+		meter_bits = BOOKKEEPING_BACKUP_SEAT_1_CREDITS_ADDRESS;
+		write_bookkeeping_credits(meter_bits);
 		return;
 	}
 	if ((uint8_t)meter_frames == 0u)
 	{
 		coin_meter--;
 		COIN_METER(coin_meter - 0x1u)->frames_off--;
-		r12 = BOOKKEEPING_SEAT_1_CREDITS_ADDRESS;
-		write_bookkeeping_credits();
+		meter_bits = BOOKKEEPING_SEAT_1_CREDITS_ADDRESS;
+		write_bookkeeping_credits(meter_bits);
 		bookkeeping_update_checksum((uint16_t)meter_frames);
-		r12 = BOOKKEEPING_BACKUP_SEAT_1_CREDITS_ADDRESS;
-		write_bookkeeping_credits();
+		meter_bits = BOOKKEEPING_BACKUP_SEAT_1_CREDITS_ADDRESS;
+		write_bookkeeping_credits(meter_bits);
 		return;
 	}
 	frames_on = COIN_METER(coin_meter - 0x2u)->frames_on;
 	COIN_METER(coin_meter - 0x2u)->frames_on = frames_on - 1u;
 	if (frames_on != 1u)
 	{
-		r12 = BOOKKEEPING_SEAT_1_CREDITS_ADDRESS;
-		write_bookkeeping_credits();
+		meter_bits = BOOKKEEPING_SEAT_1_CREDITS_ADDRESS;
+		write_bookkeeping_credits(meter_bits);
 		bookkeeping_update_checksum((uint16_t)meter_frames);
-		r12 = BOOKKEEPING_BACKUP_SEAT_1_CREDITS_ADDRESS;
-		write_bookkeeping_credits();
+		meter_bits = BOOKKEEPING_BACKUP_SEAT_1_CREDITS_ADDRESS;
+		write_bookkeeping_credits(meter_bits);
 		return;
 	}
-	PORT_OUTPUT_BITS(r12)[0] &= rotate_by(0xFEu, meter_bit, 8);
-	r12 = BOOKKEEPING_SEAT_1_CREDITS_ADDRESS;
-	write_bookkeeping_credits();
+	PORT_OUTPUT_BITS(meter_bits)[0] &= rotate_by(0xFEu, meter_bit, 8);
+	meter_bits = BOOKKEEPING_SEAT_1_CREDITS_ADDRESS;
+	write_bookkeeping_credits(meter_bits);
 	bookkeeping_update_checksum((uint16_t)meter_frames);
-	r12 = BOOKKEEPING_BACKUP_SEAT_1_CREDITS_ADDRESS;
-	write_bookkeeping_credits();
+	meter_bits = BOOKKEEPING_BACKUP_SEAT_1_CREDITS_ADDRESS;
+	write_bookkeeping_credits(meter_bits);
 }
 
 /* Writes the seats' credits (the halfwords at seat1_credits, seat1_bookkeeping_byte, seat2_credits,
    seat2_bookkeeping_byte) at R12: 701F74 in the bookkeeping or 701FF0 in its backup. */
-void write_bookkeeping_credits(void)
+void write_bookkeeping_credits(uint32_t bookkeeping_place)
 {
-	BOOKKEEPING_HALFWORDS(r12)[0] = (seat1_credits | ((uint32_t)seat1_coin_units << 8u));
-	r12 += 2u;
-	BOOKKEEPING_HALFWORDS(r12)[0] = AS16(seat1_bookkeeping_byte);
-	r12 += 2u;
-	BOOKKEEPING_HALFWORDS(r12)[0] = (seat2_credits | ((uint32_t)seat2_coin_units << 8u));
-	r12 += 2u;
-	BOOKKEEPING_HALFWORDS(r12)[0] = AS16(seat2_bookkeeping_byte);
-	r12 += 2u;
+	BOOKKEEPING_HALFWORDS(bookkeeping_place)[0] = (game->seat1_credits | ((uint32_t)game->seat1_coin_units << 8u));
+	bookkeeping_place += 2u;
+	BOOKKEEPING_HALFWORDS(bookkeeping_place)[0] = AS16(game->seat1_bookkeeping_byte);
+	bookkeeping_place += 2u;
+	BOOKKEEPING_HALFWORDS(bookkeeping_place)[0] = (game->seat2_credits | ((uint32_t)game->seat2_coin_units << 8u));
+	BOOKKEEPING_HALFWORDS(bookkeeping_place)[1] = AS16(game->seat2_bookkeeping_byte);
 }
 
 /* A service credit for the seat whose credits are at R10 (seat1_credits or seat2_credits): one credit
    more, up to 9 (at 9 its coin units are cleared; beyond, nothing); a credit given brings the screen R12
    to the title from the attract mode (show_title_on_credit), asks for the seat's service sound (R11) and
    counts one in R9, which it returns. Not run in the scenarios. */
-uint16_t add_service_credit(uint16_t credits_given, uint32_t seat_credits, uint32_t service_sounds)
+uint16_t add_service_credit(uint16_t credits_given, struct seat_credits *seat_credits, uint32_t service_sounds)
 {
 	uint32_t zero = 0;
 	uint8_t credits = 0;
 
-	SEAT_CREDITS(seat_credits)->credits++;
-	credits = SEAT_CREDITS(seat_credits)->credits;
+	seat_credits->credits++;
+	credits = seat_credits->credits;
 	zero = (uint8_t)(credits - 9u) == 0u;
 	if (credits >= 9u)
 	{
-		SEAT_CREDITS(seat_credits)->bonus_units = 0u;
-		SEAT_CREDITS(seat_credits)->coin_units = 0u;
+		seat_credits->bonus_units = 0u;
+		seat_credits->coin_units = 0u;
 		if (zero == 0u)
 		{
-			SEAT_CREDITS(seat_credits)->credits = 9u;
+			seat_credits->credits = 9u;
 			return credits_given;
 		}
 	}
-	show_title_on_credit();
+	show_title_on_credit(pointer_to(r12));
 	SEAT_SOUND_COUNTS(service_sounds)[0] = 1u;
 	credits_given = (uint8_t)(credits_given + 1u);
 	return credits_given;
@@ -251,7 +249,8 @@ uint16_t add_service_credit(uint16_t credits_given, uint32_t seat_credits, uint3
 uint16_t insert_coin(uint8_t released_switches, uint16_t credits_given, uint32_t chute_entry)
 {
 	uint8_t bonus_units = 0, chute_units = 0, credit_units = 0, units_per_credit = 0;
-	uint32_t coin_sounds = 0, counter = 0, seat_credits = 0, units_per_bonus = 0;
+	uint32_t coin_sounds = 0, counter = 0, units_per_bonus = 0;
+	struct seat_credits *seat_credits = NULL;
 	uint32_t switch_bit = 0, owed_pulses = 0;
 
 	switch_bit = COIN_CHUTE(chute_entry)->switch_bit;
@@ -259,54 +258,54 @@ uint16_t insert_coin(uint8_t released_switches, uint16_t credits_given, uint32_t
 	if ((released_switches & shl32(1u, (int)(switch_bit))) == 0u)
 		return credits_given;
 	coin_sounds = COIN_CHUTE(chute_entry - 0x4u)->coin_sounds;
-	chute_entry = chute_entry + 4u + chute_entry_offset;
-	seat_credits = COIN_CHUTE_VARIANT(chute_entry)->credits;
+	chute_entry = chute_entry + 4u + game->chute_entry_offset;
+	seat_credits = pointer_to(COIN_CHUTE_VARIANT(chute_entry)->credits);
 	io_write8(EVENT_CODE, COIN_CHUTE_VARIANT(chute_entry)->event_code);
 	owed_pulses = COIN_CHUTE_VARIANT(chute_entry)->pulses_owed;
 	COIN_METER(owed_pulses - 0x2u)->pulses_owed++;
 	counter = COIN_CHUTE_VARIANT(chute_entry)->counter;
 	bookkeeping_increment16(counter);
-	if (SEAT_CREDITS(seat_credits)->credits >= 9u)
+	if (seat_credits->credits >= 9u)
 		return credits_given;
 	SEAT_SOUND_COUNTS(coin_sounds)[0]++;
 	chute_units = CHUTE_UNIT_SETTINGS(COIN_CHUTE_VARIANT(chute_entry)->coin_units)[0];
-	units_per_bonus = bonus_adder;
+	units_per_bonus = game->bonus_adder;
 	if (units_per_bonus != 0u)
 	{
-		bonus_units = (uint8_t)(SEAT_CREDITS(seat_credits)->bonus_units + chute_units);
+		bonus_units = (uint8_t)(seat_credits->bonus_units + chute_units);
 		while (units_per_bonus <= bonus_units)
 		{
-			SEAT_CREDITS(seat_credits)->coin_units++;
+			seat_credits->coin_units++;
 			bonus_units -= units_per_bonus;
 		}
-		SEAT_CREDITS(seat_credits)->bonus_units = bonus_units;
+		seat_credits->bonus_units = bonus_units;
 	}
-	units_per_credit = coins_per_credit;
-	credit_units = (uint8_t)(SEAT_CREDITS(seat_credits)->coin_units + chute_units);
+	units_per_credit = game->coins_per_credit;
+	credit_units = (uint8_t)(seat_credits->coin_units + chute_units);
 	do
 	{
 		if (credit_units < units_per_credit)
 		{
-			SEAT_CREDITS(seat_credits)->coin_units = credit_units;
+			seat_credits->coin_units = credit_units;
 			return credits_given;
 		}
-		SEAT_CREDITS(seat_credits)->credits++;
-		show_title_on_credit();
+		seat_credits->credits++;
+		show_title_on_credit(pointer_to(r12));
 		credits_given = (uint8_t)(credits_given + 1u);
 		credit_units -= units_per_credit;
-	} while (SEAT_CREDITS(seat_credits)->credits < 9u);
+	} while (seat_credits->credits < 9u);
 	credit_units = 0u;
-	SEAT_CREDITS(seat_credits)->bonus_units = 0u;
-	SEAT_CREDITS(seat_credits)->coin_units = credit_units;
+	seat_credits->bonus_units = 0u;
+	seat_credits->coin_units = credit_units;
 	return credits_given;
 }
 
 /* A credit on the screen R12 during the attract mode (game modes 1-5, the low byte of its game_mode)
    brings it to the title: game_mode = 2 (game mode 2, game_mode_title, from its first step). */
-void show_title_on_credit(void)
+void show_title_on_credit(struct screen *screen_block)
 {
-	if ((int8_t)SCREEN(r12)->game_mode > 0 && (int8_t)SCREEN(r12)->game_mode < 6)
-		AS32(SCREEN(r12)->game_mode) = 2u;
+	if ((int8_t)screen_block->game_mode > 0 && (int8_t)screen_block->game_mode < 6)
+		AS32(screen_block->game_mode) = 2u;
 }
 
 /* Adds one to the 16-bit bookkeeping counter at R7 (and its backup's, 7C on) unless it is at FFFF, with
@@ -426,14 +425,17 @@ void bookkeeping_set8(uint32_t counter, uint8_t amount)
 
 /* Clears the credits kept in the bookkeeping (701F74-701F7B) and in its backup (701FF0-701FF7), with the
    checksum. Not run in the scenarios. */
-void bookkeeping_clear_credits(void)
+uint32_t bookkeeping_clear_credits(void)
 {
+	uint32_t bookkeeping_place = 0;
+
 	AS32(BOOKKEEPING_SEAT_1_CREDITS) = 0u;
 	AS32(BOOKKEEPING_SEAT_2_CREDITS) = 0u;
 	bookkeeping_update_checksum(0u);
 	BOOKKEEPING_BACKUP_SEAT_1_CREDITS = 0u;
 	BOOKKEEPING_BACKUP_SEAT_2_CREDITS = 0u;
-	r12 = SOUND_RAM + 0x1FF8u;
+	bookkeeping_place = SOUND_RAM + 0x1FF8u;
+	return bookkeeping_place;
 }
 
 /* Checks the bookkeeping at boot: when the block (701F02) matches the checksum (701F00), copies it over
