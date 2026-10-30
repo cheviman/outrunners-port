@@ -231,23 +231,44 @@ static void put_header(writer *out, int kind)
 
 /* ---- the devices heard ---- */
 
+/* True for a device of the room's list or of the link: its entry among the devices heard is kept */
+static bool kept_peer(uint32_t id)
+{
+	for (int index = 0; index < net.member_count; index++)
+		if (net.members[index].id == id)
+			return true;
+	for (int machine = 0; net.linked && machine < net.machines; machine++)
+		if (net.link_ids[machine] == id)
+			return true;
+	return false;
+}
+
+/* A device heard, by its id; with 'add' a new entry for it, in place of a free one or of the longest unheard
+   of those no member's (NULL when there is none) */
 static peer *peer_of(uint32_t id, bool add)
 {
-	peer *oldest = &net.peers[0];
+	peer *freed = NULL;
 
 	for (int index = 0; index < SLOTS; index++)
 	{
-		if (net.peers[index].id == id)
-			return &net.peers[index];
-		if (net.peers[index].heard < oldest->heard)
-			oldest = &net.peers[index];
+		peer *each = &net.peers[index];
+
+		if (each->id == id && id != 0u)
+			return each;
+		if (each->id == 0u)
+		{
+			if (!freed || freed->id != 0u)
+				freed = each;    /* (a free one before any other) */
+		}
+		else if (!kept_peer(each->id) && (!freed || (freed->id != 0u && each->heard < freed->heard)))
+			freed = each;
 	}
-	if (!add)
+	if (!add || !freed)
 		return NULL;
-	memset(oldest, 0, sizeof(*oldest));
-	oldest->id = id;
-	oldest->heard = net.frame;
-	return oldest;
+	memset(freed, 0, sizeof(*freed));
+	freed->id = id;
+	freed->heard = net.frame;
+	return freed;
 }
 
 /* Where a member's datagrams go: where they come from once heard, else where the room's host hears them */
@@ -499,8 +520,9 @@ static void send_leave(void)
 	}
 }
 
-/* A beacon: the room into JOIN's list (where it comes from: its host's address; one from this computer's
-   loopback only until the network's comes), with its host's id */
+/* A beacon: the room into JOIN's list with its host's id (where it comes from: its host's address; one from
+   this computer's loopback only until the network's comes). A room listed takes the beacons of that host alone,
+   until it is forgotten (a room whose host is gone comes back with the new one's) */
 static void take_beacon(reader *in, uint32_t room, uint32_t sender, net_address from)
 {
 	int index;
@@ -513,11 +535,13 @@ static void take_beacon(reader *in, uint32_t room, uint32_t sender, net_address 
 			return;
 		net.room_count++;
 		net.rooms[index].room = room;
+		net.rooms[index].host = sender;
 		net.rooms[index].address = from;
 	}
+	else if (net.rooms[index].host != sender)
+		return;    /* (another device speaking for the room) */
 	else if (from.ip != NET_LOOPBACK)
 		net.rooms[index].address = from;
-	net.rooms[index].host = sender;
 	get_name(in, net.rooms[index].name);
 	net.rooms[index].members = (int)get8(in);
 	net.rooms[index].heard = net.frame;
@@ -541,14 +565,22 @@ static void take_join(reader *in, uint32_t sender, net_address from)
 	net.list_version++;
 }
 
-/* A record from the network: its numbers that index the game's tables and arrays (the players', the
-   checkpoints', the stages', the cars' and their animations') kept within them, so that a broken datagram, or a
-   device on the network meaning harm, reaches nothing past them */
-static void check_record(struct race *record)
+/* A record from the network, of the slot 'slot': whose it is as the link has it (its machine, its player, its
+   car's number), and its numbers that index the game's tables and arrays (the players', the checkpoints', the
+   stages', the cars' and their animations', the course records') kept within them, so that a broken datagram,
+   or a device on the network meaning harm, reaches nothing past them. (Its car's frame is not: an animation
+   keeps no count of its frames; one past them reads on in the game's data, whose pieces stop the game where
+   there is none, as a device that fills the room stops a race) */
+static void check_record(struct race *record, int slot)
 {
 	const int players = net.machines * 2;
 	uint8_t *order = (uint8_t *)record + offsetof(struct race, race_order);
 
+	record->machine = (uint8_t)(slot / 2 + 1);
+	record->player = (uint8_t)slot;
+	record->car_number = (uint8_t)slot;
+	if (record->record_model >= CAR_MODELS)
+		record->record_model = 0u;
 	if (record->racer_count > players)
 		record->racer_count = (uint8_t)players;
 	for (int index = 0; index < SLOTS; index++)
@@ -571,8 +603,6 @@ static void check_record(struct race *record)
 		record->model = 0u;
 	if (record->car_choice > CAR_MODELS)
 		record->car_choice = 0u;
-	if (record->car_number >= players)
-		record->car_number = 0u;
 	if (record->record_course >= COURSES)
 		record->record_course = 0u;
 	if (record->animation >= SPRITE_ANIMATIONS)
@@ -641,7 +671,7 @@ static void take_state(reader *in, uint32_t sender)
 			continue;
 		if (publisher(slot) != machine || slot / 2 + 1 == net.machine || net.link_ids[machine - 1] != sender)
 			continue;    /* (only the machine that carries the slot, and that machine only) */
-		check_record((struct race *)record);
+		check_record((struct race *)record, slot);
 		memcpy(net.slots[slot], record, RECORD_BYTES);
 	}
 }
@@ -681,17 +711,18 @@ static void take_datagrams(void)
 		heard = peer_of(sender, false);
 		if (heard && heard->address.ip && (heard->address.ip != from.ip || heard->address.port != from.port))
 			continue;
-		if (!heard && member_index(sender) < 0 && !(kind == PACKET_JOIN && hosting())
-			&& !(net.role == ROLE_JOINING && sender == net.joining_host))
+		if (!heard && kind == PACKET_JOIN && hosting())
+			take_join(&in, sender, from);    /* (heard from then on once the room takes it) */
+		if (!heard && member_index(sender) < 0 && !(net.role == ROLE_JOINING && sender == net.joining_host))
 			continue;
-		if (!heard)
-			heard = peer_of(sender, true);
+		if (!heard && (heard = peer_of(sender, true)) == NULL)
+			continue;
 		heard->heard = net.frame;
 		heard->address = from;
 		switch (kind)
 		{
 			case PACKET_JOIN:
-				take_join(&in, sender, from);
+				take_join(&in, sender, from);    /* (once more, unheard of: nothing) */
 				break;
 			case PACKET_STATE:
 				take_state(&in, sender);
