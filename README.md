@@ -13,6 +13,16 @@ checked frame by frame against MAME in picture and sound. Two games come out of 
 This repository contains no game data. As with [n64decomp/sm64](https://github.com/n64decomp/sm64), you bring
 your own ROM set (MAME's `orunners`, World), and the game takes its assets out of it.
 
+<p align="center">
+  <img src="docs/screenshots/title_menu.png" width="32%" alt="The title and its menu, in 16:9: ARCADE, 2 PLAYERS, NETWORK, & KNUCKLES, OPTIONS, EXIT">
+  <img src="docs/screenshots/race_fork.png" width="32%" alt="A race at the pre-stage's fork: WEST or EAST, in 16:9">
+  <img src="docs/screenshots/network_room.png" width="32%" alt="NETWORK: a room with two devices, SEBAS and NICO, and the host's START">
+  <img src="docs/screenshots/reverse_map.png" width="32%" alt="& KNUCKLES > REVERSE: the goal picked on the route map">
+  <img src="docs/screenshots/options.png" width="32%" alt="OPTIONS over the title's opening">
+  <br>
+  <img src="docs/screenshots/two_players.png" width="65%" alt="2 PLAYERS: both seats in one race, side by side">
+</p>
+
 ## Playing it
 
 The [releases](https://github.com/cheviman/outrunners-port/releases) hold a package for Windows, Linux and
