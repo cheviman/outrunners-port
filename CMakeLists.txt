@@ -287,6 +287,44 @@ if(ORUNNERS_DECOMPILED AND ORUNNERS_SOUND_DECOMPILED)
 				COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:SDL2::SDL2> $<TARGET_FILE_DIR:orunners>)
 		endif()
 
+		# the executables' icon (tools/make_icon.py): a resource on Windows (which SDL gives the window too),
+		# the .app's on macOS, a picture beside them on Linux (for a launcher of the desktop's). On Windows a
+		# picture of the player's own in its place where this computer has one (ORUNNERS_PC_ICON, else
+		# local/icon_pc.png: local/ holds the player's own pictures, never committed), made an .ico here
+		set(ORUNNERS_PC_ICON "" CACHE FILEPATH "The executables' icon on Windows: a picture of the player's own")
+		set(ORUNNERS_PC_PICTURE ${ORUNNERS_PC_ICON})
+		if(NOT ORUNNERS_PC_PICTURE AND EXISTS ${CMAKE_SOURCE_DIR}/local/icon_pc.png)
+			set(ORUNNERS_PC_PICTURE ${CMAKE_SOURCE_DIR}/local/icon_pc.png)
+		endif()
+		set(ORUNNERS_ICON_RC ${CMAKE_SOURCE_DIR}/ports/sdl2/icon/outrunners.rc)
+		if(WIN32 AND ORUNNERS_PC_PICTURE AND Python3_FOUND)
+			# (made as CMake configures, once for both: again when the picture changes)
+			set(ORUNNERS_OWN_ICON ${CMAKE_BINARY_DIR}/icon)
+			execute_process(COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/make_icon.py --ico
+				${ORUNNERS_PC_PICTURE} ${ORUNNERS_OWN_ICON}/outrunners.ico RESULT_VARIABLE ORUNNERS_OWN_ICON_MADE)
+			set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${ORUNNERS_PC_PICTURE})
+			if(ORUNNERS_OWN_ICON_MADE EQUAL 0)
+				file(WRITE ${ORUNNERS_OWN_ICON}/outrunners.rc "// the player's own picture (CMakeLists.txt)\n1 ICON \"outrunners.ico\"\n")
+				set(ORUNNERS_ICON_RC ${ORUNNERS_OWN_ICON}/outrunners.rc)
+				message(STATUS "The executables' icon: ${ORUNNERS_PC_PICTURE}")
+			endif()
+		endif()
+		foreach(game orunners outrunners)
+			if(WIN32)
+				target_sources(${game} PRIVATE ${ORUNNERS_ICON_RC})
+			elseif(APPLE)
+				target_sources(${game} PRIVATE ports/sdl2/icon/outrunners.icns)
+				set_target_properties(${game} PROPERTIES MACOSX_BUNDLE_ICON_FILE outrunners.icns)
+			else()
+				add_custom_command(TARGET ${game} POST_BUILD
+					COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_SOURCE_DIR}/ports/sdl2/icon/outrunners.png
+						$<TARGET_FILE_DIR:${game}>)
+			endif()
+		endforeach()
+		if(APPLE)
+			set_source_files_properties(ports/sdl2/icon/outrunners.icns PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+		endif()
+
 		# OutRunners NSP's window (ports/switch/nsp/window.c), when it is started with nothing: still a console
 		# program, with its own main (SDL2 without SDL2main); the folder dialog is COM's on Windows. Its
 		# letters (Kenney Mini, font.bmp) beside it, as SDL2's library is

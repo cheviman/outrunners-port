@@ -171,11 +171,20 @@ merged here; this repository adds console/, the ports and their documents.
   start), and the 59 more taken back from the last checkpoints (the pre-stage's gives nothing, the first
   level's 13): the race's whole time the game's own, its margin at the start.
 
+- The computers' executables' icon: the project's wheel (ports/sdl2/icon: a resource on Windows, which SDL
+  gives the window, the .apps' on macOS, a picture beside them on Linux); on Windows a picture of the
+  player's own where the computer has one (local/icon_pc.png or ORUNNERS_PC_ICON, made an .ico as CMake
+  configures): Sebas's, the car.
+- The CI (.github/workflows/build.yml, as SegaSonic's): the Switch's .nsp pieces, Android's base APK and
+  Anbernic's game built each in its own job, in every computer's package beside OutRunners NSP, OutRunners APK
+  and OutRunners Anbernic, with docs/package/README.txt; a tag v* makes a release of the packages.
+
 ## To do
 
+- The decompilation's new version merged (Sebas: before the network).
+- The network, last (Sebas).
 - 2 PLAYERS on the Switch up to 4 players a console (Sebas, 30-10-2026), the screen in four, with the
   network's multiplayer.
-- The car (Sebas's local/icon_pc.png) as the computer's window icon, from the player's own picture.
 
 ## Order
 

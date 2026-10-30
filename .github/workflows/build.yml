@@ -2,10 +2,13 @@
 # Description: builds the game on clean machines with no ROM set (Linux with GCC, macOS with Clang,
 #              Windows with MSVC), SDL2 inside the executables, and packs what a player runs: the window
 #              ports, OutRunners Arcade and OutRunners, which take their assets out of the player's ROM set
-#              on their first run, with their licenses
-# Version:     0.1.0
+#              on their first run; the Nintendo Switch's .nsp pieces with devkitPro's toolchain, Android's game
+#              without a pack with the NDK and Anbernic's handhelds' game with Zig, in every package beside the
+#              tools that make the player's .nsp, APK and PORTS of them; with their licenses. A tag v* makes a
+#              release of those packages (as SegaSonic's)
+# Version:     0.2.0
 # Created:     27-10-2026
-# Modified:    29-10-2026
+# Modified:    30-10-2026
 # Author:      Sebastian Toyos
 name: build
 
@@ -28,6 +31,7 @@ jobs:
             os: windows-2022
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
+    needs: [switch, android, anbernic]    # (their games go in the package, beside the tools that make them)
     steps:
       # (tools/core, the shared core, holds the licenses of MAME's and ymfm's code the board follows)
       - uses: actions/checkout@v7
@@ -63,11 +67,28 @@ jobs:
       - name: Build
         run: cmake --build build/cmake --config Release --parallel
 
+      # the devices' games, which OutRunners NSP, OutRunners APK and OutRunners Anbernic make the player's
+      # .nsp, APK and PORTS of: the folders switch, android and anbernic beside them
+      - uses: actions/download-artifact@v8
+        with:
+          name: outrunners-switch
+          path: build/bin/switch
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: outrunners-android
+          path: build/bin/android
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: outrunners-anbernic
+          path: build/bin/anbernic
+
       # what a player runs (no headless runs, no build leftovers), in an archive of our own: the artifacts'
-      # zip loses the executables' permissions. With it, the terms the executable comes with: the project's,
+      # zip loses the executables' permissions. With it, the terms the executables come with: the project's,
       # MAME's and ymfm's (BSD-3: the board's libraries follow their behavior and tables), SDL2's (zlib) and
-      # Kenney's (CC0: the letters of the first run's window, the controls' pictures).
-      # The .app is signed ad hoc (no certificate): macOS then offers to open it anyway, where a bundle
+      # Kenney's (CC0: the letters of the windows, the controls' pictures), and the package's README.
+      # The .apps are signed ad hoc (no certificate): macOS then offers to open them anyway, where a bundle
       # signed in part is "damaged"
       - name: Pack
         shell: bash
@@ -80,6 +101,7 @@ jobs:
             esac
           done
           cp LICENSE dist/outrunners/LICENSE.txt
+          cp docs/package/README.txt dist/outrunners/README.txt
           cp tools/core/system32/reference/mame/LICENSE dist/outrunners/licenses/MAME.txt
           cp tools/core/system32/reference/ymfm/LICENSE dist/outrunners/licenses/ymfm.txt
           cp build/cmake/_deps/sdl2-src/LICENSE.txt dist/outrunners/licenses/SDL2.txt
@@ -107,3 +129,109 @@ jobs:
           path: |
             dist/outrunners-${{ matrix.name }}.*
             dist/outrunners-${{ matrix.name }}-all.tar.gz
+
+  # The Nintendo Switch: the .nsp's pieces (main, main.npdm, control.nacp, icon.jpg), with devkitPro's
+  # toolchain in its own image (no .nro: that one carries a player's assets)
+  switch:
+    name: switch
+    runs-on: ubuntu-24.04
+    container: devkitpro/devkita64:latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Configure
+        run: /opt/devkitpro/portlibs/switch/bin/aarch64-none-elf-cmake -S . -B build/switch -DCMAKE_BUILD_TYPE=Release -DORUNNERS_REFERENCE_TOOLS=OFF
+
+      - name: Build
+        run: cmake --build build/switch --target OutRunners_switch --parallel
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: outrunners-switch
+          path: build/bin/switch/
+
+  # Android: the game without an assets pack or a signature (build/bin/android/outrunners-base.apk), with
+  # the NDK and the SDK's tools of the runner's Android SDK and its Java 17 (ports/android/android.cmake)
+  android:
+    name: android
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "platforms;android-35" "build-tools;35.0.1" > /dev/null
+
+      - name: Configure
+        run: |
+          export JAVA_HOME="$JAVA_HOME_17_X64"
+          cmake -S . -B build/android -G Ninja -DCMAKE_BUILD_TYPE=Release -DORUNNERS_REFERENCE_TOOLS=OFF \
+            -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_LATEST_HOME/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-24
+
+      - name: Build
+        run: |
+          export JAVA_HOME="$JAVA_HOME_17_X64"
+          cmake --build build/android --target orunners_apk --parallel
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: outrunners-android
+          path: build/bin/android/outrunners-base.apk    # (the game alone: not the runner's own APK beside it)
+
+  # Anbernic's H700 handhelds: PORTS's files without the assets (build/bin/anbernic), built with Zig for the
+  # stock firmware's glibc and against its SDL2 (SDL's headers from its source; ports/anbernic/anbernic.cmake)
+  anbernic:
+    name: anbernic
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build
+          mkdir -p build/downloads/zig build/downloads/sdl2-source
+          curl -fsSL https://ziglang.org/download/0.17.0/zig-x86_64-linux-0.17.0.tar.xz | tar xJ -C build/downloads/zig
+          curl -fsSL https://github.com/libsdl-org/SDL/releases/download/release-2.32.10/SDL2-2.32.10.tar.gz \
+            | tar xz -C build/downloads/sdl2-source
+
+      - name: Configure
+        run: |
+          cmake -S . -B build/anbernic -G Ninja -DCMAKE_BUILD_TYPE=Release -DORUNNERS_REFERENCE_TOOLS=OFF \
+            -DCMAKE_TOOLCHAIN_FILE=ports/anbernic/zig_aarch64.cmake -DORUNNERS_ANBERNIC=ON \
+            -DORUNNERS_SDL2_INCLUDE="$PWD/build/downloads/sdl2-source/SDL2-2.32.10/include"
+
+      - name: Build
+        run: cmake --build build/anbernic --target OutRunners --parallel
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: outrunners-anbernic
+          path: build/bin/anbernic/
+
+  # A tag v*: the packages as a GitHub release, its notes from docs/releases/TAG.md
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: outrunners-*
+          path: dist
+          merge-multiple: true
+
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag \
+            --title "OutRunners $GITHUB_REF_NAME" --notes-file "docs/releases/$GITHUB_REF_NAME.md" \
+            dist/outrunners-windows-x64.zip dist/outrunners-linux-x64.tar.gz dist/outrunners-macos-universal.zip

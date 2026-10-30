@@ -8,6 +8,8 @@ Modified:    30-10-2026
 Author:      Sebastian Toyos
 
 Usage: python tools/make_icon.py
+       python tools/make_icon.py --ico PICTURE ICO
+
 
 As SegaSonic's (its trackball, here the wheel): the icon of the Switch's build (ports/switch/icon.jpg,
 256 x 256: the plate to the edges, which the HOME menu rounds itself), of the Android app
@@ -16,7 +18,11 @@ middle 66 of its 108, which the launcher shapes and moves itself; the icon whole
 Android 8; and the picture the APK shows in a player's own picture's place until one is put there,
 ic_launcher_art.png) and of the computers' executables (ports/sdl2/icon: outrunners.png, 1024 x 1024,
 outrunners.ico and outrunners.icns). Drawn at twice the size and scaled down, so its edges are smooth.
+
+--ico makes the Windows executables' icon of a picture of the player's own instead (CMakeLists.txt, with
+local/icon_pc.png or ORUNNERS_PC_ICON): square, the picture whole in the middle of it, see-through around.
 """
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -154,5 +160,20 @@ def main():
           f"in {ANDROID.relative_to(ROOT)}")
 
 
+def picture_ico(picture, ico):
+    """An .ico of a picture of the player's own, its sizes the project's icon's."""
+    image = Image.open(picture).convert("RGBA")
+    side = max(image.size)
+    square = Image.new("RGBA", (side, side), (0, 0, 0, 0))
+    square.paste(image, ((side - image.width) // 2, (side - image.height) // 2))
+    Path(ico).parent.mkdir(parents=True, exist_ok=True)
+    square.resize((256, 256), Image.LANCZOS).save(ico, sizes=[(size, size) for size in ICO_SIZES])
+
+
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) == 4 and sys.argv[1] == "--ico":
+        picture_ico(sys.argv[2], sys.argv[3])
+    elif len(sys.argv) == 1:
+        main()
+    else:
+        sys.exit("Usage: python tools/make_icon.py [--ico PICTURE ICO]")
