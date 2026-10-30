@@ -41,9 +41,12 @@ find_program(ORUNNERS_ELF2NRO elf2nro HINTS ${ORUNNERS_SWITCH_TOOLS} REQUIRED)
 set(ORUNNERS_SWITCH_TITLE_ID 05005e6a4f520000)    # (homebrew's range; the .nsp's title; nacptool takes it with no 0x)
 set(ORUNNERS_SWITCH_VERSION 0.1.0)
 set(ORUNNERS_SWITCH_OUT ${ORUNNERS_BIN_DIR}/switch)
-# the HOME menu's icon, 256 x 256: the project's own where it has one (ports/switch/icon.jpg), else libnx's;
-# the .nsp's maker takes the player's own instead
-if(EXISTS ${CMAKE_SOURCE_DIR}/ports/switch/icon.jpg)
+# the HOME menu's icon, 256 x 256: the player's own where this computer has one (local/icon.jpg: local/ holds
+# the player's own pictures, never in the repository), else the project's (ports/switch/icon.jpg,
+# tools/make_icon.py), else libnx's; the .nsp's maker takes the player's own instead
+if(EXISTS ${CMAKE_SOURCE_DIR}/local/icon.jpg)
+	set(ORUNNERS_SWITCH_ICON ${CMAKE_SOURCE_DIR}/local/icon.jpg)
+elseif(EXISTS ${CMAKE_SOURCE_DIR}/ports/switch/icon.jpg)
 	set(ORUNNERS_SWITCH_ICON ${CMAKE_SOURCE_DIR}/ports/switch/icon.jpg)
 else()
 	set(ORUNNERS_SWITCH_ICON ${NX_DEFAULT_ICON})
