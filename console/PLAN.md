@@ -153,6 +153,9 @@ merged here; this repository adds console/, the ports and their documents.
   (ports/switch/nsp/rom_pack.c); tools/check_nsp.py. Runs on Eden (an emulator), the .nro and the .nsp.
 - The video draws the screens the window shows alone (s32_video_show_screens): the left one in a one player
   game, its layers, sprites and mixing; the headless runs draw both.
+- OutRunners Anbernic (ports/anbernic/maker), as OutRunners NSP (Sebas): PORTS for the handheld's card from
+  the game's Anbernic build (build/bin/anbernic, no assets in it) and the player's ROM set, written beside
+  the tool or straight into the card's Roms.
 
 ## Order
 

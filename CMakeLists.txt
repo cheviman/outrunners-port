@@ -189,6 +189,15 @@ if(ORUNNERS_DECOMPILED AND ORUNNERS_SOUND_DECOMPILED)
 			ports/switch/nsp/crypto.c ports/switch/nsp/rom_pack.c)
 		target_link_libraries(orunners_nsp PRIVATE orunners_game_console orunners_sound orunners_extract)
 		set_target_properties(orunners_nsp PROPERTIES OUTPUT_NAME "OutRunners NSP")
+
+		# Anbernic's PORTS, made on the player's computer (ports/anbernic/maker): the game's Anbernic build
+		# (build/bin/anbernic) and the assets pack of the player's ROM set, as OutRunners NSP makes it
+		# (rom_pack.c). A command line; with SDL2 also a window (below)
+		add_executable(orunners_anbernic_maker ports/anbernic/maker/main.c ports/anbernic/maker/make_ports.c
+			ports/switch/nsp/rom_pack.c)
+		target_include_directories(orunners_anbernic_maker PRIVATE ports/switch/nsp)
+		target_link_libraries(orunners_anbernic_maker PRIVATE orunners_game_console orunners_sound orunners_extract)
+		set_target_properties(orunners_anbernic_maker PROPERTIES OUTPUT_NAME "OutRunners Anbernic")
 	endif()
 
 	# The devices' builds, each with its toolchain: the Nintendo Switch (devkitPro's: its .nro and its .nsp's
@@ -277,6 +286,18 @@ if(ORUNNERS_DECOMPILED AND ORUNNERS_SOUND_DECOMPILED)
 			add_custom_command(TARGET orunners_nsp POST_BUILD
 				COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_SOURCE_DIR}/ports/sdl2/font/font.bmp
 					$<TARGET_FILE_DIR:orunners_nsp>)
+		endif()
+
+		# OutRunners Anbernic's window (ports/anbernic/maker/window.c), as OutRunners NSP's: its folder dialog
+		# (with a title of its own) and its letters, font.bmp beside it
+		target_sources(orunners_anbernic_maker PRIVATE ports/anbernic/maker/window.c ports/switch/nsp/folder_dialog.c
+			ports/sdl2/letters.c)
+		target_include_directories(orunners_anbernic_maker PRIVATE ports/sdl2)
+		target_compile_definitions(orunners_anbernic_maker PRIVATE ORUNNERS_ANBERNIC_WINDOW
+			[[FOLDER_TITLE="The folder for PORTS (the Roms of your card, or any)"]])
+		target_link_libraries(orunners_anbernic_maker PRIVATE ${ORUNNERS_SDL2_LIBRARY})
+		if(WIN32)
+			target_link_libraries(orunners_anbernic_maker PRIVATE ole32 shell32 uuid)
 		endif()
 	else()
 		message(STATUS "No SDL2: the window ports (OutRunners, OutRunners Arcade) are not built")
