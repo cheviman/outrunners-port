@@ -57,12 +57,17 @@ add_library(s32runtime STATIC
 	runtime/src/memory_census.c
 	runtime/src/tasks.c
 	runtime/src/video.c
+	runtime/src/workers.c
 	runtime/src/multipcm.c
 	runtime/src/sound_chips.c
 )
 target_include_directories(s32runtime PUBLIC runtime/include)
 if(UNIX AND NOT APPLE)
 	target_link_libraries(s32runtime PUBLIC m)    # (the C library's maths are apart there)
+endif()
+if(UNIX)
+	find_package(Threads REQUIRED)
+	target_link_libraries(s32runtime PUBLIC Threads::Threads)    # (the video's workers, runtime/src/workers.c)
 endif()
 
 # The game's data: no executable carries the ROM or anything from it. The game loads its assets when it

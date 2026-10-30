@@ -109,6 +109,9 @@ merged here; this repository adds console/, the ports and their documents.
    Nintendo Switch (an .nsp made on the player's computer by OutRunners NSP), Android (an APK made by
    OutRunners APK, touch controls) and Anbernic's H700 handhelds. Of the devices, only the Switch has
    2 PLAYERS, side by side only; WIDE on the Switch and Android, not on Anbernic's handhelds (4:3).
+   Android's touch controls, as few as the race needs (Sebas): the wheel, gas and brake; the gear
+   buttons only with the manual transmission chosen in the car select (none with the automatic); the
+   music (the radio) a small oval button at the bottom.
 10. **Network**: up to 8 players, each on a device of their own: the game's own link of four cabinets.
 
 ## Done (29-10-2026)

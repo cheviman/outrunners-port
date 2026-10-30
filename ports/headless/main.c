@@ -31,6 +31,7 @@
 #include "s32/machine.h"
 #include "s32/program.h"
 #include "s32/script.h"
+#include "s32/workers.h"
 #include "s32/video.h"
 #include "sound/chips.h"
 #ifdef ORUNNERS_CONSOLE
@@ -51,7 +52,7 @@
 #define USAGE "Usage: orunners_headless [--frames N] [--hashes FILE] [--script FILE] [--dump-frame N --dump-dir DIR]" \
 	" [--video-hashes FILE] [--video-dump N ... --video-dir DIR] [--sound-hashes FILE]" \
 	" [--sprite-census FILE] [--tile-census FILE] [--memory-census FILE] [--assets FOLDER|PACK.assets]" \
-	" [--write-pack PACK.assets] [--sound-wav FILE]" \
+	" [--write-pack PACK.assets] [--workers N] [--sound-wav FILE]" \
 	" (orunners_console_headless: [--actions FILE] [--wide] [--autopilot] [--ghost-folder DIR]" \
 	" [--pause-dump N])\n"
 #define MAX_VIDEO_DUMPS 64
@@ -431,6 +432,8 @@ int main(int argc, char **argv)
 			assets_path = argv[++index];
 		else if (strcmp(argv[index], "--write-pack") == 0 && index + 1 < argc)
 			pack_path = argv[++index];
+		else if (strcmp(argv[index], "--workers") == 0 && index + 1 < argc)
+			s32_workers_start(atoi(argv[++index]));    /* (the video's rows on that many more threads) */
 #ifdef ORUNNERS_CONSOLE
 		else if (strcmp(argv[index], "--wide") == 0)
 			console_window_settings.wide = true;    /* (OPTIONS > VIDEO > WIDE) */
