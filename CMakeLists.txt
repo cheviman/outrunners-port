@@ -167,10 +167,18 @@ if(ORUNNERS_DECOMPILED AND ORUNNERS_SOUND_DECOMPILED)
 	add_executable(orunners_console_headless ports/headless/main.c)
 	target_link_libraries(orunners_console_headless PRIVATE orunners_game_console orunners_sound)
 
+	# The devices' builds, each with its toolchain: Anbernic's H700 handhelds (ports/anbernic)
+	option(ORUNNERS_ANBERNIC "Build the game for Anbernic's H700 handhelds" OFF)
+	if(ORUNNERS_ANBERNIC)
+		include(${CMAKE_SOURCE_DIR}/ports/anbernic/anbernic.cmake)
+	endif()
+
 	# The game in a window (ports/sdl2): SDL2 from the system, or on Windows the development package
 	# unpacked in build/downloads/sdl2 (SDL2_DIR picks another), a library beside the executable; or, with
 	# ORUNNERS_STATIC_SDL2, SDL2 built from its own source into the executable
-	if(ORUNNERS_STATIC_SDL2)
+	if(ORUNNERS_ANBERNIC)
+		set(SDL2_FOUND FALSE)    # (the device's own build above: no computer's window ports)
+	elseif(ORUNNERS_STATIC_SDL2)
 		include(FetchContent)
 		FetchContent_Declare(SDL2 GIT_REPOSITORY https://github.com/libsdl-org/SDL.git GIT_TAG release-2.32.10
 			GIT_SHALLOW TRUE)

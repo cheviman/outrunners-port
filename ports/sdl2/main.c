@@ -55,14 +55,21 @@
 #include "s32/video.h"
 #include "sound/chips.h"
 #include "game/assets.h"
+#ifndef ORUNNERS_HANDHELD    /* (a device makes nothing from the ROM set: its pack comes with the game) */
 #include "first_run.h"
 #include "game/extract.h"
+#endif
+#include "s32/workers.h"
 #ifdef ORUNNERS_CONSOLE
 #include "console.h"
 #include "controls.h"
 #endif
 
 #include <SDL.h>
+
+#if defined(ORUNNERS_HANDHELD) && !defined(_WIN32)
+#include <unistd.h>        /* fsync: the log on the card as it is written */
+#endif
 
 #include <inttypes.h>
 #include <math.h>
@@ -92,6 +99,11 @@
 #define PEDAL_LIFT          0x30
 #define STICK_DEAD_ZONE     4000
 #define BACKUP_RAM_START    0x1f00     /* what the game keeps of the sound board's RAM: 701F00-701FF9 */
+#define ASSETS_PACK         "outrunners.assets"    /* the assets in one file (game/assets.h), the devices' */
+#ifdef ORUNNERS_HANDHELD
+#define DEVICE_WORKERS      3          /* the video's rows on that many more cores (a handheld's four) */
+#define HANDHELD_MENU_BUTTON 8         /* the joystick button that leaves the game: the RG40XX H's MENU */
+#endif
 #define BACKUP_RAM_SIZE     0xfa
 
 #define USAGE "Usage: orunners [--script FILE [--fast]] [--hashes FILE] [--video-hashes FILE] [--sound-hashes FILE]" \
@@ -703,6 +715,15 @@ static void read_events(void)
 				program_stop();    /* (back to main, which saves: the game runs on a task's stack, which a
 				                      longjmp to main's does not leave on Windows) */
 				return;
+#ifdef ORUNNERS_HANDHELD_KEYS
+			case SDL_JOYBUTTONDOWN:
+				if (event.jbutton.button == HANDHELD_MENU_BUTTON)
+				{
+					program_stop();    /* (MENU leaves the game, as the firmware's other games) */
+					return;
+				}
+				break;
+#endif
 			case SDL_KEYDOWN:
 				if (event.key.repeat)
 					break;
@@ -723,6 +744,16 @@ static void read_events(void)
 				{
 					program_stop();
 					return;
+				}
+#endif
+#ifdef ORUNNERS_HANDHELD_KEYS
+				if (event.key.keysym.sym == SDLK_VOLUMEUP || event.key.keysym.sym == SDLK_VOLUMEDOWN)
+				{
+					/* the volume keys turn OPTIONS' VOLUME, a step a press, kept when the game ends */
+					const int volume = console_window_settings.volume + (event.key.keysym.sym == SDLK_VOLUMEUP ? 1 : -1);
+
+					console_window_settings.volume = volume < 0 ? 0 : (volume > 10 ? 10 : volume);
+					console_window_settings.changed = true;    /* (kept) */
 				}
 #endif
 				if (event.key.keysym.sym == SDLK_F11
@@ -1052,8 +1083,96 @@ static void wait_for_frame(void)
 	}
 }
 
+#ifdef ORUNNERS_HANDHELD
+/* ---- a handheld's log (stderr: the launcher's outrunners.log): what SDL found, the frames' pace ---- */
+
+/* Handhelds' own buttons as SDL's game controller has them, where SDL does not know them: Anbernic's H700
+   consoles show theirs as a joystick, "ANBERNIC-keys", numbered as Anbernic's SDL 2.0.12 numbers them (as
+   SegaSonic's port found them on the RG40XX H: the d-pad a hat, the sticks four axes, MENU button 8) */
+static const char *const device_mappings[] = {
+	"19000000010000000100000000010000,ANBERNIC-keys,a:b0,b:b1,x:b3,y:b2,leftshoulder:b4,rightshoulder:b10,"
+	"lefttrigger:b5,righttrigger:b11,back:b6,start:b7,guide:b8,dpup:h0.1,dpdown:h0.4,dpleft:h0.8,dpright:h0.2,"
+	"leftx:a0,lefty:a1,rightx:a2,righty:a3,leftstick:b9,rightstick:b12,platform:Linux,",
+};
+
+/* The mappings as a hint before SDL starts: the game controllers it finds then are opened as such */
+static void add_device_mappings(void)
+{
+	static char mappings[2048];
+
+	mappings[0] = '\0';
+	for (size_t mapping = 0; mapping < SDL_arraysize(device_mappings); mapping++)
+	{
+		SDL_strlcat(mappings, device_mappings[mapping], sizeof(mappings));
+		SDL_strlcat(mappings, "\n", sizeof(mappings));
+	}
+	SDL_SetHint(SDL_HINT_GAMECONTROLLERCONFIG, mappings);
+}
+
+/* The log on the card as it is written: a handheld is often left with its reset button */
+static void log_written(void)
+{
+	fflush(stderr);
+#ifndef _WIN32
+	fsync(fileno(stderr));
+#endif
+}
+
+static void log_device(void)
+{
+	SDL_version linked;
+	SDL_DisplayMode mode;
+
+	SDL_GetVersion(&linked);
+	fprintf(stderr, "SDL %d.%d.%d, video %s, audio %s\n", linked.major, linked.minor, linked.patch,
+		SDL_GetCurrentVideoDriver() ? SDL_GetCurrentVideoDriver() : "none",
+		SDL_GetCurrentAudioDriver() ? SDL_GetCurrentAudioDriver() : "none");
+	if (SDL_GetCurrentDisplayMode(0, &mode) == 0)
+		fprintf(stderr, "screen %dx%d at %d Hz\n", mode.w, mode.h, mode.refresh_rate);
+	for (int joystick = 0; joystick < SDL_NumJoysticks(); joystick++)
+		fprintf(stderr, "controller %d: %s%s\n", joystick, SDL_JoystickNameForIndex(joystick),
+			SDL_IsGameController(joystick) ? "" : " (a joystick: no mapping)");
+	log_written();
+}
+
+/* Every 300 frames, the frames a second and the time a frame's work takes */
+static void log_pace(bool work_done)
+{
+	static uint64_t pace_start, pace_work, pace_most, frame_start;
+	static int pace_frames;
+	const uint64_t now = SDL_GetPerformanceCounter(), frequency = SDL_GetPerformanceFrequency();
+
+	if (!work_done)
+	{
+		frame_start = now;
+		return;
+	}
+	if (!pace_start)
+		pace_start = now;
+	if (frame_start)
+	{
+		pace_work += now - frame_start;
+		if (now - frame_start > pace_most)
+			pace_most = now - frame_start;
+	}
+	if (++pace_frames == 300)
+	{
+		fprintf(stderr, "%.1f frames a second; a frame takes %.1f ms, at most %.1f\n",
+			pace_frames * (double)frequency / (double)(now - pace_start),
+			1000.0 * (double)pace_work / (double)frequency / pace_frames, 1000.0 * (double)pace_most / (double)frequency);
+		fflush(stderr);    /* (not to the card at once: a write to it would hold a frame) */
+		pace_start = now;
+		pace_frames = 0;
+		pace_work = pace_most = 0;
+	}
+}
+#endif
+
 static void on_frame_done(void)
 {
+#ifdef ORUNNERS_HANDHELD
+	log_pace(true);
+#endif
 	const uint64_t frame = program_frames() - 1;
 	size_t count;
 	const int16_t *mix;
@@ -1105,6 +1224,9 @@ static void on_frame_done(void)
 #endif
 	if (!fast)
 		wait_for_frame();
+#ifdef ORUNNERS_HANDHELD
+	log_pace(false);
+#endif
 }
 
 static void on_irq_changed(bool asserted)
@@ -1139,8 +1261,8 @@ static FILE *open_hashes(const char *path)
    The caller frees it (SDL_free) */
 static char *saves_folder(void)
 {
-#ifdef _WIN32
-	return SDL_GetBasePath();
+#if defined(_WIN32) || defined(ORUNNERS_HANDHELD)
+	return SDL_GetBasePath();    /* (a handheld's: the game's folder on its card) */
 #else
 	return SDL_GetPrefPath("", "OutRunners");
 #endif
@@ -1148,6 +1270,7 @@ static char *saves_folder(void)
 
 /* On macOS, the folder the .app is in (the game's base is the .app's Resources folder: where the player sees
    the game is beside the .app); 0 elsewhere */
+#ifndef ORUNNERS_HANDHELD
 /* A folder of assets the first run made for another build of the game (its version.txt; extract_assets.py's
    have none) */
 static bool assets_of_another_version(const char *folder)
@@ -1164,6 +1287,7 @@ static bool assets_of_another_version(const char *folder)
 	fclose(file);
 	return other;
 }
+#endif
 
 static int app_folder(const char *base, char *folder, size_t size)
 {
@@ -1195,8 +1319,15 @@ int main(int argc, char **argv)
 	const char *assets_path = NULL;
 	char *base, *saves;
 
+#ifdef ORUNNERS_HANDHELD
+	add_device_mappings();
+#endif
 	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER) != 0)
 		return fail("SDL could not start.", SDL_GetError());
+#ifdef ORUNNERS_HANDHELD
+	log_device();
+	s32_workers_start(DEVICE_WORKERS);
+#endif
 	for (int index = 1; index < argc; index++)
 	{
 		if (strcmp(argv[index], "--script") == 0 && index + 1 < argc)
@@ -1237,6 +1368,11 @@ int main(int argc, char **argv)
 #ifdef ORUNNERS_CONSOLE
 	snprintf(settings_path, sizeof(settings_path), "%s" FILE_NAME ".ini", saves ? saves : "");
 	load_window_settings();
+#ifdef ORUNNERS_HANDHELD
+	/* (the device's screen: the whole of it, the game's 4:3 picture as large as it fits) */
+	console_window_settings.full_screen = true;
+	console_window_settings.wide = false;
+#endif
 	{
 		char controls_path[1024];
 
@@ -1256,6 +1392,7 @@ int main(int argc, char **argv)
 		const char *problem;
 		size_t count = 0;
 		bool stale = false;
+		bool pack = false;
 
 		places[count++] = base ? base : "";
 		if (app_folder(base, beside_app, sizeof(beside_app)))
@@ -1267,6 +1404,16 @@ int main(int argc, char **argv)
 		{
 			FILE *probe;
 
+			/* (the pack the devices take, where a player put one) */
+			snprintf(folder, sizeof(folder), "%s" ASSETS_PACK, places[place]);
+			if ((probe = fopen(folder, "rb")) != NULL)
+			{
+				fclose(probe);
+				found = folder;
+				pack = true;
+				break;
+			}
+#ifndef ORUNNERS_HANDHELD
 			snprintf(folder, sizeof(folder), "%sassets", places[place]);
 			snprintf(layout, sizeof(layout), "%s/data/layout.json", folder);
 			if ((probe = fopen(layout, "rb")) != NULL)
@@ -1279,7 +1426,15 @@ int main(int argc, char **argv)
 					break;
 				}
 			}
+#endif
 		}
+#ifdef ORUNNERS_HANDHELD
+		(void)layout;
+		(void)stale;
+		if (!found)
+			return fail("The game's assets are missing.", "Put the " ASSETS_PACK " your computer's OutRunners writes in the "
+				"game's folder.");
+#else
 		if (!found || stale)
 		{
 			if (!stale)
@@ -1294,14 +1449,33 @@ int main(int argc, char **argv)
 			}
 			found = folder;
 		}
-		if ((problem = assets_load(found)) != NULL)
+#endif
+		if ((problem = pack || (assets_path && strstr(assets_path, ".assets")) ? assets_load_pack(found) : assets_load(found)) != NULL)
 			return fail("The game's assets cannot be read.", problem);
+#if defined(ORUNNERS_CONSOLE) && !defined(ORUNNERS_HANDHELD)
+		if (!pack)
+		{
+			/* the pack the devices take (Anbernic's handhelds: beside their game), beside the folder, once */
+			char pack_path[1100];
+			FILE *probe;
+
+			snprintf(pack_path, sizeof(pack_path), "%s" ASSETS_PACK, saves ? saves : (base ? base : ""));
+			if ((probe = fopen(pack_path, "rb")) != NULL)
+				fclose(probe);
+			else if ((problem = assets_pack_write(pack_path)) != NULL)
+				fprintf(stderr, "%s: %s\n", pack_path, problem);
+		}
+#endif
 	}
 	SDL_free(base);
 	SDL_free(saves);
 
+#ifdef ORUNNERS_HANDHELD
+	window = SDL_CreateWindow(TITLE, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 640, 480, SDL_WINDOW_FULLSCREEN_DESKTOP);
+#else
 	window = SDL_CreateWindow(TITLE, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
 		screens_shown() * 320 * WINDOW_SCALE, S32_VIDEO_HEIGHT * WINDOW_SCALE, SDL_WINDOW_RESIZABLE);
+#endif
 #ifdef ORUNNERS_CONSOLE
 	if (window)
 		apply_window_settings();
