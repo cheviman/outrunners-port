@@ -1,0 +1,19 @@
+# The network's race (with network_host.txt or network_join.txt): through car select (START every 60 frames), then the gas down
+1400 press start1
+1460 press start1
+1520 press start1
+1580 press start1
+1640 press start1
+1700 press start1
+1760 press start1
+1820 press start1
+1880 press start1
+1940 press start1
+2000 press start1
+2060 press start1
+2120 press start1
+2180 press start1
+2240 press start1
+2300 press start1
+2300 gas 1 255
+9000 end

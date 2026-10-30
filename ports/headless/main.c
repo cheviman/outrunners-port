@@ -50,13 +50,22 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
+#ifdef ORUNNERS_CONSOLE
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>    /* Sleep: --real-time */
+#else
+#include <unistd.h>     /* usleep */
+#endif
+#endif
 
 #define USAGE "Usage: orunners_headless [--frames N] [--hashes FILE] [--script FILE] [--dump-frame N --dump-dir DIR]" \
 	" [--video-hashes FILE] [--video-dump N ... --video-dir DIR] [--sound-hashes FILE]" \
 	" [--sprite-census FILE] [--tile-census FILE] [--memory-census FILE] [--assets FOLDER|PACK.assets]" \
 	" [--write-pack PACK.assets] [--workers N] [--screens 1|2] [--sound-wav FILE]" \
 	" (orunners_console_headless: [--actions FILE] [--wide | --wide-20-9] [--autopilot] [--ghost-folder DIR]" \
-	" [--pause-dump N] [--side-map])\n"
+	" [--pause-dump N] [--side-map] [--real-time] [--name NAME] [--network-log FRAMES])\n"
 #define MAX_VIDEO_DUMPS 64
 #define CENSUS_SLOTS (1u << 22)     /* open addressing for the censuses' hashes */
 #define TILE_CENSUS_EVERY 30        /* the tilemaps are looked at every this many frames */
@@ -73,6 +82,8 @@ static int video_dump_count;
 static const char *video_dir;
 #ifdef ORUNNERS_CONSOLE
 static uint64_t pause_dump_frame;    /* --pause-dump: the frame drawn with the pause's words over it */
+static bool real_time;               /* --real-time: 60 frames a second, as a window's (two games on the network) */
+static uint64_t network_log_every;   /* --network-log: the network's state every that many frames */
 #endif
 static FILE *sound_hashes;
 static FILE *sound_wav;            /* --sound-wav: the mix the window plays, 16-bit stereo */
@@ -239,6 +250,69 @@ static void on_log(const char *message)
 	fprintf(stderr, "[s32] %s\n", message);
 }
 
+#ifdef ORUNNERS_CONSOLE
+/* ---- the network, for two games on one computer ---- */
+
+static uint64_t milliseconds(void)
+{
+	struct timespec now;
+
+	timespec_get(&now, TIME_UTC);
+	return (uint64_t)now.tv_sec * 1000u + (uint64_t)now.tv_nsec / 1000000u;
+}
+
+static void sleep_for(uint64_t ms)
+{
+#ifdef _WIN32
+	Sleep((DWORD)ms);
+#else
+	usleep((useconds_t)(ms * 1000u));
+#endif
+}
+
+/* --real-time: each frame waits for its sixtieth of a second */
+static void keep_pace(void)
+{
+	static uint64_t next_frame;    /* (in 60ths of a millisecond, the frames' own) */
+	const uint64_t now = milliseconds() * 60u;
+
+	next_frame += 1000u;
+	if (now > next_frame + 15000u)
+		next_frame = now;    /* (far behind: start over) */
+	if (next_frame > now)
+		sleep_for((next_frame - now) / 60u);
+}
+
+/* The network's frame, after the game's; while a race waits for a device unheard, its frames alone */
+static void network_frame(void)
+{
+	console_network_frame();
+	if (network_log_every && (program_frames() - 1) % network_log_every == 0)
+	{
+		char text[256];
+
+		console_network_describe(text, sizeof(text));
+		printf("%" PRIu64 " %s\n", program_frames() - 1, text);
+		fflush(stdout);
+	}
+	if (real_time)
+		keep_pace();
+	if (console_network_waiting())
+	{
+		uint64_t waited = 0;
+
+		while (console_network_waiting())
+		{
+			sleep_for(16);
+			console_network_frame();
+			waited++;
+		}
+		printf("%" PRIu64 " waited %" PRIu64 " frames for a device\n", program_frames() - 1, waited);
+		fflush(stdout);
+	}
+}
+#endif
+
 static void on_frame_done(void)
 {
 	if (hashes)
@@ -286,6 +360,7 @@ static void on_frame_done(void)
 		write_bmp(path);
 		s32_video_overlay_end();
 	}
+	network_frame();
 #endif
 	if (program_frames() >= frames_wanted)
 		program_stop();
@@ -452,6 +527,12 @@ int main(int argc, char **argv)
 			pause_dump_frame = strtoull(argv[++index], NULL, 10);
 		else if (strcmp(argv[index], "--ghost-folder") == 0 && index + 1 < argc)
 			console_ghost_folder(argv[++index]);    /* (TIME ATTACK's ghosts: the current folder else) */
+		else if (strcmp(argv[index], "--real-time") == 0)
+			real_time = true;
+		else if (strcmp(argv[index], "--name") == 0 && index + 1 < argc)
+			snprintf(console_window_settings.name, sizeof(console_window_settings.name), "%s", argv[++index]);
+		else if (strcmp(argv[index], "--network-log") == 0 && index + 1 < argc)
+			network_log_every = strtoull(argv[++index], NULL, 10);
 		else if (strcmp(argv[index], "--actions") == 0 && index + 1 < argc)
 		{
 			const char *problem = load_actions(argv[++index]);

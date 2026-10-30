@@ -4,8 +4,9 @@ The console version of the game (`OutRunners`) built for Android phones and tabl
 APK, as SegaSonic's port is. It is the same game as on a computer, with what a phone asks for:
 
 - **The picture is WIDE, fixed**: a phone's screen is 16:9 or wider, and the game's wide picture fills its
-  height: 20:9 (496 pixels) where the screen is twice as wide as high or more, else 16:9 (416, 398 shown).
-  OPTIONS has no VIDEO page, and the title's menu no 2 PLAYERS.
+  height: 20:9 (496 pixels) where the screen is twice as wide as high or more, else 16:9 (416, 398 shown),
+  chosen again when the screen changes its shape mid-game (a Fold opened or closed), as the touch controls'
+  places are. OPTIONS has no VIDEO page, and the title's menu no 2 PLAYERS.
 - **Touch controls**, as few as the race needs, drawn over the picture (`ports/sdl2/touch.c`): the wheel where
   your left thumb lands on the screen's left half (it turns as far as your thumb goes across, and moves the
   menus' cursor), **GAS** (the menus' accept) and **BRAKE** on the right, **START** at the top right (start,

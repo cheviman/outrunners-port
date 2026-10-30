@@ -3,6 +3,7 @@
 660 down
 680 down
 700 down
+710 down
 720 accept
 900 down
 920 right

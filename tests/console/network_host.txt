@@ -1,0 +1,8 @@
+# NETWORK > HOST (with network_join.txt in a second game on the same computer, both --real-time, and
+# network_controls.txt): the room waits for the other device, then START races both
+600 start
+660 down
+680 down
+700 accept
+900 accept
+1300 accept

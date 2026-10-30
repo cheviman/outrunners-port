@@ -282,6 +282,35 @@ static void picture_size(int *width, int *height)
 	*height = (screens_stacked() ? 2 : 1) * S32_VIDEO_HEIGHT;
 }
 
+#if defined(ORUNNERS_CONSOLE) && ((defined(ORUNNERS_SCREEN_WIDE) && defined(__ANDROID__)) || defined(ORUNNERS_TOUCH_TEST))
+/* WIDE as the screen's shape asks, the window the whole screen: Android's (OPTIONS has no VIDEO there), and the
+   touch controls' check on a computer, whose window is the phone's screen. The screen can change its shape
+   mid-game, a Fold opened or closed (Sebas): WIDE is chosen again then, the picture's new width from the next
+   frame (on_controls_update sees it) */
+#define WIDE_BY_SCREEN
+
+static int shape_width, shape_height;    /* the screen WIDE was last chosen for */
+
+/* WIDE for a screen of 'width' x 'height': 20:9 where it is twice as wide as high or more, else 16:9 (either
+   way up: its long side across) */
+static int wide_for_screen(int width, int height)
+{
+	return SDL_max(width, height) >= 2 * SDL_min(width, height) ? WIDE_20_9 : WIDE_16_9;
+}
+
+/* The screen's size at a frame, as the renderer has it: WIDE chosen again where it changed (the log says so) */
+static void follow_screen(int width, int height)
+{
+	if (width <= 0 || height <= 0 || (width == shape_width && height == shape_height))
+		return;
+	shape_width = width;
+	shape_height = height;
+	console_window_settings.wide = wide_for_screen(width, height);
+	fprintf(stderr, "screen %dx%d: WIDE %s\n", width, height,
+		console_window_settings.wide == WIDE_20_9 ? "20:9" : "16:9");
+}
+#endif
+
 /* ---- the pixels: sharp, smooth ("sharp bilinear": a whole number of times with sharp pixels into 'scaled',
    then that softened the rest of the way, so only the pixels' edges blend), plain bilinear, or CRT (a
    multiplying overlay on smooth pixels, the size the picture is shown at), as SegaSonic's ---- */
@@ -403,6 +432,9 @@ static void present(SDL_Rect source)
 #endif
 
 	SDL_GetRendererOutputSize(renderer, &out_width, &out_height);
+#ifdef WIDE_BY_SCREEN
+	follow_screen(out_width, out_height);    /* (a Fold opened or closed: its WIDE, from the next frame) */
+#endif
 	scale = SDL_min((double)out_width / source.w, (double)out_height / source.h);
 	shown[0].w = (int)(source.w * scale);
 	shown[0].h = (int)(source.h * scale);
@@ -410,6 +442,7 @@ static void present(SDL_Rect source)
 	shown[0].y = (out_height - shown[0].h) / 2;
 	from[0] = source;
 #ifdef ORUNNERS_TOUCH
+	/* (each frame, the screen as it is: a Fold opened or closed mid-game changes them all at once) */
 	tablet = tablet_screen(out_width, out_height);
 	console_offer_two_players(tablet);
 	if (screens_facing())
@@ -742,9 +775,9 @@ static void save_window_settings(void)
 	output = fopen(settings_path, "w");
 	if (!output)
 		return;
-	fprintf(output, "window_scale=%d\nfull_screen=%d\npixels=%s\nwide=%d\ntwo_players=%s\nvolume=%d\n",
+	fprintf(output, "window_scale=%d\nfull_screen=%d\npixels=%s\nwide=%d\ntwo_players=%s\nvolume=%d\nname=%s\n",
 		settings->window_scale, settings->full_screen, pixel_names[settings->pixels], settings->wide,
-		settings->vertical ? "vertical" : "horizontal", settings->volume);
+		settings->vertical ? "vertical" : "horizontal", settings->volume, settings->name);
 	fclose(output);
 }
 
@@ -775,6 +808,13 @@ static void load_window_settings(void)
 		}
 		else if (sscanf(line, "two_players=%31s", text) == 1)
 			settings->vertical = strcmp(text, "vertical") == 0;
+		else if (strncmp(line, "name=", 5) == 0 && line[5] != '\n' && line[5] != '\r' && line[5] != '\0')
+		{
+			/* (NETWORK > NAME: the font's letters, as many as it takes) */
+			size_t length = strcspn(line + 5, "\r\n");
+
+			snprintf(settings->name, sizeof(settings->name), "%.*s", (int)length, line + 5);
+		}
 	}
 	fclose(input);
 }
@@ -782,19 +822,25 @@ static void load_window_settings(void)
 #ifdef ORUNNERS_HANDHELD
 /* A game device's picture, fixed whatever outrunners.ini says (OPTIONS has no VIDEO there, console/menu.c):
    the whole screen and smooth pixels; WIDE where the screen is wide (ORUNNERS_SCREEN_WIDE: the Switch's 16:9;
-   a phone's 20:9 where its screen is twice as wide as high or more, else 16:9), else the game's 4:3 picture
-   as large as it fits (a handheld's 640 x 480); 2 PLAYERS side by side */
+   a phone's by its screen's shape, wide_for_screen, as the screen is now: a Fold's opened or closed), else the
+   game's 4:3 picture as large as it fits (a handheld's 640 x 480); 2 PLAYERS side by side */
 static void fix_window_settings(void)
 {
 	console_window_settings.full_screen = true;
 #if defined(ORUNNERS_SCREEN_WIDE) && defined(__ANDROID__)
 	{
+		/* (the screen as the renderer has it, once there is one; before it, the display's mode) */
 		SDL_DisplayMode mode;
+		int width = 0, height = 0;
 
-		console_window_settings.wide = WIDE_16_9;
-		if (SDL_GetCurrentDisplayMode(0, &mode) == 0 && mode.h > 0 && mode.w > 0
-			&& SDL_max(mode.w, mode.h) >= 2 * SDL_min(mode.w, mode.h))
-			console_window_settings.wide = WIDE_20_9;    /* (either way up: its long side across) */
+		if (renderer)
+			SDL_GetRendererOutputSize(renderer, &width, &height);
+		else if (SDL_GetCurrentDisplayMode(0, &mode) == 0)
+		{
+			width = mode.w;
+			height = mode.h;
+		}
+		console_window_settings.wide = width > 0 && height > 0 ? wide_for_screen(width, height) : WIDE_16_9;
 	}
 #elif defined(ORUNNERS_SCREEN_WIDE)
 	console_window_settings.wide = WIDE_16_9;
@@ -822,6 +868,7 @@ static void apply_window_settings(void)
 	picture_size(&width, &height);
 	if (full != settings->full_screen)
 		SDL_SetWindowFullscreen(window, settings->full_screen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
+#ifndef ORUNNERS_TOUCH_TEST    /* (the touch controls' check: the window is a phone's screen, the shape it is given) */
 	if (!settings->full_screen && (width != window_width || height != window_height || settings->changed))
 	{
 		SDL_Rect usable;
@@ -834,6 +881,7 @@ static void apply_window_settings(void)
 		SDL_SetWindowSize(window, width * scale, height * scale);
 		SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
 	}
+#endif
 #endif
 	window_width = width;
 	window_height = height;
@@ -1221,14 +1269,14 @@ static void on_controls_update(void)
 /* ---- the frame ---- */
 
 #ifdef ORUNNERS_CONSOLE
-/* The pause's picture: the frame it stopped at in grey, PAUSE and its lines in colour over it in the game's
-   letters (console_pause_sprites). The frame is drawn again as the board stands, then with the words' sprites
-   over it (s32_video_overlay_sprites): the pixels that change are the words' */
-static void make_pause_picture(const uint32_t frozen[2][S32_VIDEO_MAX_WIDTH * S32_VIDEO_HEIGHT], int choice)
+/* The pause's picture: the frame it stopped at in grey, the words of the sprite list 'list' ('size' bytes:
+   PAUSE and its lines, or the network's WAIT) in colour over it in the game's letters. The frame is drawn
+   again as the board stands, then with the words' sprites over it (s32_video_overlay_sprites): the pixels that
+   change are the words' */
+static void make_words_picture(const uint32_t frozen[2][S32_VIDEO_MAX_WIDTH * S32_VIDEO_HEIGHT], const uint8_t *list,
+	size_t size)
 {
-	static uint8_t list[0x1000];
 	static uint32_t plain[2][S32_VIDEO_MAX_WIDTH * S32_VIDEO_HEIGHT];
-	const size_t size = console_pause_sprites(list, sizeof(list), choice);
 	int width;
 
 	s32_video_draw_frame();
@@ -1251,6 +1299,39 @@ static void make_pause_picture(const uint32_t frozen[2][S32_VIDEO_MAX_WIDTH * S3
 		}
 	}
 	s32_video_overlay_end();
+}
+
+static void make_pause_picture(const uint32_t frozen[2][S32_VIDEO_MAX_WIDTH * S32_VIDEO_HEIGHT], int choice)
+{
+	static uint8_t list[0x1000];
+
+	make_words_picture(frozen, list, console_pause_sprites(list, sizeof(list), choice));
+}
+
+/* A network race waiting for a device unheard (console_network_waiting): the game held, its sound too, the
+   picture in grey under WAIT, the network's frames running until it goes on */
+static void run_network_wait(void)
+{
+	static uint32_t frozen[2][S32_VIDEO_MAX_WIDTH * S32_VIDEO_HEIGHT];
+	static uint8_t list[0x400];
+
+	if (audio)
+		SDL_PauseAudioDevice(audio, 1);
+	for (int screen = 0; screen < 2; screen++)
+		memcpy(frozen[screen], s32_video_frame(screen, &pause_widths[screen]), sizeof(frozen[screen]));
+	make_words_picture(frozen, list, console_network_wait_sprites(list, sizeof(list)));
+	pause_shown = true;
+	while (console_network_waiting())
+	{
+		read_events();    /* (closing the window ends the game there: program_stop) */
+		show_screens();
+		SDL_Delay(16);
+		console_network_frame();
+	}
+	pause_shown = false;
+	if (audio)
+		SDL_PauseAudioDevice(audio, 0);
+	next_frame = SDL_GetPerformanceCounter();
 }
 
 /* The game stopped, its sound too, the picture in grey under PAUSE: Escape, Enter or a game controller's
@@ -1292,6 +1373,7 @@ static void run_pause(void)
 			break;
 		show_screens();    /* (the line chosen, a window resized or put full screen meanwhile) */
 		SDL_Delay(16);
+		console_network_frame();    /* (a network race goes on: this device is still heard) */
 	}
 	pause_shown = false;
 	actions_held = held;    /* (the key let go in the race is no action) */
@@ -1456,6 +1538,9 @@ static void on_frame_done(void)
 		save_backup_ram();
 	}
 #ifdef ORUNNERS_CONSOLE
+	console_network_frame();
+	if (console_network_waiting())
+		run_network_wait();
 	if (pause_requested)
 		run_pause();
 #endif

@@ -191,12 +191,36 @@ merged here; this repository adds console/, the ports and their documents.
   short side is 4 inches or more, the two screens facing each other, the first player's on the bottom half
   and the second's on the top one turned half round, each with its own touch controls, turned with it.
 
+- Android (Sebas's Fold 7): WIDE chosen again when the screen changes shape (unfolded or folded mid-game),
+  the log saying each new size; GAS and BRAKE a quarter smaller in both layouts (Sebas: too big).
+
+- NETWORK (Sebas: four devices as the four cabinets, HOST and JOIN, ARCADE only; every device against every
+  other, computers, phones and the Switch alike): console/network.c and its sockets (console/net_udp.c:
+  Winsock, libnx's BSD sockets, POSIX). A room hosted sends a beacon to the local network every half second;
+  JOIN lists the rooms found and joins one; the room's page shows its devices with their players' names
+  (NETWORK > NAME, kept in outrunners.ini) and the host's START, which links them in the list's order (the
+  host machine 1, the others 2-4; NETWORK > PLAYERS 2 where 2 PLAYERS is offered: both seats) and presses
+  each one's START: the game's own entries, car select and race, as linked cabinets. Every device sends its
+  two race records to every other each frame, as the link board would (link_receive_records and
+  link_send_records in place of the board's); every datagram written byte by byte. A device unheard for a
+  third of a second holds the race (WAIT, the frame in grey); for 3 seconds it is gone (Sebas: as out of
+  time): its players taken from the race's order, their cars out of sight, their records sent on by the first
+  device still heard, and a race whose host is gone hosted on by its first player still heard from the host's
+  last record (its time, the time left, the passes, the order); a room whose host is gone, by the next
+  device of its list. Checked with two headless games on one computer (--real-time, tests/console/network_*):
+  a race of both to its end and back to the room, the joiner gone mid-race, the host gone mid-race. Its pages
+  in the menus' font, in its colour 0E0, white to pink, the line chosen 0C0 (Sebas: not white, yellow and
+  orange).
+
 ## To do
 
-- The decompilation's new version merged (Sebas: before the network).
-- The network, last (Sebas).
+- The network: checked on two windows and between devices (Android's broadcasts:
+  some phones drop them without a multicast lock, then a room's address typed in); the pause in a network
+  race without holding the game (today the pause holds this device's car, the others race on); the entries
+  of a race whose machine 1 is gone mid-entries (counted down only).
+- The decompilation's new version merged (Sebas: before the network; then the network went first).
 - 2 PLAYERS on the Switch up to 4 players a console (Sebas, 30-10-2026), the screen in four, with the
-  network's multiplayer.
+  network's multiplayer (two cabinets in one device).
 
 ## Order
 

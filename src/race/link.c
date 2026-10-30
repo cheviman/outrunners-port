@@ -3,7 +3,7 @@
  *    Description: the link between the cabinets: the ISDN connection, the network check at boot, the race's entries and progress, the course records, the records sent and received
  *    Version:     0.1.0
  *    Created:     12-10-2026
- *    Modified:    29-10-2026
+ *    Modified:    30-10-2026
  *    Author:      Sebastian Toyos
  *
  *    OutRunners (arcade, Sega System Multi 32): the game's V70 program decompiled into C by
@@ -1532,7 +1532,7 @@ void CONSOLE_ORIGINAL(course_records_update)(void)
    (link_off, link_failed) this machine's own two (20FB00, 20FB80); in ISDN mode the eight from 21E000;
    on the link the eight from the link board (link_copy_records_in from 800020, or 800720 when its byte
    80000E is set), or link_lost when its error byte 80000C is set. */
-void link_receive_records(void)
+void CONSOLE_ORIGINAL(link_receive_records)(void)
 {
 	uint32_t destination = 0, pairs_left = 0, record_count = 0, source = 0;
 	uint8_t board_error = 0, second_buffer = 0;
@@ -1627,7 +1627,7 @@ void link_copy_records_in(uint32_t record_count, uint32_t board_records, uint32_
    their first 70 bytes to 800E20 and 800F00 (a byte in each halfword), then FF to its byte 800006;
    link_lost when its error byte 80000C is set. link_wait_frames from link_wait_frames_start (which
    nothing sets). */
-void link_send_records(void)
+void CONSOLE_ORIGINAL(link_send_records)(void)
 {
 	uint32_t board_records = 0, race = 0, record_count = 0;
 	uint8_t board_error = 0;

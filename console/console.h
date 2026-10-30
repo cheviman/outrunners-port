@@ -138,6 +138,8 @@ enum
 	WIDE_KINDS
 };
 
+#define CONSOLE_NAME_LENGTH 8    /* the player's name, NETWORK > NAME: letters of the game's font */
+
 typedef struct
 {
 	int window_scale;      /* 1-6: the window, in times the game's picture */
@@ -146,6 +148,7 @@ typedef struct
 	int wide;              /* WIDE_*: a wider picture */
 	bool vertical;         /* 2 PLAYERS: one screen over the other (false: side by side) */
 	int volume;            /* 0-10: 5 is the game's own */
+	char name[CONSOLE_NAME_LENGTH + 1];    /* the player's, as the network's rooms show it */
 	bool changed;
 } console_window;
 
@@ -157,5 +160,16 @@ int console_wide_side(void);
 
 /* The folder TIME ATTACK keeps its ghosts in (ghost_0.bin to ghost_9.bin, a goal each), with its separator */
 void console_ghost_folder(const char *folder);
+
+/* The network game (NETWORK: rooms of up to four devices, network.c): the port runs it once each of its frames
+   (60 a second), the game's frame run or not. While a race of it waits for a device unheard (true while
+   waiting) the port holds the game, its frame not run, runs the network's frames and shows
+   console_network_wait_sprites over the frame it stopped at (sprite entries, as console_pause_sprites) */
+void console_network_frame(void);
+bool console_network_waiting(void);
+size_t console_network_wait_sprites(uint8_t *list, size_t room);
+
+/* For scripted checks: where the network stands, a line of text */
+void console_network_describe(char *text, size_t size);
 
 #endif

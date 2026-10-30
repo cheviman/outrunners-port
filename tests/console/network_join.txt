@@ -1,0 +1,9 @@
+# NETWORK > JOIN (with network_host.txt in a second game on the same computer, both --real-time, and
+# network_controls.txt): the first room found, then its host's START
+600 start
+660 down
+680 down
+700 accept
+900 down
+920 accept
+1060 accept

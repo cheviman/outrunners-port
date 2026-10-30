@@ -61,8 +61,9 @@ typedef struct
 enum { BUTTON_GAS, BUTTON_BRAKE, BUTTON_SHIFT_UP, BUTTON_SHIFT_DOWN, BUTTON_START, BUTTON_MUSIC, BUTTONS };
 
 /* Where the controls are, in the unit: over the picture on a phone's whole screen (their room at its sides
-   and corners), or filling the room under it on a tall screen (the wheel and the pedals as large as it lets
-   them, over the route map) */
+   and corners), or filling the room under it on a tall screen (the wheel as large as it lets it, over the
+   route map). GAS and BRAKE are as large as a thumb needs and no larger (Sebas: they were too big), the
+   gears' buttons above them */
 typedef struct
 {
 	double wheel_x, wheel_y;     /* the wheel's place while it waits: from the left and the bottom */
@@ -74,12 +75,12 @@ typedef struct
 static const layout over_picture = {
 	0.25, 0.27, 0.15, 0.07,
 	{
-		[BUTTON_GAS] = { FROM_BOTTOM_RIGHT, 0.20, 0.25, 0.26, 0.26, CONTROL_BIT(CONTROL_GAS),
+		[BUTTON_GAS] = { FROM_BOTTOM_RIGHT, 0.17, 0.22, 0.20, 0.20, CONTROL_BIT(CONTROL_GAS),
 			ACTION_BIT(ACTION_ACCEPT), "GAS", false },
-		[BUTTON_BRAKE] = { FROM_BOTTOM_RIGHT, 0.48, 0.17, 0.21, 0.21, CONTROL_BIT(CONTROL_BRAKE), 0, "BRAKE", false },
-		[BUTTON_SHIFT_UP] = { FROM_BOTTOM_RIGHT, 0.13, 0.58, 0.15, 0.15, CONTROL_BIT(CONTROL_SHIFT_UP), 0, "UP",
+		[BUTTON_BRAKE] = { FROM_BOTTOM_RIGHT, 0.40, 0.14, 0.16, 0.16, CONTROL_BIT(CONTROL_BRAKE), 0, "BRAKE", false },
+		[BUTTON_SHIFT_UP] = { FROM_BOTTOM_RIGHT, 0.13, 0.52, 0.15, 0.15, CONTROL_BIT(CONTROL_SHIFT_UP), 0, "UP",
 			true },
-		[BUTTON_SHIFT_DOWN] = { FROM_BOTTOM_RIGHT, 0.31, 0.50, 0.15, 0.15, CONTROL_BIT(CONTROL_SHIFT_DOWN), 0,
+		[BUTTON_SHIFT_DOWN] = { FROM_BOTTOM_RIGHT, 0.31, 0.44, 0.15, 0.15, CONTROL_BIT(CONTROL_SHIFT_DOWN), 0,
 			"DOWN", true },
 		[BUTTON_START] = { FROM_TOP_RIGHT, 0.17, 0.09, 0.24, 0.09, CONTROL_BIT(CONTROL_START),
 			ACTION_BIT(ACTION_START), "START", false },
@@ -91,9 +92,9 @@ static const layout over_picture = {
 static const layout under_picture = {
 	0.45, 0.50, 0.36, 0.15,
 	{
-		[BUTTON_GAS] = { FROM_BOTTOM_RIGHT, 0.34, 0.45, 0.56, 0.56, CONTROL_BIT(CONTROL_GAS),
+		[BUTTON_GAS] = { FROM_BOTTOM_RIGHT, 0.28, 0.40, 0.42, 0.42, CONTROL_BIT(CONTROL_GAS),
 			ACTION_BIT(ACTION_ACCEPT), "GAS", false },
-		[BUTTON_BRAKE] = { FROM_BOTTOM_RIGHT, 0.92, 0.32, 0.44, 0.44, CONTROL_BIT(CONTROL_BRAKE), 0, "BRAKE", false },
+		[BUTTON_BRAKE] = { FROM_BOTTOM_RIGHT, 0.74, 0.28, 0.33, 0.33, CONTROL_BIT(CONTROL_BRAKE), 0, "BRAKE", false },
 		[BUTTON_SHIFT_UP] = { FROM_BOTTOM_RIGHT, 0.70, 0.80, 0.24, 0.24, CONTROL_BIT(CONTROL_SHIFT_UP), 0, "UP",
 			true },
 		[BUTTON_SHIFT_DOWN] = { FROM_BOTTOM_RIGHT, 1.10, 0.80, 0.24, 0.24, CONTROL_BIT(CONTROL_SHIFT_DOWN), 0,

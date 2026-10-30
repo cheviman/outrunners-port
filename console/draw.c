@@ -182,3 +182,17 @@ size_t console_pause_sprites(uint8_t *list, size_t room, int choice)
 	list[at + 1] = (uint8_t)(SPRITE_END >> 8);
 	return at + 16u;
 }
+
+/* The network's race waiting for a device unheard (network.c) */
+size_t console_network_wait_sprites(uint8_t *list, size_t room)
+{
+	size_t at = 0;
+
+	if (room < 16u)
+		return 0;
+	at = pause_line(list, at, room, PAUSE_Y, 2, PAUSE_CHOSEN, "WAIT");
+	at = pause_line(list, at, room, PAUSE_LINES_Y, 1, PAUSE_TEXT, "A PLAYER IS NOT HEARD");
+	memset(&list[at], 0, 16);
+	list[at + 1] = (uint8_t)(SPRITE_END >> 8);
+	return at + 16u;
+}

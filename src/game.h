@@ -3,7 +3,7 @@
  *    Description: prototypes of the game's functions and the addresses of the code it keeps in memory slots
  *    Version:     0.1.0
  *    Created:     12-10-2026
- *    Modified:    29-10-2026
+ *    Modified:    30-10-2026
  *    Author:      Sebastian Toyos
  *
  *    OutRunners (arcade, Sega System Multi 32): the game's V70 program decompiled into C by
@@ -522,9 +522,11 @@ uint32_t players_not_ready(void);
 void course_records_update(void);
 void CONSOLE_ORIGINAL(course_records_update)(void);
 void link_receive_records(void);
+void CONSOLE_ORIGINAL(link_receive_records)(void);
 void link_isdn_receive_records(void);
 void link_copy_records_in(uint32_t record_count, uint32_t board_records, uint32_t race_records);
 void link_send_records(void);
+void CONSOLE_ORIGINAL(link_send_records)(void);
 
 /* race/physics.c: the car's physics: the gears and torque curves, the controls, driving along the road, the engine, the road's drag and its edges, the wheels' effects */
 void player_car_load_gears(void);

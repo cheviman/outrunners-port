@@ -17,3 +17,5 @@ course_records_update       # (the same)
 stage_indicator_draw        # REVERSE, FULL: the STAGE label by the stage's own level
 race_cars_start             # TIME ATTACK: the ghost's car and riders beside the race's cars
 waiting_banner_show         # one player: no WAITING FOR CHALLENGERS, the entries closed once the choices are made
+link_receive_records        # the network: the other devices' race records as their datagrams bring them (network.c)
+link_send_records           # the network: none to a link board, the records go with the port's frame

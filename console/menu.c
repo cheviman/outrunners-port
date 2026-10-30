@@ -1,7 +1,7 @@
 /**
  *    Name:        menu.c
  *    Description: the console's menus on the left seat's screen: PRESS START in the attract mode, the title's
- *                 menu, DELUXE and OPTIONS with its pages
+ *                 menu, DELUXE, NETWORK with its rooms, and OPTIONS with its pages
  *    Version:     0.1.0
  *    Created:     29-10-2026
  *    Modified:    30-10-2026
@@ -26,6 +26,8 @@
 #define ITEM_COLOUR         0x0090u    /* the font's colours on the title: white, as the game's credits line */
 #define CHOSEN_COLOUR       0x00F0u    /* orange to yellow */
 #define TITLE_COLOUR        0x0100u    /* light yellow */
+#define NETWORK_COLOUR      0x00E0u    /* NETWORK's pages (Sebas: not white, yellow and orange): white to pink */
+#define NETWORK_CHOSEN      0x00C0u    /* and their line chosen: white to red */
 #define PROMPT_Y            186        /* PRESS START, where the game's prompt is */
 #define MENU_Y              124        /* the title's menu, under the logo */
 #define ITEM_STEP           13         /* a menu line, the font as it is */
@@ -54,13 +56,20 @@ enum
 	PAGE_TIME,
 	PAGE_SOUND_TEST,
 	PAGE_VIDEO,
-	PAGE_CONTROLS
+	PAGE_CONTROLS,
+	PAGE_NETWORK,
+	PAGE_NAME,
+	PAGE_ROOMS,         /* JOIN: the rooms found */
+	PAGE_ROOM           /* the room hosted or joined */
 };
 
-static const char *const menu_items[] = { "ARCADE", "2 PLAYERS", "& KNUCKLES", "OPTIONS", "EXIT" };
+static const char *const menu_items[] = { "ARCADE", "2 PLAYERS", "NETWORK", "& KNUCKLES", "OPTIONS", "EXIT" };
 static const char *const deluxe_items[] = { "CLASSIC", "TIME ATTACK", "FULL", "REVERSE", "BACK" };
 static const char *const options_items[] = { "CONTROLS", "DIFFICULTY", "TIME", "VIDEO", "VOLUME", "SOUND TEST",
 	"BACK" };
+static const char *const network_items[] = { "HOST", "JOIN", "NAME", "PLAYERS", "BACK" };
+/* the letters NAME goes through: the font's (a space shown as _ while it is written) */
+static const char name_letters[] = " ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-";
 static const char *const time_stages[TIME_STAGES] = { "PRE-STAGE", "STAGE 1", "STAGE 2", "STAGE 3", "STAGE 4",
 	"FINAL STAGE" };
 static const char *const pixel_kinds[PIXELS_KINDS] = { "SHARP", "SMOOTH", "BILINEAR", "CRT" };
@@ -73,10 +82,11 @@ static const char *const difficulties[DIFFICULTIES] = { "VERY EASY", "EASIER", "
 
 #define COUNT(list) ((int)(sizeof(list) / sizeof((list)[0])))
 
-enum { MENU_ARCADE, MENU_TWO_PLAYERS, MENU_DELUXE, MENU_OPTIONS, MENU_EXIT };
+enum { MENU_ARCADE, MENU_TWO_PLAYERS, MENU_NETWORK, MENU_DELUXE, MENU_OPTIONS, MENU_EXIT };
 enum { DELUXE_CLASSIC, DELUXE_TIME_ATTACK, DELUXE_FULL, DELUXE_REVERSE, DELUXE_BACK };
 enum { OPTIONS_CONTROLS, OPTIONS_DIFFICULTY, OPTIONS_TIME, OPTIONS_VIDEO, OPTIONS_VOLUME, OPTIONS_SOUND_TEST,
 	OPTIONS_BACK };
+enum { NETWORK_HOST, NETWORK_JOIN, NETWORK_NAME, NETWORK_PLAYERS, NETWORK_BACK };
 
 /* The lines a build shows of the title's menu and of OPTIONS: a computer's, all of them. A game device's
    (ORUNNERS_HANDHELD) has no VIDEO, its picture fixed (ports/sdl2/main.c); nor CONTROLS where its controls are
@@ -98,6 +108,7 @@ static void set_menu_lines(void)
 	menu_lines[menu_line_count++] = MENU_ARCADE;
 	if (two_players_offered)
 		menu_lines[menu_line_count++] = MENU_TWO_PLAYERS;
+	menu_lines[menu_line_count++] = MENU_NETWORK;
 	menu_lines[menu_line_count++] = MENU_DELUXE;
 	menu_lines[menu_line_count++] = MENU_OPTIONS;
 #ifndef ORUNNERS_SYSTEM_EXIT
@@ -115,6 +126,23 @@ static const int options_lines[] = {
 #endif
 	OPTIONS_VOLUME, OPTIONS_SOUND_TEST, OPTIONS_BACK
 };
+
+/* NETWORK's lines: PLAYERS where a second player may play (2 PLAYERS offered) */
+static int network_lines[NETWORK_BACK + 1];
+static int network_line_count;
+
+static void set_network_lines(void)
+{
+	network_line_count = 0;
+	network_lines[network_line_count++] = NETWORK_HOST;
+	network_lines[network_line_count++] = NETWORK_JOIN;
+	network_lines[network_line_count++] = NETWORK_NAME;
+	if (two_players_offered)
+		network_lines[network_line_count++] = NETWORK_PLAYERS;
+	network_lines[network_line_count++] = NETWORK_BACK;
+	if (!two_players_offered)
+		console_network_set_players(1);
+}
 enum { VIDEO_WINDOW, VIDEO_FULL_SCREEN, VIDEO_PIXELS, VIDEO_WIDE, VIDEO_TWO_PLAYERS, VIDEO_BACK, VIDEO_ITEMS };
 /* CONTROLS' lines: PLAYER, the controls, DEFAULTS, BACK */
 enum { CONTROLS_PLAYER, CONTROLS_FIRST, CONTROLS_DEFAULTS = CONTROLS_FIRST + CONTROLS, CONTROLS_BACK,
@@ -132,9 +160,11 @@ static struct
 	int controls_waiting;   /* CONTROLS: the control waiting for its key or button, or -1 */
 	bool controls_defaults; /* CONTROLS: DEFAULTS picked, for the port */
 	bool music;             /* the menu's song asked for */
+	char name[CONSOLE_NAME_LENGTH + 1];    /* NAME: the name being written */
+	int name_at;            /* NAME: the letter being changed */
 } menu = { .controls_waiting = -1 };
 
-console_window console_window_settings = { 2, false, PIXELS_SHARP, false, false, 5, false };
+console_window console_window_settings = { 2, false, PIXELS_SHARP, false, false, 5, "PLAYER", false };
 
 /* ---- drawing ---- */
 
@@ -143,22 +173,43 @@ static void centred(int y, int scale, uint16_t colour, const char *text)
 	console_text((SCREEN_WIDTH - console_text_width(text, scale)) / 2, y, scale, colour, text);
 }
 
-/* A page's line: its name on the left, its value (if any) on the right, the chosen one in its colour */
-static void line(int index, const char *name, const char *value)
+/* The colours of the page being drawn: its lines', its line chosen's and its heading's; NETWORK's pages have
+   their own */
+static struct
 {
-	const uint16_t colour = index == menu.choice ? CHOSEN_COLOUR : ITEM_COLOUR;
-	const int y = PAGE_Y + 16 + index * PAGE_STEP;
+	uint16_t item, chosen, title;
+} colours = { ITEM_COLOUR, CHOSEN_COLOUR, TITLE_COLOUR };
+
+static void page_colours(bool network)
+{
+	colours.item = network ? NETWORK_COLOUR : ITEM_COLOUR;
+	colours.chosen = network ? NETWORK_CHOSEN : CHOSEN_COLOUR;
+	colours.title = network ? NETWORK_COLOUR : TITLE_COLOUR;
+}
+
+/* A page's line on its row: its name on the left, its value (if any) on the right, the chosen one in its
+   colour */
+static void line_at(int row, bool chosen, const char *name, const char *value)
+{
+	const uint16_t colour = chosen ? colours.chosen : colours.item;
+	const int y = PAGE_Y + 16 + row * PAGE_STEP;
 
 	console_text(48, y, 1, colour, name);
 	if (value)
 		console_text(SCREEN_WIDTH - 48 - console_text_width(value, 1), y, 1, colour, value);
 }
 
+/* (the line 'index' on its own row) */
+static void line(int index, const char *name, const char *value)
+{
+	line_at(index, index == menu.choice, name, value);
+}
+
 /* The page's heading, and the darkened screen its lines are drawn over (drawn last: the list's newest group
    comes first) */
 static void page_heading(const char *heading)
 {
-	centred(PAGE_Y - 8, 2, TITLE_COLOUR, heading);
+	centred(PAGE_Y - 8, 2, colours.title, heading);
 }
 
 static void darken_page(void)
@@ -217,6 +268,10 @@ static int lines_of(int page)
 		case PAGE_SOUND_TEST: return 2;
 		case PAGE_VIDEO: return VIDEO_ITEMS;
 		case PAGE_CONTROLS: return 0;    /* (its grid moves its own way: controls_move) */
+		case PAGE_NETWORK: return network_line_count;
+		case PAGE_NAME: return 0;        /* (its letters move their own way: name_frame) */
+		case PAGE_ROOMS: return console_network_room_count() + 1;
+		case PAGE_ROOM: return console_network_hosting() ? 2 : 1;
 		default: return 0;
 	}
 }
@@ -237,6 +292,7 @@ static int line_of(const int *lines, int count, int item)
 }
 
 #define MENU_LINE(item)    line_of(menu_lines, menu_line_count, item)
+#define NETWORK_LINE(item) line_of(network_lines, network_line_count, item)
 
 static int step(int value, int by, int low, int high)
 {
@@ -581,6 +637,195 @@ bool console_controls_defaults(void)
 	return picked;
 }
 
+/* ---- NETWORK ---- */
+
+/* NETWORK: HOST, JOIN, NAME, PLAYERS, BACK; what went wrong last under them */
+static void network_frame(uint32_t pressed)
+{
+	const int item = network_lines[menu.choice];
+	const char *problem = console_network_problem();
+	char value[24];
+
+	if (pressed & (ACTION_BIT(ACTION_UP) | ACTION_BIT(ACTION_DOWN) | ACTION_BIT(ACTION_ACCEPT)))
+		console_network_problem_seen();
+	if (change(pressed) && item == NETWORK_PLAYERS)
+		console_network_set_players(console_network_players() == 1 ? 2 : 1);
+	if (pressed & (ACTION_BIT(ACTION_ACCEPT) | ACTION_BIT(ACTION_START)))
+		switch (item)
+		{
+			case NETWORK_HOST:
+				console_network_host();
+				if (console_network_in_room())
+					open_page(PAGE_ROOM, 0);
+				return;
+			case NETWORK_JOIN:
+				console_network_search();
+				if (console_network_searching())
+					open_page(PAGE_ROOMS, 0);
+				return;
+			case NETWORK_NAME:
+				snprintf(menu.name, sizeof(menu.name), "%-*s", CONSOLE_NAME_LENGTH, console_window_settings.name);
+				menu.name_at = 0;
+				open_page(PAGE_NAME, 0);
+				return;
+			case NETWORK_PLAYERS:
+				console_network_set_players(console_network_players() == 1 ? 2 : 1);
+				break;
+			case NETWORK_BACK:
+				open_page(PAGE_MENU, MENU_LINE(MENU_NETWORK));
+				return;
+		}
+	page_heading("NETWORK");
+	for (int index = 0; index < network_line_count; index++)
+	{
+		const char *shown = NULL;
+
+		if (network_lines[index] == NETWORK_NAME)
+			shown = console_window_settings.name;
+		else if (network_lines[index] == NETWORK_PLAYERS)
+		{
+			snprintf(value, sizeof(value), "< %d >", console_network_players());
+			shown = value;
+		}
+		line(index, network_items[network_lines[index]], shown);
+	}
+	if (problem)
+		centred(PAGE_Y + 16 + (network_line_count + 1) * PAGE_STEP, 1, colours.chosen, problem);
+	darken_page();
+}
+
+/* The place of a letter in name_letters (0, the space, for one not there) */
+static int letter_of(char letter)
+{
+	for (int index = 0; name_letters[index]; index++)
+		if (name_letters[index] == letter)
+			return index;
+	return 0;
+}
+
+/* NAME: UP and DOWN change the letter, LEFT and RIGHT go to the one beside it, ACCEPT keeps the name, BACK
+   leaves it as it was */
+static void name_frame(uint32_t pressed)
+{
+	const int letters = (int)sizeof(name_letters) - 1;
+	int x = (SCREEN_WIDTH - CONSOLE_NAME_LENGTH * 16) / 2;
+	char shown[2] = { 0, 0 };
+
+	if (pressed & ACTION_BIT(ACTION_BACK))
+	{
+		open_page(PAGE_NETWORK, NETWORK_LINE(NETWORK_NAME));
+		return;
+	}
+	if (pressed & (ACTION_BIT(ACTION_ACCEPT) | ACTION_BIT(ACTION_START)))
+	{
+		int length = CONSOLE_NAME_LENGTH;
+
+		while (length > 0 && menu.name[length - 1] == ' ')
+			length--;
+		if (length > 0)
+		{
+			snprintf(console_window_settings.name, sizeof(console_window_settings.name), "%.*s", length, menu.name);
+			console_window_settings.changed = true;    /* (the port keeps it) */
+		}
+		open_page(PAGE_NETWORK, NETWORK_LINE(NETWORK_NAME));
+		return;
+	}
+	if (pressed & (ACTION_BIT(ACTION_UP) | ACTION_BIT(ACTION_DOWN)))
+		menu.name[menu.name_at] = name_letters[step(letter_of(menu.name[menu.name_at]),
+			(pressed & ACTION_BIT(ACTION_UP)) ? 1 : -1, 0, letters - 1)];
+	menu.name_at = step(menu.name_at, change(pressed), 0, CONSOLE_NAME_LENGTH - 1);
+	page_heading("NAME");
+	for (int at = 0; at < CONSOLE_NAME_LENGTH; at++, x += 16)
+	{
+		shown[0] = menu.name[at] == ' ' ? '_' : menu.name[at];
+		console_text(x, PAGE_Y + 40, 2, at == menu.name_at ? colours.chosen : colours.item, shown);
+	}
+	darken_page();
+}
+
+/* JOIN: the rooms the local network has (their host's name, their devices), and BACK */
+static void rooms_frame(uint32_t pressed)
+{
+	const int rooms = console_network_room_count();
+	char text[32];
+
+	if (!console_network_searching())
+	{
+		open_page(PAGE_NETWORK, NETWORK_LINE(NETWORK_JOIN));
+		return;
+	}
+	if ((pressed & ACTION_BIT(ACTION_BACK))
+		|| ((pressed & (ACTION_BIT(ACTION_ACCEPT) | ACTION_BIT(ACTION_START))) && menu.choice == rooms))
+	{
+		console_network_leave();
+		open_page(PAGE_NETWORK, NETWORK_LINE(NETWORK_JOIN));
+		return;
+	}
+	if ((pressed & (ACTION_BIT(ACTION_ACCEPT) | ACTION_BIT(ACTION_START))) && menu.choice < rooms
+		&& !console_network_room_full(menu.choice))
+	{
+		console_network_join(menu.choice);
+		open_page(PAGE_ROOM, 0);
+		return;
+	}
+	page_heading("JOIN");
+	for (int room = 0; room < rooms; room++)
+	{
+		console_network_room(room, text, sizeof(text));
+		line(room, text, NULL);
+	}
+	line(rooms, "BACK", NULL);
+	if (rooms == 0 && (menu.blink++ & 16) == 0)
+		centred(PAGE_Y + 16 + 2 * PAGE_STEP, 1, colours.item, "LOOKING FOR ROOMS");
+	darken_page();
+}
+
+/* The room: its devices, then the host's START (two devices or more, none racing) and LEAVE */
+static void room_frame(uint32_t pressed)
+{
+	const bool host = console_network_hosting();
+	const int members = console_network_member_count();
+	const int y = PAGE_Y + 16 + 5 * PAGE_STEP;    /* (under four devices and a gap) */
+	char text[32];
+
+	if (!console_network_in_room())
+	{
+		open_page(PAGE_NETWORK, 0);
+		return;
+	}
+	if ((pressed & ACTION_BIT(ACTION_BACK))
+		|| ((pressed & (ACTION_BIT(ACTION_ACCEPT) | ACTION_BIT(ACTION_START))) && menu.choice == (host ? 1 : 0)))
+	{
+		console_network_leave();
+		open_page(PAGE_NETWORK, 0);
+		return;
+	}
+	if ((pressed & (ACTION_BIT(ACTION_ACCEPT) | ACTION_BIT(ACTION_START))) && host && menu.choice == 0
+		&& console_network_can_start())
+	{
+		console_network_start();    /* (the race on the left seat's next frame: check_game_start) */
+		return;
+	}
+	page_heading(console_network_joining() ? "JOINING" : "ROOM");
+	for (int index = 0; index < members; index++)
+	{
+		console_network_member(index, text, sizeof(text));
+		console_text(64, PAGE_Y + 16 + index * PAGE_STEP, 1, colours.title, text);
+	}
+	if (host)
+	{
+		line_at(5, menu.choice == 0, console_network_can_start() ? "START" : "START: 2 OR MORE", NULL);
+		line_at(6, menu.choice == 1, "LEAVE", NULL);
+	}
+	else
+	{
+		if ((menu.blink++ & 16) == 0)
+			centred(y - PAGE_STEP, 1, colours.item, console_network_joining() ? "WAITING FOR THE ROOM" : "WAITING FOR THE HOST");
+		line_at(5, true, "LEAVE", NULL);
+	}
+	darken_page();
+}
+
 /* The title's menu and DELUXE: their lines centred under the logo, over a shadow (the items lines lists, or
    all of them) */
 static void list_frame(const char *const *items, const int *lines, int count)
@@ -625,9 +870,10 @@ int console_menu_frame(uint32_t mode)
 	int lines;
 
 	set_menu_lines();
+	set_network_lines();
 	lines = lines_of(menu.page);
-	if (menu.page == PAGE_MENU && menu.choice >= lines)
-		menu.choice = lines - 1;    /* (2 PLAYERS gone from it) */
+	if (lines && menu.choice >= lines)
+		menu.choice = lines - 1;    /* (2 PLAYERS gone from it, a room gone from JOIN's) */
 	console.pressed = 0;
 	if (mode == GAME_MODE_PLAY || mode == GAME_MODE_POWER_ON || mode == GAME_MODE_RESTART)
 	{
@@ -639,6 +885,14 @@ int console_menu_frame(uint32_t mode)
 		return MENU_NOTHING;
 	}
 	draw_signature();
+
+	/* in a network room, its page over the title's opening (after a race too) */
+	if (console_network_in_room() && menu.page != PAGE_ROOM)
+	{
+		open_page(PAGE_ROOM, 0);
+		if (mode != GAME_MODE_TITLE || !title_opening())
+			return MENU_TITLE;
+	}
 
 	/* the attract mode: PRESS START, the menu on the title */
 	if (menu.page == PAGE_NONE)
@@ -703,6 +957,9 @@ int console_menu_frame(uint32_t mode)
 					case MENU_TWO_PLAYERS:
 						open_page(PAGE_NONE, 0);
 						return MENU_START_TWO;
+					case MENU_NETWORK:
+						open_page(PAGE_NETWORK, 0);
+						return title_opening() ? MENU_NOTHING : MENU_TITLE;
 					case MENU_DELUXE:
 						open_page(PAGE_DELUXE, 0);
 						return MENU_NOTHING;
@@ -749,8 +1006,30 @@ int console_menu_frame(uint32_t mode)
 			break;
 	}
 
-	/* OPTIONS and its pages, over the title's opening */
+	/* NETWORK and its pages (in their own colours), and OPTIONS and its, over the title's opening */
 	hold_title(true);
+	page_colours(menu.page == PAGE_NETWORK || menu.page == PAGE_NAME || menu.page == PAGE_ROOMS
+		|| menu.page == PAGE_ROOM);
+	switch (menu.page)
+	{
+		case PAGE_NETWORK:
+			if (pressed & ACTION_BIT(ACTION_BACK))
+				open_page(PAGE_MENU, MENU_LINE(MENU_NETWORK));
+			else
+				network_frame(pressed);
+			return MENU_NOTHING;
+		case PAGE_NAME:
+			name_frame(pressed);
+			return MENU_NOTHING;
+		case PAGE_ROOMS:
+			rooms_frame(pressed);
+			return MENU_NOTHING;
+		case PAGE_ROOM:
+			room_frame(pressed);
+			return MENU_NOTHING;
+		default:
+			break;
+	}
 	if (pressed & ACTION_BIT(ACTION_BACK))
 	{
 		if (menu.page == PAGE_OPTIONS)

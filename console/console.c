@@ -88,6 +88,20 @@ void console_settings_to_race(void)
 		| ((uint32_t)(uint8_t)time_difficulty[4] << 16u) | ((uint32_t)(uint8_t)time_difficulty[5] << 24u);
 }
 
+void console_master_settings(void)
+{
+	const uint32_t race = RACE_1;
+
+	RACE(race)->master_advertise_sound = advertise_sound;
+	RACE(race)->master_steering_wheel_reaction = steering_wheel_reaction;
+	RACE(race)->master_coins_per_credit = coins_per_credit;
+	RACE(race)->master_first_chute_multiplier = first_chute_multiplier;
+	RACE(race)->master_bonus_adder = bonus_adder;
+	RACE(race)->master_coin_setting = coin_setting;
+	RACE(race)->master_free_play = free_play;
+	console_settings_to_race();
+}
+
 /* The machine alone (stand alone, or the link failed), as the game's network_check_stand_alone and
    network_check_result set it up as machine 1, without NETWORK CHECK and its result on the screens for
    128 frames: the SEGA presentation is the first thing seen */
@@ -112,14 +126,7 @@ void network_check_stand_alone(void)
 	SCREEN(SCREEN_2)->race_copy = race_copy_offsets[1] + GAME_VARIABLES;
 	SCREEN(SCREEN_1)->race = RACE_1;
 	SCREEN(SCREEN_2)->race = RACE_2;
-	RACE(race)->master_advertise_sound = advertise_sound;
-	RACE(race)->master_steering_wheel_reaction = steering_wheel_reaction;
-	RACE(race)->master_coins_per_credit = coins_per_credit;
-	RACE(race)->master_first_chute_multiplier = first_chute_multiplier;
-	RACE(race)->master_bonus_adder = bonus_adder;
-	RACE(race)->master_coin_setting = coin_setting;
-	RACE(race)->master_free_play = free_play;
-	console_settings_to_race();
+	console_master_settings();
 	move_halfwords(race + 0x30u, BOOKKEEPING_COURSE_RECORDS_ADDRESS, 0x1Eu);
 	clear_text_layer();
 }
@@ -238,6 +245,18 @@ uint32_t check_game_start(uint32_t mode, uint32_t seat_credits)
 		console.two_players = false;    /* (the race of both is over) */
 	if (console.classic && mode != GAME_MODE_PLAY && SCREEN(SCREEN_2)->game_mode != GAME_MODE_PLAY)
 		console.classic = false;
+	if (console_network_start_pending() && mode >= GAME_MODE_TITLE && mode <= GAME_MODE_RANKING)
+	{
+		/* the network room's START: an ARCADE race of all its devices (network.c), both seats of one with
+		   two players as 2 PLAYERS starts them */
+		if (console_network_take_start() == 2)
+		{
+			console.two_players = true;
+			console.join_right = true;
+		}
+		console_menu_frame(GAME_MODE_PLAY);    /* (its pages closed) */
+		return press_start(mode, seat_credits);
+	}
 	switch (console_menu_frame(mode))
 	{
 		case MENU_START_ONE:
@@ -268,11 +287,11 @@ uint32_t check_game_start(uint32_t mode, uint32_t seat_credits)
 }
 
 /* The car select's WAITING FOR CHALLENGERS! (then JUST A MOMENT PLEASE) once the player's choices are made,
-   while the race takes entries: with one player (no 2 PLAYERS, no CLASSIC) none, and the entries closed at
-   once (player 0's record's entry_frames), as no one else comes */
+   while the race takes entries: with one player (no 2 PLAYERS, no CLASSIC, no network) none, and the entries
+   closed at once (player 0's record's entry_frames), as no one else comes */
 void waiting_banner_show(void)
 {
-	if (console.two_players || console.classic)
+	if (console.two_players || console.classic || console_network_linked())
 	{
 		original_waiting_banner_show();
 		return;

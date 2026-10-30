@@ -10,6 +10,7 @@
 #define ORUNNERS_CONSOLE_INTERNAL_H
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #define LEFT_SEAT                   0u    /* screen index: the left seat's screen (screen 1); the right one's is 1 */
@@ -118,8 +119,44 @@ bool console_route_select_running(void);
 int console_route_select_frame(uint32_t pressed);
 int console_route_select_goal(void);
 
-/* DIFFICULTY and TIME, as OPTIONS leaves them, into the race records (console.c) */
+/* DIFFICULTY and TIME, as OPTIONS leaves them, into the race records (console.c); and with them the rest of
+   machine 1's settings, as network_check_result puts them in its first record for every machine's races */
 void console_settings_to_race(void);
+void console_master_settings(void);
+
+/* The network game (network.c), for the menus: a room hosted (HOST), the rooms looked for and one joined (JOIN),
+   left; the players of this device in its races (1, or 2: both seats) */
+void console_network_host(void);
+void console_network_search(void);
+void console_network_join(int room);
+void console_network_leave(void);
+int console_network_players(void);
+void console_network_set_players(int players);
+bool console_network_in_room(void);     /* (joining one too) */
+bool console_network_joining(void);
+bool console_network_searching(void);
+bool console_network_hosting(void);
+bool console_network_linked(void);      /* (the link set up for the room's races) */
+
+/* JOIN's list of rooms: how many, and a line for each (its host's name, its devices); full ones unjoinable */
+int console_network_room_count(void);
+void console_network_room(int room, char *text, size_t size);
+bool console_network_room_full(int room);
+
+/* The room's devices, a line for each (its number, its player's name, 2P) */
+int console_network_member_count(void);
+void console_network_member(int index, char *text, size_t size);
+
+/* The host's START (two devices or more, none of them racing), and the race it starts on the left seat's frame:
+   the seats to start (0 none, 1, or 2), once, in the game's attract modes */
+bool console_network_can_start(void);
+void console_network_start(void);
+bool console_network_start_pending(void);
+int console_network_take_start(void);
+
+/* What went wrong with the network (the room gone, no network), once: NULL if nothing */
+const char *console_network_problem(void);
+void console_network_problem_seen(void);
 
 /* The menus on the left seat's frame, before its game mode's code ('mode'): what it asks for (MENU_*) */
 int console_menu_frame(uint32_t mode);

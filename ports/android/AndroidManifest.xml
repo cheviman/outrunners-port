@@ -20,6 +20,10 @@
 	<uses-feature android:name="android.hardware.gamepad" android:required="false" />
 	<uses-feature android:name="android.hardware.bluetooth" android:required="false" />
 	<uses-feature android:name="android.hardware.usb.host" android:required="false" />
+	<uses-feature android:name="android.hardware.wifi" android:required="false" />
+
+	<!-- NETWORK: the rooms' datagrams on the local network (console/net_udp.c) -->
+	<uses-permission android:name="android.permission.INTERNET" />
 
 	<application
 		android:label="OutRunners"
