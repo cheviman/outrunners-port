@@ -179,12 +179,21 @@ merged here; this repository adds console/, the ports and their documents.
   Anbernic's game built each in its own job, in every computer's package beside OutRunners NSP, OutRunners APK
   and OutRunners Anbernic, with docs/package/README.txt; a tag v* makes a release of the packages.
 
+- Android on a tall screen (Sebas's Fold open): the picture at the top, the touch controls in the room under it,
+  as large as it lets them, and between the wheel and the pedals the game's own route map (Sebas: the game's
+  pictures, nothing made up): the right seat, unseen with one player, shows the close-up map the game drives
+  after a race, its car as far along the route as the race's (console/side_map.c), and the port draws that
+  screen there; a phone's screen as before. ORUNNERS_TOUCH_TEST: the touch controls in a computer's window,
+  the mouse a finger; the headless build's --side-map.
+
 ## To do
 
 - The decompilation's new version merged (Sebas: before the network).
 - The network, last (Sebas).
 - 2 PLAYERS on the Switch up to 4 players a console (Sebas, 30-10-2026), the screen in four, with the
   network's multiplayer.
+- 2 PLAYERS on a tablet or an open Fold (Sebas, 30-10-2026): the two screens facing each other, the far one
+  turned round, each player's touch controls on their side.
 
 ## Order
 

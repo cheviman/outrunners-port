@@ -56,7 +56,7 @@
 	" [--sprite-census FILE] [--tile-census FILE] [--memory-census FILE] [--assets FOLDER|PACK.assets]" \
 	" [--write-pack PACK.assets] [--workers N] [--screens 1|2] [--sound-wav FILE]" \
 	" (orunners_console_headless: [--actions FILE] [--wide | --wide-20-9] [--autopilot] [--ghost-folder DIR]" \
-	" [--pause-dump N])\n"
+	" [--pause-dump N] [--side-map])\n"
 #define MAX_VIDEO_DUMPS 64
 #define CENSUS_SLOTS (1u << 22)     /* open addressing for the censuses' hashes */
 #define TILE_CENSUS_EVERY 30        /* the tilemaps are looked at every this many frames */
@@ -446,6 +446,8 @@ int main(int argc, char **argv)
 			console_window_settings.wide = WIDE_20_9;
 		else if (strcmp(argv[index], "--autopilot") == 0)
 			autopilot = true;
+		else if (strcmp(argv[index], "--side-map") == 0)
+			console_side_map_wanted(true);    /* (a tall screen's room: the route map beside the race) */
 		else if (strcmp(argv[index], "--pause-dump") == 0 && index + 1 < argc)
 			pause_dump_frame = strtoull(argv[++index], NULL, 10);
 		else if (strcmp(argv[index], "--ghost-folder") == 0 && index + 1 < argc)

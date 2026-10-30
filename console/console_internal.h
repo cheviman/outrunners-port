@@ -46,6 +46,7 @@ typedef struct
 	bool join_right;        /* the right seat's START, pressed once it is in the entry (game mode 7) */
 	bool time_attack;       /* DELUXE > TIME ATTACK: the left seat's race has no time limit */
 	bool classic;           /* DELUXE > CLASSIC: the game's entries as the arcade's (WAITING FOR CHALLENGERS) */
+	bool side_map_wanted;   /* the port has room for the route map beside the race (console_side_map_wanted) */
 	uint8_t quit_seats;     /* the pause's QUIT GAME: the seats (bit 0 the left) still to go back to the title */
 } console_state;
 
@@ -57,6 +58,9 @@ extern console_state console;
 #define CONSOLE_CODE_START_LINE         0xFE0002u    /* REVERSE's start line (routes.c) */
 #define CONSOLE_CODE_GHOST              0xFE0003u    /* TIME ATTACK's ghost's objects (ghost.c) */
 #define CONSOLE_CODE_ROUTE_CAR          0xFE0004u    /* the car on REVERSE's route map (route_select.c) */
+#define CONSOLE_CODE_SIDE_MAP           0xFE0005u    /* the route map beside the race (side_map.c): its place */
+#define CONSOLE_CODE_SIDE_MAP_CAR       0xFE0006u    /* and its car */
+#define CONSOLE_CODE_SIDE_MAP_SIGN      0xFE0007u    /* and a C.P sign */
 
 /* The menus' sound, a line changed or picked: the test mode's sound 57 */
 #define MENU_SOUND          0x4Eu
@@ -66,6 +70,9 @@ void presentation_car_update(void);
 void presentation_start_line_update(void);
 void ghost_object_update(void);
 void route_select_car_update(void);
+void side_map_update(void);
+void side_map_car_update(void);
+void side_map_sign_update(void);
 
 /* TIME ATTACK's ghost (ghost.c): a game starts; the left seat's frame during it */
 void console_ghost_start(void);
@@ -81,6 +88,20 @@ bool console_presentation_frame(uint32_t pressed);
 void console_reverse_start(void);
 void console_full_start(void);
 bool console_routes_frame(uint32_t mode, uint32_t pressed);    /* (true: the left seat's game waits) */
+bool console_routes_running(void);    /* (a game of FULL or REVERSE: its route is not the game's) */
+
+/* The route map beside the race (side_map.c), on the right seat's frame: its scene while it is 'due'
+   (SIDE_MAP_ON: the right seat's game waits), and once it is over (SIDE_MAP_OVER: the right seat back to
+   its title) */
+enum
+{
+	SIDE_MAP_OFF,
+	SIDE_MAP_ON,
+	SIDE_MAP_OVER
+};
+
+int console_side_map_frame(bool due);
+bool console_side_map_running(void);
 
 /* REVERSE's goal on the route map (route_select.c), once the car select is over: started with the car
    model chosen, on while the goal is picked, the left seat's frame meanwhile (its game waits) and the goal

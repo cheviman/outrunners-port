@@ -500,6 +500,11 @@ static const route *route_running(void)
 	return routes.running == ROUTE_FULL ? &routes.full : &routes.reverse;
 }
 
+bool console_routes_running(void)
+{
+	return routes.running != ROUTE_NONE;
+}
+
 void console_reverse_start(void)
 {
 	build_reverse();

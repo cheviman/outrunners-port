@@ -55,6 +55,7 @@ void console_quit_game(void);
    gear buttons are shown then alone */
 bool console_manual_gears(void);
 
+
 /* The pause's words, PAUSE and its lines (CONTINUE, QUIT GAME), in the game's letters: sprite entries for
    s32_video_overlay_sprites into 'list' ('room' bytes), the line 'choice' in colour; their size in bytes */
 enum
@@ -65,6 +66,12 @@ enum
 };
 
 size_t console_pause_sprites(uint8_t *list, size_t room, int choice);
+
+/* The route map beside the race: the port says each frame whether it has room for it (a tall screen's room
+   under the picture); the right seat, unseen with one player, shows it then while the left one races, and
+   its screen is shown there while true */
+void console_side_map_wanted(bool wanted);
+bool console_side_map_shown(void);
 
 /* CLASSIC: true while the right seat may join the race being entered with its START, its screen unseen */
 bool console_right_seat_joins(void);

@@ -326,6 +326,37 @@ static uint32_t pause_pixels[2][S32_VIDEO_MAX_WIDTH * S32_VIDEO_HEIGHT];
 static int pause_widths[2];
 #endif
 
+#ifdef ORUNNERS_TOUCH
+/* The route map beside the race (console_side_map_shown): the right screen's frame, its board's columns, in
+   the texture's corner the screens leave free */
+#define SIDE_MAP_WIDTH 320
+
+static const SDL_Rect side_map_source = { S32_VIDEO_MAX_WIDTH, S32_VIDEO_HEIGHT, SIDE_MAP_WIDTH, S32_VIDEO_HEIGHT };
+
+static void upload_side_map(void)
+{
+	int width = 0;
+	const uint32_t *pixels = s32_video_frame(1, &width);
+
+	if (width > SIDE_MAP_WIDTH)
+		pixels += (width - SIDE_MAP_WIDTH) / 2;    /* (the middle of a WIDE frame) */
+	SDL_UpdateTexture(texture, &side_map_source, pixels, S32_VIDEO_MAX_WIDTH * (int)sizeof(uint32_t));
+}
+
+/* And in the room the controls leave for it, as large as it fits with its proportions */
+static void present_side_map(const SDL_Rect *room)
+{
+	const double scale = SDL_min((double)room->w / side_map_source.w, (double)room->h / side_map_source.h);
+	SDL_Rect shown;
+
+	shown.w = (int)(side_map_source.w * scale);
+	shown.h = (int)(side_map_source.h * scale);
+	shown.x = room->x + (room->w - shown.w) / 2;
+	shown.y = room->y + (room->h - shown.h) / 2;
+	SDL_RenderCopy(renderer, texture, &side_map_source, &shown);
+}
+#endif
+
 /* The picture (its part 'source' of 'texture') in the window, as large as it fits with its proportions */
 static void present(SDL_Rect source)
 {
@@ -333,6 +364,10 @@ static void present(SDL_Rect source)
 	SDL_Rect shown;
 	int out_width = 0, out_height = 0;
 	double scale;
+#ifdef ORUNNERS_TOUCH
+	SDL_Rect map_room;
+	bool map_room_there;
+#endif
 
 	SDL_GetRendererOutputSize(renderer, &out_width, &out_height);
 	scale = SDL_min((double)out_width / source.w, (double)out_height / source.h);
@@ -340,6 +375,11 @@ static void present(SDL_Rect source)
 	shown.h = (int)(source.h * scale);
 	shown.x = (out_width - shown.w) / 2;
 	shown.y = (out_height - shown.h) / 2;
+#ifdef ORUNNERS_TOUCH
+	touch_layout(out_width, out_height, &shown);    /* (a tall screen: the picture at the top, the controls under it) */
+	map_room_there = touch_map_room(&map_room);
+	console_side_map_wanted(map_room_there);    /* (and between them the route map, from the game's next frame) */
+#endif
 	SDL_SetTextureScaleMode(texture, kind == 2 ? SDL_ScaleModeLinear : SDL_ScaleModeNearest);
 	SDL_RenderClear(renderer);
 	if (kind == 1 || kind == 3)
@@ -375,7 +415,13 @@ static void present(SDL_Rect source)
 	else
 		SDL_RenderCopy(renderer, texture, &source, &shown);
 #ifdef ORUNNERS_TOUCH
+	if (map_room_there && console_side_map_shown())
+		present_side_map(&map_room);
+#ifdef ORUNNERS_TOUCH_TEST
+	touch_draw(renderer, true);    /* (a computer's check: the gears' buttons always, to see them) */
+#else
 	touch_draw(renderer, console_manual_gears());    /* (the gears' buttons with the manual transmission) */
+#endif
 #endif
 	SDL_RenderPresent(renderer);
 }
@@ -560,6 +606,10 @@ static void show_screens(void)
 		source.w = stacked ? cell : source.w + cell;
 		source.h = stacked ? source.h + S32_VIDEO_HEIGHT : S32_VIDEO_HEIGHT;
 	}
+#ifdef ORUNNERS_TOUCH
+	if (console_side_map_shown())
+		upload_side_map();
+#endif
 	present(source);
 }
 
@@ -569,8 +619,13 @@ static uint64_t pace_video, pace_showing;    /* a handheld's log: the frames' ti
 
 static void on_frame_shown(void)
 {
-	/* the video draws the screens the window shows alone (both where the frames' hashes are written) */
+	/* the video draws the screens the window shows alone (both where the frames' hashes are written, or the
+	   right one is the route map beside the race) */
+#ifdef ORUNNERS_TOUCH
+	s32_video_show_screens(screens_shown() == 2 || video_hashes || console_side_map_shown() ? 3 : 1);
+#else
 	s32_video_show_screens(screens_shown() == 2 || video_hashes ? 3 : 1);
+#endif
 #ifdef ORUNNERS_HANDHELD
 	const uint64_t start = SDL_GetPerformanceCounter();
 	uint64_t drawn;
@@ -1503,6 +1558,9 @@ int main(int argc, char **argv)
 	SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");          /* (fingers are the touch controls, not the mouse) */
 	SDL_SetHint(SDL_HINT_ACCELEROMETER_AS_JOYSTICK, "0");
 	SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
+#endif
+#ifdef ORUNNERS_TOUCH_TEST
+	SDL_SetHint(SDL_HINT_MOUSE_TOUCH_EVENTS, "1");    /* (a computer's check of the touch controls: the mouse a finger) */
 #endif
 #ifdef ORUNNERS_HANDHELD
 	add_device_mappings();

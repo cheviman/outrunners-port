@@ -268,6 +268,13 @@ if(ORUNNERS_DECOMPILED AND ORUNNERS_SOUND_DECOMPILED)
 		add_executable(outrunners WIN32 MACOSX_BUNDLE ports/sdl2/main.c ports/sdl2/controls.c ports/sdl2/first_run.c
 			ports/sdl2/letters.c ports/sdl2/prompts/input_prompts.bmp ports/sdl2/font/font.bmp)
 		target_link_libraries(outrunners PRIVATE orunners_game_console orunners_sound orunners_extract ${ORUNNERS_SDL2})
+		# a development aid: OutRunners with Android's touch controls, the mouse a finger, to look at them in a
+		# window of any shape
+		option(ORUNNERS_TOUCH_TEST "Build OutRunners with Android's touch controls, the mouse as a finger" OFF)
+		if(ORUNNERS_TOUCH_TEST)
+			target_sources(outrunners PRIVATE ports/sdl2/touch.c)
+			target_compile_definitions(outrunners PRIVATE ORUNNERS_TOUCH ORUNNERS_TOUCH_TEST)
+		endif()
 		set_target_properties(outrunners PROPERTIES OUTPUT_NAME "OutRunners"
 			MACOSX_BUNDLE_BUNDLE_NAME "OutRunners" MACOSX_BUNDLE_GUI_IDENTIFIER io.github.cheviman.outrunners)
 		set_source_files_properties(ports/sdl2/prompts/input_prompts.bmp ports/sdl2/font/font.bmp PROPERTIES

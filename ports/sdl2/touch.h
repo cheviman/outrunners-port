@@ -35,6 +35,15 @@ bool touch_holds(int control);
 /* How far the wheel turns, -TOUCH_WHEEL_FULL (left) to TOUCH_WHEEL_FULL */
 int touch_wheel(void);
 
+/* Where the controls go on a screen of 'width' x 'height' with the picture at 'picture': over it, on the whole
+   screen; or with room enough under it (a screen taller than the picture), the picture at the top
+   ('picture' moved) and the controls in the room under it */
+void touch_layout(int width, int height, SDL_Rect *picture);
+
+/* The room for the game's route map in the room under the picture, between the wheel and the pedals: false
+   on a phone's screen (the controls over the picture) or where there is too little of it */
+bool touch_map_room(SDL_Rect *room);
+
 /* The controls over the picture, before it is presented, the gears' buttons with 'gears' (a race with the
    manual transmission) alone: nothing while they are hidden */
 void touch_draw(SDL_Renderer *renderer, bool gears);

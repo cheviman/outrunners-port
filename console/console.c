@@ -149,10 +149,31 @@ static uint32_t press_start(uint32_t mode, uint32_t seat_credits)
 	return original_check_game_start(mode, seat_credits);
 }
 
+/* The steps of game mode 6 (and of the demo's race, game mode 4) from the race's set-up to its fade out
+   (game_mode_play): the race on the screen */
+static bool racing(uint32_t screen_block)
+{
+	const uint8_t mode = SCREEN(screen_block)->game_mode;
+	const uint8_t step = SCREEN(screen_block)->game_step;
+
+	if (mode != GAME_MODE_PLAY && mode != GAME_MODE_DEMO_RACE)
+		return false;
+	return step == 5u || step == 6u || step == 7u || step == 8u || step == 11u || (step >= 23u && step <= 27u);
+}
+
+/* The route map beside the race on the right seat's screen (side_map.c), its game mode 'mode': where the port
+   has room for it, while the left seat races alone on the game's route and the right seat is idle */
+static bool side_map_due(uint32_t mode)
+{
+	return console.side_map_wanted && !console.two_players && !console.classic && !console_routes_running()
+		&& SCREEN(SCREEN_1)->game_mode == GAME_MODE_PLAY && racing(SCREEN_1)
+		&& mode != GAME_MODE_PLAY && mode != GAME_MODE_ENTRY_INVITATION;
+}
+
 /* Each screen's frame before its game mode's code. The right seat starts only to join a 2 PLAYERS race, or a
-   CLASSIC one with its own START, which shows its screen (its START is let alone otherwise); the left one's
-   START opens the title's menu, whose ARCADE and 2 PLAYERS start the game as the arcade's START does
-   (menu.c) */
+   CLASSIC one with its own START, which shows its screen (its START is let alone otherwise), and shows the
+   route map beside a race of the left one where the port has room for it; the left one's START opens the
+   title's menu, whose ARCADE and 2 PLAYERS start the game as the arcade's START does (menu.c) */
 uint32_t check_game_start(uint32_t mode, uint32_t seat_credits)
 {
 	if (console.quit_seats & (1u << SCREEN(screen)->index))
@@ -167,6 +188,16 @@ uint32_t check_game_start(uint32_t mode, uint32_t seat_credits)
 	}
 	if (SCREEN(screen)->index != LEFT_SEAT)
 	{
+		switch (console_side_map_frame(side_map_due(mode)))
+		{
+			case SIDE_MAP_ON:
+				return GAME_MODE_CONSOLE_SCENE;
+			case SIDE_MAP_OVER:
+				AS32(SCREEN(screen)->game_mode) = GAME_MODE_RESTART;
+				return GAME_MODE_RESTART;
+			default:
+				break;
+		}
 		if (console.join_right && mode == GAME_MODE_ENTRY_INVITATION)
 		{
 			console.join_right = false;
@@ -274,6 +305,15 @@ static bool console_code(uint32_t address)
 		case CONSOLE_CODE_ROUTE_CAR:
 			route_select_car_update();
 			return true;
+		case CONSOLE_CODE_SIDE_MAP:
+			side_map_update();
+			return true;
+		case CONSOLE_CODE_SIDE_MAP_CAR:
+			side_map_car_update();
+			return true;
+		case CONSOLE_CODE_SIDE_MAP_SIGN:
+			side_map_sign_update();
+			return true;
 		default:
 			return false;
 	}
@@ -283,18 +323,6 @@ void console_attach(void)
 {
 	call_code_elsewhere = console_code;
 	s32_video_use_extra_palette(true);    /* (REVERSE's start line) */
-}
-
-/* The steps of game mode 6 (and of the demo's race, game mode 4) from the race's set-up to its fade out
-   (game_mode_play): the race on the screen */
-static bool racing(uint32_t screen_block)
-{
-	const uint8_t mode = SCREEN(screen_block)->game_mode;
-	const uint8_t step = SCREEN(screen_block)->game_step;
-
-	if (mode != GAME_MODE_PLAY && mode != GAME_MODE_DEMO_RACE)
-		return false;
-	return step == 5u || step == 6u || step == 7u || step == 8u || step == 11u || (step >= 23u && step <= 27u);
 }
 
 int console_wide_side(void)
@@ -342,6 +370,16 @@ bool console_manual_gears(void)
 void console_quit_game(void)
 {
 	console.quit_seats = 3u;
+}
+
+void console_side_map_wanted(bool wanted)
+{
+	console.side_map_wanted = wanted;
+}
+
+bool console_side_map_shown(void)
+{
+	return console_side_map_running();
 }
 
 bool console_right_seat_joins(void)

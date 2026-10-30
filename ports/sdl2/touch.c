@@ -14,8 +14,11 @@
  *    the top right (the race's pause); SHIFT UP and DOWN above GAS in a race with the manual transmission
  *    alone (none with the automatic); the radio a small oval at the bottom. A finger that slides from one
  *    button to another presses the one under it. Back in the menus is Android's own back. Places and sizes
- *    are in the screen's height, the same on every phone: a phone's sides, where they mostly are, are what
- *    the 16:9 picture leaves free. As SegaSonic's touch.c, with the race's controls.
+ *    are in the height of the controls' area, the same on every phone: on a phone, the whole screen, whose
+ *    sides, where they mostly are, are what the wide picture leaves free; on a screen taller than the picture
+ *    (a tablet's, an open Fold's: Sebas) the room under the picture, which goes to the top, with room
+ *    between the wheel and the pedals for the game's route map (touch_map_room). As SegaSonic's touch.c,
+ *    with the race's controls.
  */
 #include "touch.h"
 
@@ -28,13 +31,12 @@
 #define FINGERS          10
 #define SHAPE_HEIGHT     128     /* the shapes' pictures, scaled to each control */
 #define EDGE             0.06    /* a ring's width, in its height */
-#define WHEEL_X          0.25    /* the wheel's place while it waits: from the left and the bottom */
-#define WHEEL_Y          0.27
-#define WHEEL_RADIUS     0.15    /* its ring: turned all the way */
-#define KNOB_RADIUS      0.07
 #define WHEEL_DIRECTION  0.35    /* a turn that is a menu's arrow too, in the ring's radius */
 #define BUTTON_MARGIN    0.03    /* a button takes a finger this far past its edge */
 #define GLYPH_MIDDLE     7       /* font.bmp's capitals: rows 2 to 11 of their 16 */
+#define ROOM_UNDER       0.25    /* the room under the picture, in the screen's height, that takes the controls */
+#define AREA_ASPECT      2.2     /* the controls' unit: the area's height, or its width over this, the smaller */
+#define MAP_MARGIN       0.06    /* around the route map's room, in the unit */
 
 #define CONTROL_BIT(control) (1u << (control))
 
@@ -58,16 +60,49 @@ typedef struct
 
 enum { BUTTON_GAS, BUTTON_BRAKE, BUTTON_SHIFT_UP, BUTTON_SHIFT_DOWN, BUTTON_START, BUTTON_MUSIC, BUTTONS };
 
-static const button buttons[BUTTONS] = {
-	[BUTTON_GAS] = { FROM_BOTTOM_RIGHT, 0.20, 0.25, 0.26, 0.26, CONTROL_BIT(CONTROL_GAS), ACTION_BIT(ACTION_ACCEPT),
-		"GAS", false },
-	[BUTTON_BRAKE] = { FROM_BOTTOM_RIGHT, 0.48, 0.17, 0.21, 0.21, CONTROL_BIT(CONTROL_BRAKE), 0, "BRAKE", false },
-	[BUTTON_SHIFT_UP] = { FROM_BOTTOM_RIGHT, 0.13, 0.58, 0.15, 0.15, CONTROL_BIT(CONTROL_SHIFT_UP), 0, "UP", true },
-	[BUTTON_SHIFT_DOWN] = { FROM_BOTTOM_RIGHT, 0.31, 0.50, 0.15, 0.15, CONTROL_BIT(CONTROL_SHIFT_DOWN), 0, "DOWN",
-		true },
-	[BUTTON_START] = { FROM_TOP_RIGHT, 0.17, 0.09, 0.24, 0.09, CONTROL_BIT(CONTROL_START), ACTION_BIT(ACTION_START),
-		"START", false },
-	[BUTTON_MUSIC] = { FROM_BOTTOM_MIDDLE, 0.0, 0.06, 0.20, 0.08, CONTROL_BIT(CONTROL_MUSIC), 0, "MUSIC", false },
+/* Where the controls are, in the unit: over the picture on a phone's whole screen (their room at its sides
+   and corners), or filling the room under it on a tall screen (the wheel and the pedals as large as it lets
+   them, the route map between them) */
+typedef struct
+{
+	double wheel_x, wheel_y;     /* the wheel's place while it waits: from the left and the bottom */
+	double wheel_radius;         /* its ring: turned all the way */
+	double knob_radius;
+	button buttons[BUTTONS];
+} layout;
+
+static const layout over_picture = {
+	0.25, 0.27, 0.15, 0.07,
+	{
+		[BUTTON_GAS] = { FROM_BOTTOM_RIGHT, 0.20, 0.25, 0.26, 0.26, CONTROL_BIT(CONTROL_GAS),
+			ACTION_BIT(ACTION_ACCEPT), "GAS", false },
+		[BUTTON_BRAKE] = { FROM_BOTTOM_RIGHT, 0.48, 0.17, 0.21, 0.21, CONTROL_BIT(CONTROL_BRAKE), 0, "BRAKE", false },
+		[BUTTON_SHIFT_UP] = { FROM_BOTTOM_RIGHT, 0.13, 0.58, 0.15, 0.15, CONTROL_BIT(CONTROL_SHIFT_UP), 0, "UP",
+			true },
+		[BUTTON_SHIFT_DOWN] = { FROM_BOTTOM_RIGHT, 0.31, 0.50, 0.15, 0.15, CONTROL_BIT(CONTROL_SHIFT_DOWN), 0,
+			"DOWN", true },
+		[BUTTON_START] = { FROM_TOP_RIGHT, 0.17, 0.09, 0.24, 0.09, CONTROL_BIT(CONTROL_START),
+			ACTION_BIT(ACTION_START), "START", false },
+		[BUTTON_MUSIC] = { FROM_BOTTOM_MIDDLE, 0.0, 0.06, 0.20, 0.08, CONTROL_BIT(CONTROL_MUSIC), 0, "MUSIC",
+			false },
+	},
+};
+
+static const layout under_picture = {
+	0.45, 0.50, 0.36, 0.15,
+	{
+		[BUTTON_GAS] = { FROM_BOTTOM_RIGHT, 0.34, 0.45, 0.56, 0.56, CONTROL_BIT(CONTROL_GAS),
+			ACTION_BIT(ACTION_ACCEPT), "GAS", false },
+		[BUTTON_BRAKE] = { FROM_BOTTOM_RIGHT, 0.92, 0.32, 0.44, 0.44, CONTROL_BIT(CONTROL_BRAKE), 0, "BRAKE", false },
+		[BUTTON_SHIFT_UP] = { FROM_BOTTOM_RIGHT, 0.70, 0.80, 0.24, 0.24, CONTROL_BIT(CONTROL_SHIFT_UP), 0, "UP",
+			true },
+		[BUTTON_SHIFT_DOWN] = { FROM_BOTTOM_RIGHT, 1.10, 0.80, 0.24, 0.24, CONTROL_BIT(CONTROL_SHIFT_DOWN), 0,
+			"DOWN", true },
+		[BUTTON_START] = { FROM_TOP_RIGHT, 0.30, 0.10, 0.40, 0.14, CONTROL_BIT(CONTROL_START),
+			ACTION_BIT(ACTION_START), "START", false },
+		[BUTTON_MUSIC] = { FROM_BOTTOM_MIDDLE, 0.0, 0.09, 0.30, 0.12, CONTROL_BIT(CONTROL_MUSIC), 0, "MUSIC",
+			false },
+	},
 };
 
 typedef enum { FINGER_FREE, FINGER_WHEEL, FINGER_BUTTON } finger_role;
@@ -82,6 +117,11 @@ static struct
 static bool shown;
 static bool gears_shown;                            /* the gears' buttons: touch_draw's last frame */
 static int screen_width = 1, screen_height = 1;    /* the renderer's, as it last drew */
+static SDL_Rect area = { 0, 0, 1, 1 };              /* the controls': the screen, or the room under the picture */
+static double unit = 1.0;                           /* their places and sizes, in pixels */
+static bool under;                                  /* the area is the room under the picture */
+static const layout *laid = &over_picture;          /* the controls' places there */
+static const button *const buttons = over_picture.buttons;    /* (what each button does: the same in both) */
 static double wheel_x, wheel_y;                     /* the wheel's centre while a finger holds it */
 static double turn_x, turn_y;                       /* -1 to 1 */
 static SDL_Texture *disc, *ring, *pill, *pill_ring;
@@ -136,36 +176,67 @@ void touch_open(SDL_Renderer *renderer, const char *base)
 	const int pill_width = (int)lround(SHAPE_HEIGHT * buttons[BUTTON_START].width / buttons[BUTTON_START].height);
 
 	SDL_GetRendererOutputSize(renderer, &screen_width, &screen_height);
+	area.w = screen_width;
+	area.h = screen_height;
+	unit = SDL_min(area.h, area.w / AREA_ASPECT);
 	disc = make_shape(renderer, SHAPE_HEIGHT, SHAPE_HEIGHT, false);
 	ring = make_shape(renderer, SHAPE_HEIGHT, SHAPE_HEIGHT, true);
 	pill = make_shape(renderer, pill_width, SHAPE_HEIGHT, false);
 	pill_ring = make_shape(renderer, pill_width, SHAPE_HEIGHT, true);
 	have_font = letters_load(renderer, base, &font) != 0;
+#ifdef ORUNNERS_TOUCH_TEST
+	shown = true;    /* (a computer's check: no touch screen) */
+#else
 	shown = SDL_GetNumTouchDevices() > 0;
+#endif
+}
+
+void touch_layout(int width, int height, SDL_Rect *picture)
+{
+	screen_width = width;
+	screen_height = height;
+	under = height - picture->h >= height * ROOM_UNDER;
+	if (under)
+	{
+		picture->y = 0;    /* (the picture at the top, the controls in the room under it) */
+		area.x = 0;
+		area.y = picture->h;
+		area.w = width;
+		area.h = height - picture->h;
+	}
+	else
+	{
+		area.x = area.y = 0;
+		area.w = width;
+		area.h = height;
+	}
+	unit = SDL_min(area.h, area.w / AREA_ASPECT);
+	laid = under ? &under_picture : &over_picture;
 }
 
 /* A button's centre and size on the screen, in pixels */
 static void place(int which, double *x, double *y, double *width, double *height)
 {
-	const button *it = &buttons[which];
+	const button *it = &laid->buttons[which];
+	const double right = area.x + area.w, bottom = area.y + area.h;
 
 	switch (it->from)
 	{
 		case FROM_TOP_RIGHT:
-			*x = screen_width - it->x * screen_height;
-			*y = it->y * screen_height;
+			*x = right - it->x * unit;
+			*y = area.y + it->y * unit;
 			break;
 		case FROM_BOTTOM_MIDDLE:
-			*x = screen_width / 2.0 + it->x * screen_height;
-			*y = screen_height - it->y * screen_height;
+			*x = area.x + area.w / 2.0 + it->x * unit;
+			*y = bottom - it->y * unit;
 			break;
 		default:
-			*x = screen_width - it->x * screen_height;
-			*y = screen_height - it->y * screen_height;
+			*x = right - it->x * unit;
+			*y = bottom - it->y * unit;
 			break;
 	}
-	*width = it->width * screen_height;
-	*height = it->height * screen_height;
+	*width = it->width * unit;
+	*height = it->height * unit;
 }
 
 static bool button_shown(int which)
@@ -177,7 +248,7 @@ static bool button_shown(int which)
 static int button_at(double x, double y)
 {
 	int nearest = -1;
-	double nearest_distance = BUTTON_MARGIN * screen_height;
+	double nearest_distance = BUTTON_MARGIN * unit;
 
 	for (int which = 0; which < BUTTONS; which++)
 	{
@@ -222,7 +293,7 @@ static bool wheel_held(void)
 /* The wheel toward a finger at (x, y), turned all the way at its ring and beyond */
 static void turn_to(double x, double y)
 {
-	const double radius = WHEEL_RADIUS * screen_height;
+	const double radius = laid->wheel_radius * unit;
 	const double length = hypot(x - wheel_x, y - wheel_y) / radius;
 	const double keep = length > 1.0 ? 1.0 / length : 1.0;
 
@@ -232,7 +303,7 @@ static void turn_to(double x, double y)
 
 static void finger_down(SDL_FingerID id, double x, double y)
 {
-	const double radius = WHEEL_RADIUS * screen_height;
+	const double radius = laid->wheel_radius * unit;
 	const int slot = finger_slot(id, true);
 
 	if (slot < 0)
@@ -243,10 +314,10 @@ static void finger_down(SDL_FingerID id, double x, double y)
 		fingers[slot].role = FINGER_BUTTON;
 	else if (x < screen_width / 2.0 && !wheel_held())
 	{
-		/* the wheel where the finger lands, all of its ring on the screen */
+		/* the wheel where the finger lands, all of its ring in the controls' area */
 		fingers[slot].role = FINGER_WHEEL;
-		wheel_x = clamped(x, radius, screen_width / 2.0);
-		wheel_y = clamped(y, radius, screen_height - radius);
+		wheel_x = clamped(x, area.x + radius, area.x + area.w / 2.0);
+		wheel_y = area.h > 2 * radius ? clamped(y, area.y + radius, area.y + area.h - radius) : area.y + area.h / 2.0;
 		turn_to(x, y);
 	}
 }
@@ -277,8 +348,10 @@ void touch_event(const SDL_Event *event)
 			fingers[slot].role = FINGER_FREE;
 			break;
 		case SDL_KEYDOWN:
+#ifndef ORUNNERS_TOUCH_TEST    /* (a computer's check: the keyboard drives the game to them) */
 			if (event->key.keysym.scancode != SDL_SCANCODE_AC_BACK)    /* (Android's back: the screen's too) */
 				shown = false;
+#endif
 			break;
 		case SDL_CONTROLLERBUTTONDOWN:
 			shown = false;
@@ -351,22 +424,50 @@ static void draw_shape(SDL_Renderer *renderer, SDL_Texture *shape, double x, dou
 	SDL_RenderCopy(renderer, shape, NULL, &where);
 }
 
+bool touch_map_room(SDL_Rect *room)
+{
+	double left, right, top, bottom;
+	double music_x, music_y, music_width, music_height;
+
+	if (!under)
+		return false;
+	place(BUTTON_MUSIC, &music_x, &music_y, &music_width, &music_height);
+	left = area.x + (laid->wheel_x + laid->wheel_radius + MAP_MARGIN) * unit;
+	right = area.x + area.w;
+	for (int which = 0; which < BUTTONS; which++)
+		if (which != BUTTON_MUSIC && button_shown(which))
+		{
+			double x, y, width, height;
+
+			place(which, &x, &y, &width, &height);
+			right = SDL_min(right, x - width / 2 - MAP_MARGIN * unit);    /* (the leftmost of the right's) */
+		}
+	top = area.y + MAP_MARGIN * unit;
+	bottom = music_y - music_height / 2 - MAP_MARGIN * unit;
+	if (right - left < unit * 0.5 || bottom - top < unit * 0.3)
+		return false;    /* (no room for it) */
+	room->x = (int)lround(left);
+	room->y = (int)lround(top);
+	room->w = (int)lround(right - left);
+	room->h = (int)lround(bottom - top);
+	return true;
+}
+
 void touch_draw(SDL_Renderer *renderer, bool gears)
 {
 	bool wheel;
 	uint32_t held;
 	double radius, knob, centre_x, centre_y;
 
-	SDL_GetRendererOutputSize(renderer, &screen_width, &screen_height);
 	gears_shown = gears;
 	if (!shown)
 		return;
 	wheel = wheel_held();
 	held = buttons_held();
-	radius = WHEEL_RADIUS * screen_height;
-	knob = KNOB_RADIUS * screen_height;
-	centre_x = wheel ? wheel_x : WHEEL_X * screen_height;
-	centre_y = wheel ? wheel_y : screen_height - WHEEL_Y * screen_height;
+	radius = laid->wheel_radius * unit;
+	knob = laid->knob_radius * unit;
+	centre_x = wheel ? wheel_x : area.x + laid->wheel_x * unit;
+	centre_y = wheel ? wheel_y : area.y + area.h - laid->wheel_y * unit;
 	draw_shape(renderer, disc, centre_x, centre_y, radius * 2, radius * 2, 0, wheel ? 70 : 45);
 	draw_shape(renderer, ring, centre_x, centre_y, radius * 2, radius * 2, 255, wheel ? 150 : 90);
 	draw_shape(renderer, disc, centre_x + turn_x * radius, centre_y + turn_y * radius, knob * 2, knob * 2, 255,
