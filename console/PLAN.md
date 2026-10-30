@@ -210,10 +210,14 @@ merged here; this repository adds console/, the ports and their documents.
   device of its list. Checked with two headless games on one computer (--real-time, tests/console/network_*):
   a race of both to its end and back to the room, the joiner gone mid-race, the host gone mid-race. Its pages
   in the menus' font, in its colour 0E0, white to pink, the line chosen 0C0 (Sebas: not white, yellow and
-  orange).
+  orange). Only the room's devices are heard, each at the address it was first heard at; the room's list
+  from its host alone; a record's numbers that index the game (players, checkpoints, stages, cars, their
+  animations, the course records) kept within its tables before the game reads them.
 
 ## To do
 
+- The network on a network shared with strangers: a room's code to join it (today a device on the same local
+  network can fill a room with JOINs or speak for a member it overhears).
 - The network: checked on two windows and between devices (Android's broadcasts:
   some phones drop them without a multicast lock, then a room's address typed in); the pause in a network
   race without holding the game (today the pause holds this device's car, the others race on); the entries

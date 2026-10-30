@@ -48,6 +48,13 @@
 #define ENTRIES_CUT         0x28u      /* race_entries_update's entry_frames once every player is in */
 #define RACE_PART           0x30u      /* a race record's race (race_record_clear): the car's state, its passes */
 
+/* What a record's numbers index in the game, for those from the network (check_record) */
+#define CHECKPOINTS         6u         /* a race's checkpoints, the goal's the last: stage_count 0-6 */
+#define LAST_STAGE          0x1Eu      /* the map's stages, 0-1E */
+#define CAR_MODELS          8u
+#define COURSES             10u        /* course_records: a course each goal */
+#define SPRITE_ANIMATIONS   0x22B2u    /* sprite_animations' entries (034138, 8AC8 bytes) */
+
 static const uint8_t magic[4] = { 'O', 'R', 'U', 'N' };
 
 enum { PACKET_BEACON = 1, PACKET_JOIN, PACKET_STATE, PACKET_LEAVE };
@@ -87,12 +94,14 @@ static struct
 	uint8_t start_serial;      /* the host's STARTs */
 	peer peers[SLOTS];
 	uint32_t role_frame;       /* JOINING: since when */
-	net_address joining;       /* JOINING: the room's host */
+	net_address joining;       /* JOINING: the room's host, its address */
+	uint32_t joining_host;     /* and its id */
 
 	/* the rooms found (JOIN) */
 	struct
 	{
 		uint32_t room;
+		uint32_t host;         /* its host's id */
 		net_address address;
 		char name[CONSOLE_NAME_LENGTH + 1];
 		int members;
@@ -491,8 +500,8 @@ static void send_leave(void)
 }
 
 /* A beacon: the room into JOIN's list (where it comes from: its host's address; one from this computer's
-   loopback only until the network's comes) */
-static void take_beacon(reader *in, uint32_t room, net_address from)
+   loopback only until the network's comes), with its host's id */
+static void take_beacon(reader *in, uint32_t room, uint32_t sender, net_address from)
 {
 	int index;
 
@@ -508,6 +517,7 @@ static void take_beacon(reader *in, uint32_t room, net_address from)
 	}
 	else if (from.ip != NET_LOOPBACK)
 		net.rooms[index].address = from;
+	net.rooms[index].host = sender;
 	get_name(in, net.rooms[index].name);
 	net.rooms[index].members = (int)get8(in);
 	net.rooms[index].heard = net.frame;
@@ -531,9 +541,48 @@ static void take_join(reader *in, uint32_t sender, net_address from)
 	net.list_version++;
 }
 
-/* A member's STATE: the room's list from its host (a newer one), START, and the records it carries */
+/* A record from the network: its numbers that index the game's tables and arrays (the players', the
+   checkpoints', the stages', the cars' and their animations') kept within them, so that a broken datagram, or a
+   device on the network meaning harm, reaches nothing past them */
+static void check_record(struct race *record)
+{
+	const int players = net.machines * 2;
+	uint8_t *order = (uint8_t *)record + offsetof(struct race, race_order);
+
+	if (record->racer_count > players)
+		record->racer_count = (uint8_t)players;
+	for (int index = 0; index < SLOTS; index++)
+		if (order[index] >= players)
+			order[index] = 0u;
+	if (record->entrant != 0xFFu && record->entrant >= players)
+		record->entrant = 0xFFu;
+	if (record->pass_player >= players)
+		record->pass_player = 0u;
+	if (record->pass_order >= players)
+		record->pass_order = 0u;
+	if (record->pass_checkpoint >= CHECKPOINTS)
+		record->pass_checkpoint = CHECKPOINTS - 1u;
+	record->pass_branch &= 1u;
+	if (record->stage_count > CHECKPOINTS)
+		record->stage_count = CHECKPOINTS;
+	if (record->stage > LAST_STAGE)
+		record->stage = LAST_STAGE;
+	if (record->model >= CAR_MODELS)
+		record->model = 0u;
+	if (record->car_choice > CAR_MODELS)
+		record->car_choice = 0u;
+	if (record->car_number >= players)
+		record->car_number = 0u;
+	if (record->record_course >= COURSES)
+		record->record_course = 0u;
+	if (record->animation >= SPRITE_ANIMATIONS)
+		record->animation = 0u;
+}
+
+/* A member's STATE: the room's list from the room's host (a newer one), START, and the records it carries */
 static void take_state(reader *in, uint32_t sender)
 {
+	const uint32_t host = net.role == ROLE_JOINING ? net.joining_host : (net.member_count > 0 ? net.members[0].id : 0u);
 	member list[MACHINES];
 	uint16_t version;
 	uint8_t start_serial, flags, link_serial, machine;
@@ -549,7 +598,7 @@ static void take_state(reader *in, uint32_t sender)
 	{
 		list[index].id = get32(in);
 		get_name(in, list[index].name);
-		list[index].players = (uint8_t)get8(in);
+		list[index].players = (uint8_t)(get8(in) == 2u ? 2u : 1u);
 		list[index].address.ip = get32(in);
 		list[index].address.port = (uint16_t)get16(in);
 	}
@@ -561,8 +610,9 @@ static void take_state(reader *in, uint32_t sender)
 	if (heard)
 		heard->flags = flags;
 
-	/* the list from the room's host: JOINING ends once it lists this device */
-	if (count > 0 && list[0].id == sender && (int16_t)(version - net.list_version) >= 0)
+	/* the list from the room's host (the one JOIN found, or the list's first): JOINING ends once it lists this
+	   device */
+	if (count > 0 && list[0].id == sender && sender == host && (int16_t)(version - net.list_version) >= 0)
 	{
 		const bool new_start = net.role == ROLE_IN_ROOM && start_serial != net.start_serial;
 
@@ -589,8 +639,10 @@ static void take_state(reader *in, uint32_t sender)
 		get_bytes(in, record, RECORD_BYTES);
 		if (in->short_of || !net.linked || link_serial != net.link_serial || slot >= net.machines * 2)
 			continue;
-		if (publisher(slot) == machine && slot / 2 + 1 != net.machine)
-			memcpy(net.slots[slot], record, RECORD_BYTES);
+		if (publisher(slot) != machine || slot / 2 + 1 == net.machine || net.link_ids[machine - 1] != sender)
+			continue;    /* (only the machine that carries the slot, and that machine only) */
+		check_record((struct race *)record);
+		memcpy(net.slots[slot], record, RECORD_BYTES);
 	}
 }
 
@@ -618,12 +670,22 @@ static void take_datagrams(void)
 		if (kind == PACKET_BEACON)
 		{
 			if (net.role == ROLE_SEARCHING)
-				take_beacon(&in, room, from);
+				take_beacon(&in, room, sender, from);
 			continue;
 		}
 		if (room != net.room || net.role == ROLE_OFF || net.role == ROLE_SEARCHING)
 			continue;
-		heard = peer_of(sender, true);
+
+		/* the room's devices alone (and, at its host, a device that JOINs; while JOINING, its host), each at the
+		   address it was first heard at: a datagram with its id from another is not its */
+		heard = peer_of(sender, false);
+		if (heard && heard->address.ip && (heard->address.ip != from.ip || heard->address.port != from.port))
+			continue;
+		if (!heard && member_index(sender) < 0 && !(kind == PACKET_JOIN && hosting())
+			&& !(net.role == ROLE_JOINING && sender == net.joining_host))
+			continue;
+		if (!heard)
+			heard = peer_of(sender, true);
 		heard->heard = net.frame;
 		heard->address = from;
 		switch (kind)
@@ -655,14 +717,15 @@ static void take_datagrams(void)
 #define HOST_TAKEN          0xFFu      /* in a record's link_pad_5A (nothing of the game's reads it): the race
                                           hosted on from a host gone */
 
+/* (a player of the link: one of its machines' seats) */
 static bool player_lost(int player)
 {
-	return net.link_lost[player / 2];
+	return player >= 0 && player < net.machines * 2 && net.link_lost[player / 2];
 }
 
 static uint32_t copy_of(int player)
 {
-	return race_copy_offsets[player] + GAME_VARIABLES;
+	return race_copy_offsets[player >= 0 && player < SLOTS ? player : 0] + GAME_VARIABLES;
 }
 
 static uint8_t *race_order(uint32_t race)
@@ -788,6 +851,7 @@ static bool carry_link(void)
 static bool check_members(void)
 {
 	bool silent = false;
+	peer *gone;
 
 	for (int machine = 1; net.linked && machine <= net.machines; machine++)
 	{
@@ -810,6 +874,9 @@ static bool check_members(void)
 		memmove(&net.members[index], &net.members[index + 1], sizeof(member) * (size_t)(net.member_count - index - 1));
 		net.member_count--;
 		net.list_version++;
+		gone = peer_of(id, false);
+		if (gone)
+			memset(gone, 0, sizeof(*gone));    /* (its address forgotten: it may JOIN again from another) */
 	}
 	return silent;
 }
@@ -931,6 +998,7 @@ void console_network_join(int room)
 		return;
 	net.room = net.rooms[room].room;
 	net.joining = net.rooms[room].address;
+	net.joining_host = net.rooms[room].host;
 	net.role = ROLE_JOINING;
 	net.role_frame = net.frame;
 	net.member_count = 0;
