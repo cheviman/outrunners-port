@@ -50,7 +50,8 @@
 
 #define USAGE "Usage: orunners_headless [--frames N] [--hashes FILE] [--script FILE] [--dump-frame N --dump-dir DIR]" \
 	" [--video-hashes FILE] [--video-dump N ... --video-dir DIR] [--sound-hashes FILE]" \
-	" [--sprite-census FILE] [--tile-census FILE] [--memory-census FILE] [--assets FOLDER] [--sound-wav FILE]" \
+	" [--sprite-census FILE] [--tile-census FILE] [--memory-census FILE] [--assets FOLDER|PACK.assets]" \
+	" [--write-pack PACK.assets] [--sound-wav FILE]" \
 	" (orunners_console_headless: [--actions FILE] [--wide] [--autopilot] [--ghost-folder DIR]" \
 	" [--pause-dump N])\n"
 #define MAX_VIDEO_DUMPS 64
@@ -357,7 +358,12 @@ static const char *load_assets(const char *program, const char *given)
 	FILE *probe;
 
 	if (given)
-		return assets_load(given);
+	{
+		const size_t length = strlen(given);
+
+		/* (a pack, made by --write-pack: one file) */
+		return length > 7 && strcmp(given + length - 7, ".assets") == 0 ? assets_load_pack(given) : assets_load(given);
+	}
 	snprintf(folder, sizeof(folder), "%.*sassets", last ? (int)(last - program + 1) : 0, program);
 	snprintf(beside_layout, sizeof(beside_layout), "%s/data/layout.json", folder);
 	if ((probe = fopen(beside_layout, "rb")) != NULL)
@@ -379,6 +385,7 @@ int main(int argc, char **argv)
 	const char *tile_census_path = NULL;
 	const char *memory_census_path = NULL;
 	const char *assets_path = NULL;
+	const char *pack_path = NULL;    /* --write-pack FILE */
 	bool frames_given = false;
 
 	for (int index = 1; index < argc; index++)
@@ -422,6 +429,8 @@ int main(int argc, char **argv)
 			memory_census_path = argv[++index];
 		else if (strcmp(argv[index], "--assets") == 0 && index + 1 < argc)
 			assets_path = argv[++index];
+		else if (strcmp(argv[index], "--write-pack") == 0 && index + 1 < argc)
+			pack_path = argv[++index];
 #ifdef ORUNNERS_CONSOLE
 		else if (strcmp(argv[index], "--wide") == 0)
 			console_window_settings.wide = true;    /* (OPTIONS > VIDEO > WIDE) */
@@ -450,6 +459,7 @@ int main(int argc, char **argv)
 	}
 #ifdef ORUNNERS_SCAFFOLD
 	(void)assets_path;
+	(void)pack_path;
 	{
 		const char *problem = game_rom_set_load("rom");
 
@@ -467,6 +477,17 @@ int main(int argc, char **argv)
 		{
 			fprintf(stderr, "%s\n", problem);
 			return 1;
+		}
+		if (pack_path)
+		{
+			/* --write-pack: the assets loaded, as the pack the devices' builds load */
+			if ((problem = assets_pack_write(pack_path)) != NULL)
+			{
+				fprintf(stderr, "%s: %s\n", pack_path, problem);
+				return 1;
+			}
+			printf("%s written\n", pack_path);
+			return 0;
 		}
 	}
 	s32_board.program_at = data_at;

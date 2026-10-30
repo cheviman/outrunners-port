@@ -64,6 +64,15 @@ const s32_graphics *assets_graphics(void);
    (for the board's sound: s32_board.pcm_at) */
 uint8_t assets_pcm_byte(uint32_t place);
 
+/* The assets as one file, the pack (the devices' builds and the tools that make their packages): written
+   from the assets loaded (assets_load), and loaded in their place from its bytes ('bytes', 'size': kept by
+   the caller while the game runs) or from a file. The pack holds what the loader makes of the assets, the
+   version of the game's tables it was made for in its head: a pack of another build is refused. NULL, or
+   what failed, in words for the player */
+const char *assets_pack_write(const char *path);
+const char *assets_load_pack_bytes(const uint8_t *bytes, size_t size);
+const char *assets_load_pack(const char *path);
+
 /* Every loaded piece into 'path' (a development aid: what the loader read, to compare with the ROM set):
    per piece its address and size (32 bits, little endian), then its bytes; false when it cannot be written */
 int assets_dump(const char *path);

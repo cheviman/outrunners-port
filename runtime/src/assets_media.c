@@ -727,6 +727,84 @@ uint8_t assets_pcm_byte(uint32_t place)
 	return pcm_blocks[low - 1].data[place - pcm_blocks[low - 1].offset];
 }
 
+/* ---- the pack's part ---- */
+
+int assets_pack_write_media(FILE *output)
+{
+	uint8_t present[TILE_COUNT / 8] = { 0 };
+	int written;
+
+	for (uint32_t tile = 0; tile < TILE_COUNT; tile++)
+		if (tile_pens[tile])
+			present[tile / 8] |= (uint8_t)(1u << (tile % 8));
+	written = pack_put_bytes(output, present, sizeof(present));
+	for (uint32_t tile = 0; tile < TILE_COUNT && written; tile++)
+		if (tile_pens[tile])
+			written = pack_put_bytes(output, tile_pens[tile], 256);
+	written = written && pack_put32(output, (uint32_t)sprite_block_count);
+	for (size_t block = 0; block < sprite_block_count && written; block++)
+	{
+		const sprite_block *each = &sprite_blocks[block];
+
+		written = pack_put32(output, each->first) && pack_put32(output, each->count);
+		for (uint32_t word = 0; word < each->count && written; word++)
+			written = pack_put32(output, each->words[word]);
+	}
+	written = written && pack_put_bytes(output, pcm_headers, sizeof(pcm_headers))
+		&& pack_put32(output, (uint32_t)pcm_block_count);
+	for (size_t block = 0; block < pcm_block_count && written; block++)
+		written = pack_put32(output, pcm_blocks[block].offset) && pack_put32(output, pcm_blocks[block].length)
+			&& pack_put_bytes(output, pcm_blocks[block].data, pcm_blocks[block].length);
+	return written;
+}
+
+int assets_pack_read_media(pack_reader *reader)
+{
+	const uint8_t *present = pack_get_bytes(reader, TILE_COUNT / 8), *headers;
+	uint32_t count;
+
+	if (!present)
+		return 0;
+	for (uint32_t tile = 0; tile < TILE_COUNT; tile++)
+		if ((present[tile / 8] >> (tile % 8)) & 1u)
+		{
+			if (!(tile_pens[tile] = pack_get_bytes(reader, 256)))
+				return 0;
+		}
+		else
+			tile_pens[tile] = NULL;
+	if (!pack_get32(reader, &count) || !(sprite_blocks = calloc(count ? count : 1, sizeof(*sprite_blocks))))
+		return 0;
+	sprite_block_count = count;
+	last_block = 0;
+	for (uint32_t block = 0; block < count; block++)
+	{
+		sprite_block *each = &sprite_blocks[block];
+		const uint8_t *words;
+
+		if (!pack_get32(reader, &each->first) || !pack_get32(reader, &each->count)
+			|| !(words = pack_get_bytes(reader, (size_t)each->count * 4u)))
+			return 0;
+		each->words = (uint32_t *)(uintptr_t)words;    /* (4-byte aligned, little endian: the hosts' order) */
+	}
+	if (!(headers = pack_get_bytes(reader, sizeof(pcm_headers))) || !pack_get32(reader, &count)
+		|| !(pcm_blocks = calloc(count ? count : 1, sizeof(*pcm_blocks))))
+		return 0;
+	memcpy(pcm_headers, headers, sizeof(pcm_headers));
+	pcm_block_count = count;
+	last_pcm = 0;
+	for (uint32_t block = 0; block < count; block++)
+	{
+		pcm_block *each = &pcm_blocks[block];
+
+		if (!pack_get32(reader, &each->offset) || !pack_get32(reader, &each->length)
+			|| !(each->data = pack_get_bytes(reader, each->length)))
+			return 0;
+		each->name = NULL;
+	}
+	return 1;
+}
+
 /* ---- the graphics for the video ---- */
 
 const s32_graphics *assets_graphics(void)

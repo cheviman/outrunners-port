@@ -939,6 +939,60 @@ const uint8_t *assets_sound_data(uint32_t offset)
 	return find(&sound, offset);
 }
 
+/* ---- the pack's part ---- */
+
+int assets_pack_write_data(FILE *output)
+{
+	int written = 1;
+
+	for (int which = 0; which < 2 && written; which++)
+	{
+		const data_region *region = which ? &sound : &program;
+
+		written = pack_put32(output, (uint32_t)region->count);
+		for (size_t index = 0; index < region->count && written; index++)
+			written = pack_put32(output, region->pieces[index].address) && pack_put32(output, region->pieces[index].size)
+				&& pack_put_bytes(output, region->pieces[index].data, region->pieces[index].size);
+	}
+	return written;
+}
+
+int assets_pack_read_data(pack_reader *reader)
+{
+	for (int which = 0; which < 2; which++)
+	{
+		data_region *region = which ? &sound : &program;
+		uint32_t count;
+
+		if (!pack_get32(reader, &count) || !(region->pieces = calloc(count ? count : 1, sizeof(*region->pieces))))
+			return 0;
+		region->count = count;
+		region->bytes = 0;
+		region->last = 0;
+		for (uint32_t index = 0; index < count; index++)
+		{
+			piece *each = &region->pieces[index];
+
+			if (!pack_get32(reader, &each->address) || !pack_get32(reader, &each->size)
+				|| !(each->data = (uint8_t *)pack_get_bytes(reader, each->size)))
+				return 0;
+			region->bytes += each->size;
+		}
+	}
+	for (size_t index = 0; index < game_table_count; index++)
+	{
+		const uint8_t *found = find(&program, folded(game_tables[index].address));
+
+		if (!found)
+		{
+			snprintf(assets_problem, ASSETS_PROBLEM_SIZE, "the assets have no table %s", game_tables[index].name);
+			return 0;
+		}
+		*game_tables[index].data = found;
+	}
+	return 1;
+}
+
 const char *assets_load(const char *folder)
 {
 	assets_problem[0] = 0;

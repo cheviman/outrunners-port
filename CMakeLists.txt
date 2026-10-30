@@ -124,7 +124,8 @@ endif()
 
 if(ORUNNERS_DECOMPILED AND ORUNNERS_SOUND_DECOMPILED)
 	add_library(orunners_game STATIC runtime/src/game.c runtime/src/assets.c runtime/src/assets_media.c
-		runtime/src/assets_midi.c runtime/src/json.c runtime/src/png.c runtime/src/inflate.c ${ORUNNERS_DECOMPILED})
+		runtime/src/assets_midi.c runtime/src/assets_pack.c runtime/src/json.c runtime/src/png.c runtime/src/inflate.c
+		${ORUNNERS_DECOMPILED})
 	target_include_directories(orunners_game PUBLIC runtime/include ${ORUNNERS_DECOMPILED_DIR})
 	target_link_libraries(orunners_game PUBLIC s32runtime)
 	if(MSVC)
@@ -148,8 +149,8 @@ if(ORUNNERS_DECOMPILED AND ORUNNERS_SOUND_DECOMPILED)
 	# lists (console/*.c, ORUNNERS_CONSOLE), in OutRunners and a headless build for scripted checks
 	file(GLOB ORUNNERS_CONSOLE_SOURCES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/console/*.c)
 	add_library(orunners_game_console STATIC runtime/src/game.c runtime/src/assets.c runtime/src/assets_media.c
-		runtime/src/assets_midi.c runtime/src/json.c runtime/src/png.c runtime/src/inflate.c ${ORUNNERS_DECOMPILED}
-		${ORUNNERS_CONSOLE_SOURCES})
+		runtime/src/assets_midi.c runtime/src/assets_pack.c runtime/src/json.c runtime/src/png.c runtime/src/inflate.c
+		${ORUNNERS_DECOMPILED} ${ORUNNERS_CONSOLE_SOURCES})
 	target_include_directories(orunners_game_console PUBLIC runtime/include ${ORUNNERS_DECOMPILED_DIR} console)
 	target_compile_definitions(orunners_game_console PUBLIC ORUNNERS_CONSOLE)
 	target_link_libraries(orunners_game_console PUBLIC s32runtime)
