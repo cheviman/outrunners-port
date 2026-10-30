@@ -8,14 +8,15 @@
 #
 # Included by CMakeLists.txt with ORUNNERS_ANBERNIC (and the toolchain zig_aarch64.cmake: aarch64, glibc 2.35),
 # as SegaSonic's port does. The game is the console build with its picture fixed (ORUNNERS_HANDHELD: the
-# whole screen, the game's 4:3 picture, the video on the four cores), the handheld's MENU and volume keys
-# (ORUNNERS_HANDHELD_KEYS), and with the firmware's SDL2: the executable is linked against a stand-in of its
-# name (sdl2_stub.c) and SDL's headers (ORUNNERS_SDL2_INCLUDE, by default the development package in
-# build/downloads/sdl2). The handheld makes nothing from the ROM set: its folder gets the assets pack this
-# computer has (build/bin/outrunners.assets, which OutRunners writes on its first run from the player's ROM
-# set).
+# whole screen, the game's 4:3 picture, the video on the four cores; no VIDEO, no 2 PLAYERS), CONTROLS for its
+# own buttons (ORUNNERS_CONTROLS_PAGE), the handheld's MENU and volume keys (ORUNNERS_HANDHELD_KEYS), and with
+# the firmware's SDL2: the executable is linked against a stand-in of its name (sdl2_stub.c) and SDL's headers
+# (ORUNNERS_SDL2_INCLUDE, by default the development package in build/downloads/sdl2). The handheld makes
+# nothing from the ROM set: its folder gets the assets pack this computer has (build/bin/outrunners.assets,
+# which OutRunners writes on its first run from the player's ROM set).
 
-target_compile_definitions(orunners_game_console PUBLIC ORUNNERS_HANDHELD ORUNNERS_HANDHELD_KEYS)
+target_compile_definitions(orunners_game_console PUBLIC ORUNNERS_HANDHELD ORUNNERS_HANDHELD_KEYS
+	ORUNNERS_CONTROLS_PAGE)
 
 set(ORUNNERS_SDL2_INCLUDE "" CACHE PATH "SDL2's headers (the folder with SDL.h)")
 if(NOT ORUNNERS_SDL2_INCLUDE)

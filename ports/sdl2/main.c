@@ -4,7 +4,7 @@
  *                 keeps the pace, around the same game and board the headless runs check
  *    Version:     0.1.0
  *    Created:     21-10-2026
- *    Modified:    29-10-2026
+ *    Modified:    30-10-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
@@ -28,6 +28,12 @@
  *    folder of what the game keeps, or in the current folder. Where there is none, the first run takes them
  *    out of the ROM set itself into the folder of what the game keeps (first_run.c, runtime/src/extract.c):
  *    orunners.zip or rom/ beside the game or in that folder, or a set dropped on its window.
+ *
+ *    The game devices (ORUNNERS_HANDHELD) make nothing from the ROM set: their assets pack (outrunners.assets)
+ *    comes with the game, made on a computer, and their picture is fixed (fix_window_settings). On Anbernic's
+ *    handhelds it is beside the executable, where the game keeps what it writes; on the Switch it is in the
+ *    .nro's or the .nsp's romfs, and what the game writes goes to /switch/outrunners/ on the SD card, with
+ *    outrunners.log.
  *
  *    --script plays a control script (runtime/include/s32/script.h) instead of the keyboard, to its end,
  *    from a blank EEPROM and sound RAM that it does not keep; --fast runs it without waiting for the frames'
@@ -67,7 +73,12 @@
 
 #include <SDL.h>
 
-#if defined(ORUNNERS_HANDHELD) && !defined(_WIN32)
+#ifdef __SWITCH__
+#include <switch.h>        /* romfsInit: the game's own files, its .nro's or .nsp's */
+#include <sys/stat.h>
+#define SWITCH_FOLDER "sdmc:/switch/outrunners"    /* the game's folder on the SD card */
+#endif
+#if defined(ORUNNERS_HANDHELD) && !defined(_WIN32) && !defined(__SWITCH__)
 #include <unistd.h>        /* fsync: the log on the card as it is written */
 #endif
 
@@ -100,8 +111,12 @@
 #define STICK_DEAD_ZONE     4000
 #define BACKUP_RAM_START    0x1f00     /* what the game keeps of the sound board's RAM: 701F00-701FF9 */
 #define ASSETS_PACK         "outrunners.assets"    /* the assets in one file (game/assets.h), the devices' */
-#ifdef ORUNNERS_HANDHELD
-#define DEVICE_WORKERS      3          /* the video's rows on that many more cores (a handheld's four) */
+#ifdef __SWITCH__
+#define VIDEO_WORKERS       2          /* the video's rows on cores 1 and 2 (the game's is 0; 3 is the system's) */
+#else
+#define VIDEO_WORKERS       SDL_min(SDL_GetCPUCount() - 1, 3)    /* up to three more cores (a handheld's four) */
+#endif
+#ifdef ORUNNERS_HANDHELD_KEYS
 #define HANDHELD_MENU_BUTTON 8         /* the joystick button that leaves the game: the RG40XX H's MENU */
 #endif
 #define BACKUP_RAM_SIZE     0xfa
@@ -538,10 +553,27 @@ static void show_screens(void)
 	present(source);
 }
 
+#ifdef ORUNNERS_HANDHELD
+static uint64_t pace_video, pace_showing;    /* a handheld's log: the frames' time drawing them, showing them */
+#endif
+
 static void on_frame_shown(void)
 {
+	/* the video draws the screens the window shows alone (both where the frames' hashes are written) */
+	s32_video_show_screens(screens_shown() == 2 || video_hashes ? 3 : 1);
+#ifdef ORUNNERS_HANDHELD
+	const uint64_t start = SDL_GetPerformanceCounter();
+	uint64_t drawn;
+
+	s32_video_draw_frame();
+	drawn = SDL_GetPerformanceCounter();
+	show_screens();
+	pace_video += drawn - start;
+	pace_showing += SDL_GetPerformanceCounter() - drawn;
+#else
 	s32_video_draw_frame();
 	show_screens();
+#endif
 }
 
 static void toggle_full_screen(void)
@@ -620,13 +652,35 @@ static void load_window_settings(void)
 	fclose(input);
 }
 
+#ifdef ORUNNERS_HANDHELD
+/* A game device's picture, fixed whatever outrunners.ini says (OPTIONS has no VIDEO there, console/menu.c):
+   the whole screen and smooth pixels; WIDE where the screen is 16:9 (ORUNNERS_SCREEN_WIDE: the Switch's), else
+   the game's 4:3 picture as large as it fits (a handheld's 640 x 480); 2 PLAYERS side by side */
+static void fix_window_settings(void)
+{
+	console_window_settings.full_screen = true;
+#ifdef ORUNNERS_SCREEN_WIDE
+	console_window_settings.wide = true;
+#else
+	console_window_settings.wide = false;
+#endif
+	console_window_settings.pixels = PIXELS_SMOOTH;
+	console_window_settings.vertical = false;
+}
+#endif
+
 /* The window as the settings say: full screen or not, and out of it the picture times window_scale (the
-   largest whole scale under it at which it fits the screen) */
+   largest whole scale under it at which it fits the screen). A game device's window is its screen */
 static void apply_window_settings(void)
 {
+	int width, height;
+
+#ifdef ORUNNERS_HANDHELD
+	fix_window_settings();
+	picture_size(&width, &height);
+#else
 	const console_window *settings = &console_window_settings;
 	const bool full = (SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN_DESKTOP) != 0;
-	int width, height;
 
 	picture_size(&width, &height);
 	if (full != settings->full_screen)
@@ -643,6 +697,7 @@ static void apply_window_settings(void)
 		SDL_SetWindowSize(window, width * scale, height * scale);
 		SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
 	}
+#endif
 	window_width = width;
 	window_height = height;
 }
@@ -1113,7 +1168,7 @@ static void add_device_mappings(void)
 static void log_written(void)
 {
 	fflush(stderr);
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(__SWITCH__)
 	fsync(fileno(stderr));
 #endif
 }
@@ -1157,13 +1212,16 @@ static void log_pace(bool work_done)
 	}
 	if (++pace_frames == 300)
 	{
-		fprintf(stderr, "%.1f frames a second; a frame takes %.1f ms, at most %.1f\n",
-			pace_frames * (double)frequency / (double)(now - pace_start),
-			1000.0 * (double)pace_work / (double)frequency / pace_frames, 1000.0 * (double)pace_most / (double)frequency);
+		const double per_frame = 1000.0 / (double)frequency / pace_frames;
+
+		fprintf(stderr, "%.1f frames a second; a frame takes %.1f ms (its video %.1f, showing it %.1f), at most %.1f\n",
+			pace_frames * (double)frequency / (double)(now - pace_start), (double)pace_work * per_frame,
+			(double)pace_video * per_frame, (double)pace_showing * per_frame, 1000.0 * (double)pace_most / (double)frequency);
 		fflush(stderr);    /* (not to the card at once: a write to it would hold a frame) */
 		pace_start = now;
 		pace_frames = 0;
 		pace_work = pace_most = 0;
+		pace_video = pace_showing = 0;
 	}
 }
 #endif
@@ -1261,7 +1319,10 @@ static FILE *open_hashes(const char *path)
    The caller frees it (SDL_free) */
 static char *saves_folder(void)
 {
-#if defined(_WIN32) || defined(ORUNNERS_HANDHELD)
+#ifdef __SWITCH__
+	mkdir(SWITCH_FOLDER, 0777);
+	return SDL_strdup(SWITCH_FOLDER "/");
+#elif defined(_WIN32) || defined(ORUNNERS_HANDHELD)
 	return SDL_GetBasePath();    /* (a handheld's: the game's folder on its card) */
 #else
 	return SDL_GetPrefPath("", "OutRunners");
@@ -1319,6 +1380,14 @@ int main(int argc, char **argv)
 	const char *assets_path = NULL;
 	char *base, *saves;
 
+#ifdef __SWITCH__
+	romfsInit();
+	/* (what the game says, failures included, goes to outrunners.log in its folder: the Switch has no console
+	   and SDL no message boxes there) */
+	mkdir(SWITCH_FOLDER, 0777);
+	freopen(SWITCH_FOLDER "/outrunners.log", "w", stderr);
+	fprintf(stderr, "OutRunners: starting\n");
+#endif
 #ifdef ORUNNERS_HANDHELD
 	add_device_mappings();
 #endif
@@ -1326,8 +1395,11 @@ int main(int argc, char **argv)
 		return fail("SDL could not start.", SDL_GetError());
 #ifdef ORUNNERS_HANDHELD
 	log_device();
-	s32_workers_start(DEVICE_WORKERS);
 #endif
+	/* the video's layers, sprites and mixing a band of rows on each core beside the game's (the same frames
+	   as on one: runtime/src/workers.c) */
+	s32_workers_start(VIDEO_WORKERS);
+	fprintf(stderr, "video: %d threads beside the game's\n", s32_workers_count());
 	for (int index = 1; index < argc; index++)
 	{
 		if (strcmp(argv[index], "--script") == 0 && index + 1 < argc)
@@ -1361,7 +1433,11 @@ int main(int argc, char **argv)
 		return fail("A hash file cannot be written.", hashes_path && !hashes ? hashes_path
 			: (video_hashes_path && !video_hashes ? video_hashes_path : sound_hashes_path));
 
+#ifdef __SWITCH__
+	base = SDL_strdup("romfs:/");    /* (what comes with the game: the pack and the pictures) */
+#else
 	base = SDL_GetBasePath();
+#endif
 	saves = saves_folder();
 	snprintf(eeprom_path, sizeof(eeprom_path), "%s" FILE_NAME ".eeprom", saves ? saves : "");
 	snprintf(backup_ram_path, sizeof(backup_ram_path), "%s" FILE_NAME ".bookkeeping", saves ? saves : "");
@@ -1369,9 +1445,7 @@ int main(int argc, char **argv)
 	snprintf(settings_path, sizeof(settings_path), "%s" FILE_NAME ".ini", saves ? saves : "");
 	load_window_settings();
 #ifdef ORUNNERS_HANDHELD
-	/* (the device's screen: the whole of it, the game's 4:3 picture as large as it fits) */
-	console_window_settings.full_screen = true;
-	console_window_settings.wide = false;
+	fix_window_settings();
 #endif
 	{
 		char controls_path[1024];
@@ -1432,8 +1506,7 @@ int main(int argc, char **argv)
 		(void)layout;
 		(void)stale;
 		if (!found)
-			return fail("The game's assets are missing.", "Put the " ASSETS_PACK " your computer's OutRunners writes in the "
-				"game's folder.");
+			return fail("The game's assets are missing.", ASSETS_PACK);
 #else
 		if (!found || stale)
 		{
@@ -1470,7 +1543,10 @@ int main(int argc, char **argv)
 	SDL_free(base);
 	SDL_free(saves);
 
-#ifdef ORUNNERS_HANDHELD
+#ifdef __SWITCH__
+	/* (the Switch's screen, 1280 x 720; docked, the system shows it at the TV's size) */
+	window = SDL_CreateWindow(TITLE, 0, 0, 1280, 720, 0);
+#elif defined(ORUNNERS_HANDHELD)
 	window = SDL_CreateWindow(TITLE, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 640, 480, SDL_WINDOW_FULLSCREEN_DESKTOP);
 #else
 	window = SDL_CreateWindow(TITLE, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
@@ -1539,5 +1615,8 @@ int main(int argc, char **argv)
 	if (audio)
 		SDL_CloseAudioDevice(audio);
 	SDL_Quit();
+#ifdef __SWITCH__
+	romfsExit();
+#endif
 	return 0;
 }

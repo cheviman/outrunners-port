@@ -4,13 +4,14 @@
  *                 aside and taken up again where it was
  *    Version:     0.1.0
  *    Created:     20-10-2026
- *    Modified:    20-10-2026
+ *    Modified:    30-10-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
  *    OutRunners runs two tasks, each on a stack of its own, and its VBLANK handler swaps them (03F5FC): it
  *    returns into the other task. Its C runs the same way: each task keeps its C calls on a stack of its
- *    own (a fiber on Windows, a ucontext elsewhere) and only one runs at a time, so nothing is concurrent.
+ *    own (a fiber on Windows, its registers on its own stack on the Switch and Android, a ucontext elsewhere)
+ *    and only one runs at a time, so nothing is concurrent.
  */
 #ifndef HOST_TASKS_H
 #define HOST_TASKS_H

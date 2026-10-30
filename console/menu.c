@@ -4,7 +4,7 @@
  *                 menu, DELUXE and OPTIONS with its pages
  *    Version:     0.1.0
  *    Created:     29-10-2026
- *    Modified:    29-10-2026
+ *    Modified:    30-10-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
@@ -76,6 +76,32 @@ enum { MENU_ARCADE, MENU_TWO_PLAYERS, MENU_DELUXE, MENU_OPTIONS, MENU_EXIT };
 enum { DELUXE_CLASSIC, DELUXE_TIME_ATTACK, DELUXE_FULL, DELUXE_REVERSE, DELUXE_BACK };
 enum { OPTIONS_CONTROLS, OPTIONS_DIFFICULTY, OPTIONS_TIME, OPTIONS_VIDEO, OPTIONS_VOLUME, OPTIONS_SOUND_TEST,
 	OPTIONS_BACK };
+
+/* The lines a build shows of the title's menu and of OPTIONS: a computer's, all of them. A game device's
+   (ORUNNERS_HANDHELD) has no VIDEO, its picture fixed (ports/sdl2/main.c); nor CONTROLS where its controls are
+   fixed (the Switch's), but where they may need putting right (ORUNNERS_CONTROLS_PAGE: a handheld's own
+   buttons); nor 2 PLAYERS but where a second player has a controller of their own (ORUNNERS_TWO_PLAYERS: the
+   Switch's, side by side); nor EXIT where the system leaves games (ORUNNERS_SYSTEM_EXIT: the Switch's HOME) */
+static const int menu_lines[] = {
+	MENU_ARCADE,
+#if !defined(ORUNNERS_HANDHELD) || defined(ORUNNERS_TWO_PLAYERS)
+	MENU_TWO_PLAYERS,
+#endif
+	MENU_DELUXE, MENU_OPTIONS,
+#ifndef ORUNNERS_SYSTEM_EXIT
+	MENU_EXIT,
+#endif
+};
+static const int options_lines[] = {
+#if !defined(ORUNNERS_HANDHELD) || defined(ORUNNERS_CONTROLS_PAGE)
+	OPTIONS_CONTROLS,
+#endif
+	OPTIONS_DIFFICULTY, OPTIONS_TIME,
+#ifndef ORUNNERS_HANDHELD
+	OPTIONS_VIDEO,
+#endif
+	OPTIONS_VOLUME, OPTIONS_SOUND_TEST, OPTIONS_BACK
+};
 enum { VIDEO_WINDOW, VIDEO_FULL_SCREEN, VIDEO_PIXELS, VIDEO_WIDE, VIDEO_TWO_PLAYERS, VIDEO_BACK, VIDEO_ITEMS };
 /* CONTROLS' lines: PLAYER, the controls, DEFAULTS, BACK */
 enum { CONTROLS_PLAYER, CONTROLS_FIRST, CONTROLS_DEFAULTS = CONTROLS_FIRST + CONTROLS, CONTROLS_BACK,
@@ -171,9 +197,9 @@ static int lines_of(int page)
 {
 	switch (page)
 	{
-		case PAGE_MENU: return COUNT(menu_items);
+		case PAGE_MENU: return COUNT(menu_lines);
 		case PAGE_DELUXE: return COUNT(deluxe_items);
-		case PAGE_OPTIONS: return COUNT(options_items);
+		case PAGE_OPTIONS: return COUNT(options_lines);
 		case PAGE_TIME: return TIME_STAGES + 1;
 		case PAGE_SOUND_TEST: return 2;
 		case PAGE_VIDEO: return VIDEO_ITEMS;
@@ -187,6 +213,17 @@ static void open_page(int page, int choice)
 	menu.page = page;
 	menu.choice = choice;
 }
+
+/* The line of the title's menu or of OPTIONS an item is on, of those the build shows */
+static int line_of(const int *lines, int count, int item)
+{
+	for (int index = 0; index < count; index++)
+		if (lines[index] == item)
+			return index;
+	return 0;
+}
+
+#define MENU_LINE(item)    line_of(menu_lines, COUNT(menu_lines), item)
 
 static int step(int value, int by, int low, int high)
 {
@@ -234,19 +271,20 @@ static void options_frame(uint32_t pressed)
 {
 	char value[16];
 	const int by = change(pressed);
+	const int item = options_lines[menu.choice];
 
-	if (by && menu.choice == OPTIONS_DIFFICULTY)
+	if (by && item == OPTIONS_DIFFICULTY)
 	{
 		game_difficulty = (uint8_t)step(game_difficulty, by, 0, DIFFICULTIES - 1);
 		menu.settings_changed = true;
 	}
-	if (by && menu.choice == OPTIONS_VOLUME)
+	if (by && item == OPTIONS_VOLUME)
 	{
 		console_window_settings.volume = step(console_window_settings.volume, by, 0, 10);
 		console_window_settings.changed = true;
 	}
 	if (pressed & ACTION_BIT(ACTION_ACCEPT))
-		switch (menu.choice)
+		switch (item)
 		{
 			case OPTIONS_CONTROLS:
 				menu.options_choice = menu.choice;
@@ -266,27 +304,27 @@ static void options_frame(uint32_t pressed)
 				return;
 			case OPTIONS_BACK:
 				save_game_settings();
-				open_page(PAGE_MENU, MENU_OPTIONS);
+				open_page(PAGE_MENU, MENU_LINE(MENU_OPTIONS));
 				return;
 			default:
 				break;
 		}
 	page_heading("OPTIONS");
-	for (int index = 0; index < COUNT(options_items); index++)
+	for (int index = 0; index < COUNT(options_lines); index++)
 	{
 		const char *shown = NULL;
 
-		if (index == OPTIONS_DIFFICULTY)
+		if (options_lines[index] == OPTIONS_DIFFICULTY)
 		{
 			snprintf(value, sizeof(value), "< %s >", difficulties[game_difficulty & (DIFFICULTIES - 1)]);
 			shown = value;
 		}
-		else if (index == OPTIONS_VOLUME)
+		else if (options_lines[index] == OPTIONS_VOLUME)
 		{
 			snprintf(value, sizeof(value), "< %d >", console_window_settings.volume);
 			shown = value;
 		}
-		line(index, options_items[index], shown);
+		line(index, options_items[options_lines[index]], shown);
 	}
 	darken_page();
 }
@@ -529,18 +567,20 @@ bool console_controls_defaults(void)
 	return picked;
 }
 
-/* The title's menu and DELUXE: their lines centred under the logo, over a shadow */
-static void list_frame(const char *const *items, int count)
+/* The title's menu and DELUXE: their lines centred under the logo, over a shadow (the items lines lists, or
+   all of them) */
+static void list_frame(const char *const *items, const int *lines, int count)
 {
 	const int height = count * ITEM_STEP;
 	int widest = 0;
 
 	for (int index = 0; index < count; index++)
 	{
-		const int width = console_text_width(items[index], 1);
+		const char *const name = items[lines ? lines[index] : index];
+		const int width = console_text_width(name, 1);
 
 		widest = width > widest ? width : widest;
-		centred(MENU_Y + index * ITEM_STEP, 1, index == menu.choice ? CHOSEN_COLOUR : ITEM_COLOUR, items[index]);
+		centred(MENU_Y + index * ITEM_STEP, 1, index == menu.choice ? CHOSEN_COLOUR : ITEM_COLOUR, name);
 	}
 	console_shade((SCREEN_WIDTH - widest) / 2 - 24, MENU_Y - 8, widest + 48, height + 11);
 }
@@ -632,7 +672,7 @@ int console_menu_frame(uint32_t mode)
 				return MENU_NOTHING;
 			}
 			if (pressed & (ACTION_BIT(ACTION_ACCEPT) | ACTION_BIT(ACTION_START)))
-				switch (menu.choice)
+				switch (menu_lines[menu.choice])
 				{
 					case MENU_ARCADE:
 						open_page(PAGE_NONE, 0);
@@ -644,20 +684,20 @@ int console_menu_frame(uint32_t mode)
 						open_page(PAGE_DELUXE, 0);
 						return MENU_NOTHING;
 					case MENU_OPTIONS:
-						open_page(PAGE_OPTIONS, OPTIONS_CONTROLS);
+						open_page(PAGE_OPTIONS, 0);
 						return title_opening() ? MENU_NOTHING : MENU_TITLE;
 					case MENU_EXIT:
 						console.quit = true;
 						return MENU_NOTHING;
 				}
-			list_frame(menu_items, COUNT(menu_items));
+			list_frame(menu_items, menu_lines, COUNT(menu_lines));
 			return MENU_NOTHING;
 		case PAGE_DELUXE:
 			hold_title(false);
 			if ((pressed & ACTION_BIT(ACTION_BACK))
 				|| ((pressed & ACTION_BIT(ACTION_ACCEPT)) && menu.choice == DELUXE_BACK))
 			{
-				open_page(PAGE_MENU, MENU_DELUXE);
+				open_page(PAGE_MENU, MENU_LINE(MENU_DELUXE));
 				return MENU_NOTHING;
 			}
 			if ((pressed & (ACTION_BIT(ACTION_ACCEPT) | ACTION_BIT(ACTION_START))) && menu.choice == DELUXE_TIME_ATTACK)
@@ -680,7 +720,7 @@ int console_menu_frame(uint32_t mode)
 				open_page(PAGE_NONE, 0);
 				return MENU_REVERSE;    /* (its goal on the route map once the car is chosen) */
 			}
-			list_frame(deluxe_items, COUNT(deluxe_items));
+			list_frame(deluxe_items, NULL, COUNT(deluxe_items));
 			return MENU_NOTHING;
 		default:
 			break;
@@ -693,7 +733,7 @@ int console_menu_frame(uint32_t mode)
 		if (menu.page == PAGE_OPTIONS)
 		{
 			save_game_settings();
-			open_page(PAGE_MENU, MENU_OPTIONS);
+			open_page(PAGE_MENU, MENU_LINE(MENU_OPTIONS));
 		}
 		else
 		{

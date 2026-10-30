@@ -142,6 +142,18 @@ merged here; this repository adds console/, the ports and their documents.
   a game controller's Start): the frame in grey, PAUSE, CONTINUE and QUIT GAME in the game's letters (the
   video's overlay of sprites).
 
+## Done (30-10-2026)
+
+- The devices' menus (console/menu.c): no VIDEO on a game device, its picture fixed (WIDE on the Switch,
+  4:3 on Anbernic's handhelds, smooth pixels); CONTROLS on Anbernic's handhelds only; 2 PLAYERS on the
+  Switch only, side by side; no EXIT where the system leaves games (the Switch).
+- The Switch (ports/switch): the game as an .nro with the pack in its romfs and as the .nsp's pieces,
+  devkitPro's toolchain; the game's two tasks on stacks of their own without ucontext (runtime/src/tasks.c,
+  aarch64: the Switch and Android); OutRunners NSP, SegaSonic NSP's with the pack made from the ROM set
+  (ports/switch/nsp/rom_pack.c); tools/check_nsp.py. Runs on Eden (an emulator), the .nro and the .nsp.
+- The video draws the screens the window shows alone (s32_video_show_screens): the left one in a one player
+  game, its layers, sprites and mixing; the headless runs draw both.
+
 ## Order
 
 1. The build: CONSOLE_ORIGINAL in the core, console/, the two executables, the headless console build.

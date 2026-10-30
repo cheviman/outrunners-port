@@ -2,7 +2,7 @@
 # Description: build of the OutRunners runtime and its development tools
 # Version:     0.1.0
 # Created:     11-10-2026
-# Modified:    29-10-2026
+# Modified:    30-10-2026
 # Author:      Sebastian Toyos
 cmake_minimum_required(VERSION 3.20)
 project(outrunners C CXX)
@@ -65,9 +65,14 @@ target_include_directories(s32runtime PUBLIC runtime/include)
 if(UNIX AND NOT APPLE)
 	target_link_libraries(s32runtime PUBLIC m)    # (the C library's maths are apart there)
 endif()
-if(UNIX)
+# (the video's workers, runtime/src/workers.c: POSIX threads but on Windows and the Switch, libnx's there)
+set(ORUNNERS_SWITCH OFF)
+if(NINTENDO_SWITCH OR CMAKE_SYSTEM_NAME STREQUAL "NintendoSwitch")
+	set(ORUNNERS_SWITCH ON)
+endif()
+if(UNIX AND NOT ORUNNERS_SWITCH)
 	find_package(Threads REQUIRED)
-	target_link_libraries(s32runtime PUBLIC Threads::Threads)    # (the video's workers, runtime/src/workers.c)
+	target_link_libraries(s32runtime PUBLIC Threads::Threads)
 endif()
 
 # The game's data: no executable carries the ROM or anything from it. The game loads its assets when it
@@ -147,6 +152,14 @@ if(ORUNNERS_DECOMPILED AND ORUNNERS_SOUND_DECOMPILED)
 		target_compile_definitions(orunners_game PUBLIC S32_MEMORY_CENSUS)
 	endif()
 
+	# (GCC, the Switch's and Linux's: it takes the sprite list's second copy, 6144 words past an entry, for a
+	# write past the sprite RAM's end, from an entry at any address its mask leaves (game/support.h, board());
+	# the lists' entries are all in its first part)
+	if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
+		set(ORUNNERS_GAME_GCC_OPTIONS -Wno-stringop-overflow)
+		target_compile_options(orunners_game PRIVATE ${ORUNNERS_GAME_GCC_OPTIONS})
+	endif()
+
 	add_executable(orunners_game_headless ports/headless/main.c)
 	target_link_libraries(orunners_game_headless PRIVATE orunners_game orunners_sound)
 
@@ -162,21 +175,35 @@ if(ORUNNERS_DECOMPILED AND ORUNNERS_SOUND_DECOMPILED)
 	if(MSVC)
 		target_compile_options(orunners_game_console PRIVATE /bigobj)
 	else()
-		target_compile_options(orunners_game_console PRIVATE -fno-strict-aliasing)
+		target_compile_options(orunners_game_console PRIVATE -fno-strict-aliasing ${ORUNNERS_GAME_GCC_OPTIONS})
 	endif()
 	add_executable(orunners_console_headless ports/headless/main.c)
 	target_link_libraries(orunners_console_headless PRIVATE orunners_game_console orunners_sound)
 
-	# The devices' builds, each with its toolchain: Anbernic's H700 handhelds (ports/anbernic)
+	# The Switch's .nsp, made on the player's computer (ports/switch/nsp): the game's Switch build (main,
+	# main.npdm, control.nacp, icon.jpg), the assets pack of the player's ROM set (the first run's steps, the
+	# console game's loader) and the keys of the player's console. A command line; with SDL2 also a window
+	# (below, with the game's window)
+	if(NOT ORUNNERS_SWITCH AND NOT ORUNNERS_ANBERNIC AND NOT ANDROID)
+		add_executable(orunners_nsp ports/switch/nsp/main.c ports/switch/nsp/make_nsp.c ports/switch/nsp/formats.c
+			ports/switch/nsp/crypto.c ports/switch/nsp/rom_pack.c)
+		target_link_libraries(orunners_nsp PRIVATE orunners_game_console orunners_sound orunners_extract)
+		set_target_properties(orunners_nsp PROPERTIES OUTPUT_NAME "OutRunners NSP")
+	endif()
+
+	# The devices' builds, each with its toolchain: the Nintendo Switch (devkitPro's: its .nro and its .nsp's
+	# pieces, ports/switch) and Anbernic's H700 handhelds (ports/anbernic)
 	option(ORUNNERS_ANBERNIC "Build the game for Anbernic's H700 handhelds" OFF)
-	if(ORUNNERS_ANBERNIC)
+	if(ORUNNERS_SWITCH)
+		include(${CMAKE_SOURCE_DIR}/ports/switch/switch.cmake)
+	elseif(ORUNNERS_ANBERNIC)
 		include(${CMAKE_SOURCE_DIR}/ports/anbernic/anbernic.cmake)
 	endif()
 
 	# The game in a window (ports/sdl2): SDL2 from the system, or on Windows the development package
 	# unpacked in build/downloads/sdl2 (SDL2_DIR picks another), a library beside the executable; or, with
 	# ORUNNERS_STATIC_SDL2, SDL2 built from its own source into the executable
-	if(ORUNNERS_ANBERNIC)
+	if(ORUNNERS_ANBERNIC OR ORUNNERS_SWITCH)
 		set(SDL2_FOUND FALSE)    # (the device's own build above: no computer's window ports)
 	elseif(ORUNNERS_STATIC_SDL2)
 		include(FetchContent)
@@ -232,6 +259,24 @@ if(ORUNNERS_DECOMPILED AND ORUNNERS_SOUND_DECOMPILED)
 		if(WIN32 AND NOT ORUNNERS_STATIC_SDL2)
 			add_custom_command(TARGET orunners POST_BUILD
 				COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:SDL2::SDL2> $<TARGET_FILE_DIR:orunners>)
+		endif()
+
+		# OutRunners NSP's window (ports/switch/nsp/window.c), when it is started with nothing: still a console
+		# program, with its own main (SDL2 without SDL2main); the folder dialog is COM's on Windows. Its
+		# letters (Kenney Mini, font.bmp) beside it, as SDL2's library is
+		list(GET ORUNNERS_SDL2 0 ORUNNERS_SDL2_LIBRARY)
+		target_sources(orunners_nsp PRIVATE ports/switch/nsp/window.c ports/switch/nsp/folder_dialog.c
+			ports/sdl2/letters.c)
+		target_include_directories(orunners_nsp PRIVATE ports/sdl2)
+		target_compile_definitions(orunners_nsp PRIVATE ORUNNERS_NSP_WINDOW)
+		target_link_libraries(orunners_nsp PRIVATE ${ORUNNERS_SDL2_LIBRARY})
+		if(WIN32)
+			target_link_libraries(orunners_nsp PRIVATE ole32 shell32 uuid)
+		endif()
+		if(NOT APPLE)
+			add_custom_command(TARGET orunners_nsp POST_BUILD
+				COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_SOURCE_DIR}/ports/sdl2/font/font.bmp
+					$<TARGET_FILE_DIR:orunners_nsp>)
 		endif()
 	else()
 		message(STATUS "No SDL2: the window ports (OutRunners, OutRunners Arcade) are not built")
