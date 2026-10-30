@@ -1,13 +1,92 @@
-# OutRunners — decompilation
+# OutRunners — port
 
-A reconstruction of Sega's 1992 arcade game *OutRunners* (Sega System Multi 32) into platform-agnostic C,
-not an emulator, following the method of
-[segasonic-decomp](https://github.com/cheviman/segasonic-decomp): the game's program decompiled one
-function at a time, checked frame by frame against MAME in picture and sound.
+Sega's 1992 arcade game *OutRunners* (Sega System Multi 32) as a native game for computers, the Nintendo
+Switch, Android and Anbernic's handhelds, built on its decompilation,
+[outrunners-decomp](https://github.com/cheviman/outrunners-decomp): the game's program decompiled into C and
+checked frame by frame against MAME in picture and sound. Two games come out of the same C:
 
-**Work in progress.** This repository will contain no game data. As with
-[n64decomp/sm64](https://github.com/n64decomp/sm64), you bring your own ROM set (MAME's `orunners`), and
-the tools verify it, extract the assets and build your own executable.
+- **OutRunners Arcade**: the arcade game as it is, both cabinet screens side by side, the same frame by frame
+  as the reference.
+- **OutRunners**: the console version, the arcade game made for playing at home. The game's functions that
+  `console/replaced.txt` lists have the console's own versions (`console/`); the rest is the game's.
+
+This repository contains no game data. As with [n64decomp/sm64](https://github.com/n64decomp/sm64), you bring
+your own ROM set (MAME's `orunners`, World), and the game takes its assets out of it.
+
+## Playing it
+
+The [releases](https://github.com/cheviman/outrunners-port/releases) hold a package for Windows, Linux and
+macOS (an .app for Apple silicon and Intel), with both games and the tools that make the devices' games.
+Keep `orunners.zip` beside the game, or drop it on its window when it asks: the first time it starts, it
+takes the assets out of it (a few seconds) and keeps them. `README.txt` in the package says what each tool
+needs.
+
+- **Nintendo Switch**: OutRunners NSP makes `OutRunners.nsp` with your ROM set and your console's keys, for
+  a console with Atmosphere (`ports/switch/README.md`).
+- **Android**: OutRunners APK makes `OutRunners.apk` with your ROM set, signed with a key of yours
+  (`ports/android/README.md`).
+- **Anbernic's H700 handhelds** (RG35XX, RG40XX and their kin): OutRunners Anbernic makes the folder for
+  PORTS (`ports/anbernic/README.md`).
+
+What any tool makes is yours alone, with the game's data in it: never share it.
+
+## OutRunners, the console version
+
+- **One screen**, the left seat's, and one sound; free play, no coins. The SEGA presentation (the title's
+  SEGA, dark, until three cars race across it), then the title with PRESS START.
+- **The title's menu**:
+  - ARCADE: the arcade's game, one player.
+  - 2 PLAYERS: both seats in one race, their screens side by side or one over the other; on a tablet or an
+    open Fold, the two screens facing each other, each player with their own touch controls.
+  - NETWORK: rooms of up to four devices on the local network (below).
+  - & KNUCKLES: CLASSIC (the arcade's game as it is, the right seat's START joins it), TIME ATTACK (no
+    time limit, the fastest run raced again as a see-through ghost), FULL (all 31 courses in one race),
+    REVERSE (from a goal picked on the route map back to the start).
+  - OPTIONS: CONTROLS (keys and game controller buttons for each player), DIFFICULTY, TIME (by stage),
+    VIDEO (the window's size, full screen, PIXELS sharp, smooth, bilinear or CRT, WIDE off, 16:9 or 20:9,
+    2 PLAYERS' layout), VOLUME, SOUND TEST.
+- **The pause** in a race (Escape, Enter or a game controller's Start): CONTINUE, QUIT GAME.
+- **The keys**: the arrows steer, accelerate and brake; Q and A shift up and down; space is the radio,
+  `[` and `]` its songs; Enter starts and pauses. A game controller: the d-pad or the left stick steers,
+  A accelerates, B brakes, the shoulders shift. OPTIONS > CONTROLS changes them.
+- **Android's touch controls**: the wheel, GAS and BRAKE, the gears' buttons with the manual transmission,
+  START and the radio. On a tall screen (an open Fold, a tablet) the picture goes to the top and the controls
+  under it, over the game's own route map following the car.
+
+## NETWORK
+
+Up to four devices race together, each one of the arcade's linked cabinets (two seats each: NETWORK > PLAYERS
+2 where the device has a second player), on the same local network: a house's Wi-Fi, or a phone's hotspot.
+Computers, phones and the Switch play together.
+
+1. NETWORK > NAME: your name, as the rooms show it.
+2. One device picks HOST: its room waits for the others, showing each one that joins with its name.
+3. The others pick JOIN: the rooms found on the network, and the one to join.
+4. The host's START (two devices or more) starts an ARCADE race of all of them: each one picks a car, and the
+   race is the game's own, its entries, checkpoints, forks and times as the arcade's linked cabinets have
+   them. After the race, back to the room.
+
+A device that stops being heard holds the race for a moment (WAIT); after 3 seconds it is out of it, as a car
+out of time, and the race goes on without it. If the one gone hosted the race or the room, the next device
+hosts it on, from where it was. The game uses UDP: the rooms' beacons on port 27720, and a port of the
+system's choosing for the race; a firewall that asks about the game should let it reach the private network.
+
+How it works: each device sends its two race records to every other one each frame, as the cabinets' link
+board would, and the game reads them as it reads the board's (`console/network.c`, with the sockets in
+`console/net_udp.c`). `orunners_console_headless --real-time` runs two games on one computer for the checks
+(`tests/console/network_*.txt`).
+
+## Building the port
+
+The window games build as the rest of this repository does ("Getting started" below): `cmake --build` makes
+`OutRunners Arcade` (target `orunners`) and `OutRunners` (target `outrunners`) beside the tools in
+`build/bin/`. `orunners_console_headless` runs the console version without a window, from scripts of its
+menu's actions (`--actions`, `tests/console/`). The devices' builds and their tools are in `ports/switch/`,
+`ports/android/` and `ports/anbernic/`, each with its README; `console/PLAN.md` holds the console version's
+plan and what is done.
+
+The rest of this README is the decompilation's, which this repository carries
+([outrunners-decomp](https://github.com/cheviman/outrunners-decomp)).
 
 ## Status
 

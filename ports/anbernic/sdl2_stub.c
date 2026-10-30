@@ -404,6 +404,11 @@ void SDL_RenderCopy(void)
 {
 }
 
+void SDL_RenderCopyEx(void);
+void SDL_RenderCopyEx(void)
+{
+}
+
 void SDL_RenderPresent(void);
 void SDL_RenderPresent(void)
 {

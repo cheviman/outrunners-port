@@ -521,13 +521,14 @@ static void send_leave(void)
 }
 
 /* A beacon: the room into JOIN's list with its host's id (where it comes from: its host's address; one from
-   this computer's loopback only until the network's comes). A room listed takes the beacons of that host alone,
-   until it is forgotten (a room whose host is gone comes back with the new one's) */
+   this computer's loopback only until the network's comes). A room is listed once for each device that sends
+   its beacons: one speaking for another's room is a line of its own, no other's in its place (a room whose host
+   is gone comes back with the new one's) */
 static void take_beacon(reader *in, uint32_t room, uint32_t sender, net_address from)
 {
 	int index;
 
-	for (index = 0; index < net.room_count && net.rooms[index].room != room; index++)
+	for (index = 0; index < net.room_count && (net.rooms[index].room != room || net.rooms[index].host != sender); index++)
 		;
 	if (index == net.room_count)
 	{
@@ -538,8 +539,6 @@ static void take_beacon(reader *in, uint32_t room, uint32_t sender, net_address 
 		net.rooms[index].host = sender;
 		net.rooms[index].address = from;
 	}
-	else if (net.rooms[index].host != sender)
-		return;    /* (another device speaking for the room) */
 	else if (from.ip != NET_LOOPBACK)
 		net.rooms[index].address = from;
 	get_name(in, net.rooms[index].name);

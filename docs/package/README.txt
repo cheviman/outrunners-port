@@ -12,14 +12,22 @@ window when it asks for it.
 
 The games
 ---------
-OutRunners           the console version: one screen, a menu (ARCADE, 2 PLAYERS, & KNUCKLES with CLASSIC,
-                     TIME ATTACK, FULL and REVERSE, OPTIONS), WIDE 16:9 and 20:9, the pause, game
+OutRunners           the console version: one screen, a menu (ARCADE, 2 PLAYERS, NETWORK, & KNUCKLES with
+                     CLASSIC, TIME ATTACK, FULL and REVERSE, OPTIONS), WIDE 16:9 and 20:9, the pause, game
                      controllers and keys set in OPTIONS > CONTROLS
 OutRunners Arcade    the arcade game as it is, both cabinet screens side by side
 
 The first time either starts it takes the assets out of orunners.zip (a few seconds) and keeps them:
 beside the game on Windows, in your user folder for the game elsewhere. OutRunners also writes
 outrunners.assets there, the assets in one file, which the devices' tools below can take instead.
+
+NETWORK
+-------
+Up to four devices on the same local network (a house's Wi-Fi, a phone's hotspot) race together:
+computers, phones and the Switch alike. NETWORK > NAME is your name; one device picks HOST and waits for
+the others, which pick JOIN and the room; the host's START races them all. A device that stops being
+heard is out of the race after 3 seconds, and the race goes on. The game uses UDP (the rooms on port
+27720): a firewall that asks about the game should let it reach the private network.
 
 The devices
 -----------
