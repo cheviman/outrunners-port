@@ -215,6 +215,22 @@ merged here; this repository adds console/, the ports and their documents.
   from its host alone; a record's numbers that index the game (players, checkpoints, stages, cars, their
   animations, the course records) kept within its tables before the game reads them.
 
+## Done (31-10-2026)
+
+- WIDE's background through a stage's change (Sebas, and a player on Reddit: the clouds cut after the
+  pre-stage): the game swaps its four pages a column at a time while the view's turn keeps that column out
+  of its 320, and WIDE's sides showed the half-swapped pages. WIDE keeps the background whole: the change's
+  first set through the left column's swap, its last from the right one's on (routes.c); the turn reaches
+  only about 0x2A8, so waiting for more turn could not hide it.
+- The route map beside the race (a tall screen, the Fold opened) in CLASSIC too: its right seat joins while
+  the race takes entries, before the race and its map.
+- CLASSIC 5 seconds more than ARCADE in every part (Sebas: friendlier, and apart from ARCADE): at the start
+  and at each checkpoint (console_classic_time).
+- OPTIONS: STEERING (the sticks' DEAD ZONE and SENSITIVITY, the keys' and pads' SPEED; issue 1), FPS (the
+  frames a second at the picture's top right and in a computer's window's title, its letters the port's
+  own 3 x 5), the version at the bottom right (CMake's project version, the devices' packages' too); the
+  signature only on the title.
+
 ## To do
 
 - The network on a network shared with strangers: a room's code to join it (today a device on the same local

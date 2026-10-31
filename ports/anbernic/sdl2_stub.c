@@ -4,7 +4,7 @@
  *                 functions the window port calls, by name only
  *    Version:     0.1.0
  *    Created:     30-10-2026
- *    Modified:    30-10-2026
+ *    Modified:    31-10-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
@@ -406,6 +406,11 @@ void SDL_RenderCopy(void)
 
 void SDL_RenderCopyEx(void);
 void SDL_RenderCopyEx(void)
+{
+}
+
+void SDL_RenderFillRects(void);
+void SDL_RenderFillRects(void)
 {
 }
 

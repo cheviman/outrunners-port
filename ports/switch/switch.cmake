@@ -3,7 +3,7 @@
 #              .nsp (the NSO, main.npdm, the NACP and the icon) and, where the assets pack is, as OutRunners.nro
 # Version:     0.1.0
 # Created:     30-10-2026
-# Modified:    30-10-2026
+# Modified:    31-10-2026
 # Author:      Sebastian Toyos
 #
 # Included by CMakeLists.txt when the toolchain is the Switch's (aarch64-none-elf-cmake), as SegaSonic's port
@@ -39,7 +39,7 @@ find_program(ORUNNERS_NPDMTOOL npdmtool HINTS ${ORUNNERS_SWITCH_TOOLS} REQUIRED)
 find_program(ORUNNERS_ELF2NRO elf2nro HINTS ${ORUNNERS_SWITCH_TOOLS} REQUIRED)
 
 set(ORUNNERS_SWITCH_TITLE_ID 05005e6a4f520000)    # (homebrew's range; the .nsp's title; nacptool takes it with no 0x)
-set(ORUNNERS_SWITCH_VERSION 1.0.0)
+set(ORUNNERS_SWITCH_VERSION ${PROJECT_VERSION})
 set(ORUNNERS_SWITCH_OUT ${ORUNNERS_BIN_DIR}/switch)
 # the HOME menu's icon, 256 x 256: the player's own where this computer has one (local/icon.jpg: local/ holds
 # the player's own pictures, never in the repository), else the project's (ports/switch/icon.jpg,

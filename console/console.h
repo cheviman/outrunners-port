@@ -3,7 +3,7 @@
  *    Description: what the console build tells the port
  *    Version:     0.1.0
  *    Created:     29-10-2026
- *    Modified:    30-10-2026
+ *    Modified:    31-10-2026
  *    Author:      Sebastian Toyos
  */
 #ifndef ORUNNERS_CONSOLE_H
@@ -119,7 +119,7 @@ void console_controls_bound(void);
 /* DEFAULTS was picked on CONTROLS (true once): the port puts the shown player's keys and buttons back */
 bool console_controls_defaults(void);
 
-/* The window's settings OPTIONS > VIDEO and VOLUME show and change: the port fills them in, and applies and
+/* The window's settings OPTIONS > VIDEO, VOLUME, STEERING and FPS show and change: the port fills them in, and applies and
    saves them when 'changed' is set */
 enum
 {
@@ -140,6 +140,14 @@ enum
 
 #define CONSOLE_NAME_LENGTH 8    /* the player's name, NETWORK > NAME: letters of the game's font */
 
+/* OPTIONS > STEERING: the sticks' dead zone (percent of their travel, in steps of DEAD_ZONE_STEP), and the
+   sticks' sensitivity and the keys' and pads' speed (1 to STEERING_LEVELS, STEERING_NORMAL the game's own) */
+#define DEAD_ZONE_STEP      5
+#define DEAD_ZONE_MOST      50
+#define DEAD_ZONE_NORMAL    10
+#define STEERING_LEVELS     9
+#define STEERING_NORMAL     5
+
 typedef struct
 {
 	int window_scale;      /* 1-6: the window, in times the game's picture */
@@ -149,6 +157,10 @@ typedef struct
 	bool vertical;         /* 2 PLAYERS: one screen over the other (false: side by side) */
 	int volume;            /* 0-10: 5 is the game's own */
 	char name[CONSOLE_NAME_LENGTH + 1];    /* the player's, as the network's rooms show it */
+	bool fps;              /* OPTIONS > FPS: the frames a second at the picture's top right, and in a window's title */
+	int dead_zone;         /* STEERING: DEAD_ZONE_* */
+	int sensitivity;       /* STEERING: the sticks', STEERING_LEVELS */
+	int steering_speed;    /* STEERING: the keys' and pads', STEERING_LEVELS */
 	bool changed;
 } console_window;
 

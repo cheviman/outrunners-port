@@ -4,7 +4,7 @@
  *                 keeps the pace, around the same game and board the headless runs check
  *    Version:     0.1.0
  *    Created:     21-10-2026
- *    Modified:    30-10-2026
+ *    Modified:    31-10-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
@@ -417,6 +417,81 @@ static void present_side_map(const SDL_Rect *room)
 }
 #endif
 
+#ifdef ORUNNERS_CONSOLE
+/* ---- OPTIONS > FPS: the frames shown a second, at the picture's top right and in a window's title ---- */
+
+#define FPS_GLYPHS "0123456789 FPS"
+
+/* FPS_GLYPHS' letters, 3 x 5 pixels of the game's: a row each, its high bit the left */
+static const uint8_t fps_glyphs[][5] = {
+	{ 7, 5, 5, 5, 7 }, { 2, 6, 2, 2, 7 }, { 7, 1, 7, 4, 7 }, { 7, 1, 7, 1, 7 }, { 5, 5, 7, 1, 1 },
+	{ 7, 4, 7, 1, 7 }, { 7, 4, 7, 5, 7 }, { 7, 1, 2, 2, 2 }, { 7, 5, 7, 5, 7 }, { 7, 5, 7, 1, 7 },
+	{ 0, 0, 0, 0, 0 }, { 7, 4, 6, 4, 4 }, { 6, 5, 6, 4, 4 }, { 3, 4, 2, 1, 6 }
+};
+static int fps_counted = -1;    /* the last half second's frames a second (-1: none counted yet) */
+
+/* A frame shown: the frames a second, each half second; a computer's window says them in its title */
+static void count_fps(void)
+{
+	static uint64_t start;
+	static int frames;
+	static bool titled;
+	const uint64_t now = SDL_GetPerformanceCounter(), frequency = SDL_GetPerformanceFrequency();
+
+	if (!start)
+		start = now;
+	if (++frames < 2 || now - start < frequency / 2)
+		return;
+	fps_counted = (int)lround(frames * (double)frequency / (double)(now - start));
+	start = now;
+	frames = 0;
+#ifndef ORUNNERS_HANDHELD
+	if (console_window_settings.fps || titled)
+	{
+		char title[48];
+
+		snprintf(title, sizeof(title), console_window_settings.fps ? TITLE " - %d FPS" : TITLE, fps_counted);
+		SDL_SetWindowTitle(window, title);
+		titled = console_window_settings.fps;
+	}
+#endif
+}
+
+/* The frames a second at the top right of the picture 'shown', its letters the game's pixels, with a shadow */
+static void draw_fps(const SDL_Rect *shown)
+{
+	SDL_Rect cells[2][14 * 15];
+	int count = 0;
+	char text[16];
+	const int pixel = SDL_max(1, shown->h / S32_VIDEO_HEIGHT);
+	int x;
+
+	if (!console_window_settings.fps || fps_counted < 0)
+		return;
+	snprintf(text, sizeof(text), "%d FPS", SDL_min(fps_counted, 999));
+	x = shown->x + shown->w - (4 * (int)strlen(text) + 3) * pixel;
+	for (const char *letter = text; *letter; letter++, x += 4 * pixel)
+	{
+		const uint8_t *rows = fps_glyphs[strchr(FPS_GLYPHS, *letter) - FPS_GLYPHS];
+
+		for (int row = 0; row < 5; row++)
+			for (int column = 0; column < 3; column++)
+				if (rows[row] & (4 >> column))
+				{
+					cells[1][count] = (SDL_Rect){ x + column * pixel, shown->y + (4 + row) * pixel, pixel, pixel };
+					cells[0][count] = cells[1][count];
+					cells[0][count].x += pixel;
+					cells[0][count].y += pixel;
+					count++;
+				}
+	}
+	SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+	SDL_RenderFillRects(renderer, cells[0], count);
+	SDL_SetRenderDrawColor(renderer, 255, 224, 0, 255);
+	SDL_RenderFillRects(renderer, cells[1], count);
+}
+#endif
+
 /* The picture (its part 'source' of 'texture') in the window, as large as it fits with its proportions; with
    the screens facing each other, each screen on its half, the second turned half round */
 static void present(SDL_Rect source)
@@ -517,6 +592,10 @@ static void present(SDL_Rect source)
 
 		touch_draw(renderer, gears);
 	}
+#endif
+#ifdef ORUNNERS_CONSOLE
+	count_fps();
+	draw_fps(&shown[0]);
 #endif
 	SDL_RenderPresent(renderer);
 }
@@ -781,9 +860,11 @@ static void save_window_settings(void)
 	output = fopen(settings_path, "w");
 	if (!output)
 		return;
-	fprintf(output, "window_scale=%d\nfull_screen=%d\npixels=%s\nwide=%d\ntwo_players=%s\nvolume=%d\nname=%s\n",
+	fprintf(output, "window_scale=%d\nfull_screen=%d\npixels=%s\nwide=%d\ntwo_players=%s\nvolume=%d\nname=%s\n"
+		"fps=%d\ndead_zone=%d\nsensitivity=%d\nsteering_speed=%d\n",
 		settings->window_scale, settings->full_screen, pixel_names[settings->pixels], settings->wide,
-		settings->vertical ? "vertical" : "horizontal", settings->volume, settings->name);
+		settings->vertical ? "vertical" : "horizontal", settings->volume, settings->name, settings->fps,
+		settings->dead_zone, settings->sensitivity, settings->steering_speed);
 	fclose(output);
 }
 
@@ -806,6 +887,14 @@ static void load_window_settings(void)
 			settings->wide = number;    /* (0 off, 1 16:9, 2 20:9) */
 		else if (sscanf(line, "volume=%d", &number) == 1 && number >= 0 && number <= 10)
 			settings->volume = number;
+		else if (sscanf(line, "fps=%d", &number) == 1)
+			settings->fps = number != 0;
+		else if (sscanf(line, "dead_zone=%d", &number) == 1 && number >= 0 && number <= DEAD_ZONE_MOST)
+			settings->dead_zone = number / DEAD_ZONE_STEP * DEAD_ZONE_STEP;
+		else if (sscanf(line, "sensitivity=%d", &number) == 1 && number >= 1 && number <= STEERING_LEVELS)
+			settings->sensitivity = number;
+		else if (sscanf(line, "steering_speed=%d", &number) == 1 && number >= 1 && number <= STEERING_LEVELS)
+			settings->steering_speed = number;
 		else if (sscanf(line, "pixels=%31s", text) == 1)
 		{
 			for (int kind = 0; kind < PIXELS_KINDS; kind++)
@@ -1076,14 +1165,46 @@ static int clamp(int value, int low, int high)
 	return value < low ? low : (value > high ? high : value);
 }
 
-/* the keyboard's wheel: turned while a key holds it, back to the centre when let go */
+/* the keyboard's wheel: turned while a key holds it, back to the centre when let go; the console's at
+   OPTIONS > STEERING's SPEED (STEERING_NORMAL: WHEEL_TURN and WHEEL_RETURN) */
 static int steer(int position, bool left, bool right)
 {
+#ifdef ORUNNERS_CONSOLE
+	const int turn = WHEEL_TURN + console_window_settings.steering_speed - STEERING_NORMAL;
+#else
+	const int turn = WHEEL_TURN;
+#endif
+	const int back = WHEEL_RETURN * turn / WHEEL_TURN;
+
 	if (left != right)
-		return clamp(position + (right ? WHEEL_TURN : -WHEEL_TURN), WHEEL_LEFT, WHEEL_RIGHT);
+		return clamp(position + (right ? turn : -turn), WHEEL_LEFT, WHEEL_RIGHT);
 	if (position < WHEEL_CENTRE)
-		return position + WHEEL_RETURN > WHEEL_CENTRE ? WHEEL_CENTRE : position + WHEEL_RETURN;
-	return position - WHEEL_RETURN < WHEEL_CENTRE ? WHEEL_CENTRE : position - WHEEL_RETURN;
+		return position + back > WHEEL_CENTRE ? WHEEL_CENTRE : position + back;
+	return position - back < WHEEL_CENTRE ? WHEEL_CENTRE : position - back;
+}
+
+/* A stick's travel as the wheel's, past its dead zone (false inside it). The console's from the dead zone's
+   edge out, as OPTIONS > STEERING's DEAD ZONE and SENSITIVITY have it: under STEERING_NORMAL softer about the
+   centre, over it sharper (issue 1: twitchy on some controllers) */
+static bool stick_wheel(int stick, int *position)
+{
+	const int travel = stick < 0 ? -stick : stick;
+#ifdef ORUNNERS_CONSOLE
+	static const double curves[STEERING_LEVELS] = { 2.2, 1.9, 1.6, 1.3, 1.0, 0.85, 0.72, 0.6, 0.5 };
+	const int dead = console_window_settings.dead_zone * 32767 / 100;
+	double out;
+
+	if (travel <= dead || travel == 0)
+		return false;
+	out = SDL_min(1.0, pow((double)(travel - dead) / (32767 - dead), curves[console_window_settings.sensitivity - 1]));
+	*position = WHEEL_CENTRE + (int)lround((stick < 0 ? -out : out) * (WHEEL_RIGHT - WHEEL_CENTRE));
+	return true;
+#else
+	if (travel <= STICK_DEAD_ZONE)
+		return false;
+	*position = clamp(WHEEL_CENTRE + stick * (WHEEL_RIGHT - WHEEL_CENTRE) / 32767, WHEEL_LEFT, WHEEL_RIGHT);
+	return true;
+#endif
 }
 
 static int press(int position, bool held)
@@ -1215,8 +1336,7 @@ static void on_controls_update(void)
 			const int pad_gas = trigger_pedal(pad, SDL_CONTROLLER_AXIS_TRIGGERRIGHT);
 			const int pad_brake = trigger_pedal(pad, SDL_CONTROLLER_AXIS_TRIGGERLEFT);
 
-			if (stick > STICK_DEAD_ZONE || stick < -STICK_DEAD_ZONE)
-				wheels[player] = clamp(WHEEL_CENTRE + stick * (WHEEL_RIGHT - WHEEL_CENTRE) / 32767, WHEEL_LEFT, WHEEL_RIGHT);
+			stick_wheel(stick, &wheels[player]);
 			if (pad_gas > gases[player])
 				gases[player] = pad_gas;
 			if (pad_brake > brakes[player])

@@ -47,6 +47,7 @@ typedef struct
 	bool join_right;        /* the right seat's START, pressed once it is in the entry (game mode 7) */
 	bool time_attack;       /* DELUXE > TIME ATTACK: the left seat's race has no time limit */
 	bool classic;           /* DELUXE > CLASSIC: the game's entries as the arcade's (WAITING FOR CHALLENGERS) */
+	bool classic_start;     /* CLASSIC: its seconds more given at the start (console_classic_time) */
 	bool side_map_wanted;   /* the port has room for the route map beside the race (console_side_map_wanted) */
 	uint8_t quit_seats;     /* the pause's QUIT GAME: the seats (bit 0 the left) still to go back to the title */
 } console_state;
@@ -123,6 +124,9 @@ int console_route_select_goal(void);
    machine 1's settings, as network_check_result puts them in its first record for every machine's races */
 void console_settings_to_race(void);
 void console_master_settings(void);
+
+/* CLASSIC's seconds more, after race_progress_update (console.c): 'passes' the race's pass_count before it */
+void console_classic_time(uint8_t passes);
 
 /* The network game (network.c), for the menus: a room hosted (HOST), the rooms looked for and one joined (JOIN),
    left; the players of this device in its races (1, or 2: both seats) */

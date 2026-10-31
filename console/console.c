@@ -22,6 +22,7 @@
 #define COIN_SETTINGS       0x1Au    /* the test mode's COIN/CREDIT SETTING: 26 */
 #define START_BUTTON        0x40u    /* screen buttons_pressed: START */
 #define TIME_ATTACK_TIME_LEFT (99u * 30u)    /* race time_left, in 30ths of a second */
+#define CLASSIC_EXTRA       5u       /* CLASSIC's seconds more, at the start and at each checkpoint */
 #define SCREEN_CAR          0x1000u  /* the screen's car, beside its block (the register player_car) */
 #define TRANSMISSION_MANUAL 1u       /* car transmission (car_select_wheel_transmissions): 0 automatic */
 
@@ -169,10 +170,11 @@ static bool racing(uint32_t screen_block)
 }
 
 /* The route map beside the race on the right seat's screen (side_map.c), its game mode 'mode': where the port
-   has room for it, while the left seat races alone on the game's route and the right seat is idle */
+   has room for it, while the left seat races alone on the game's route and the right seat is idle (CLASSIC's
+   too: its right seat joins while the race takes entries, before the race and its map) */
 static bool side_map_due(uint32_t mode)
 {
-	return console.side_map_wanted && !console.two_players && !console.classic && !console_routes_running()
+	return console.side_map_wanted && !console.two_players && !console_routes_running()
 		&& SCREEN(SCREEN_1)->game_mode == GAME_MODE_PLAY && racing(SCREEN_1)
 		&& mode != GAME_MODE_PLAY && mode != GAME_MODE_ENTRY_INVITATION;
 }
@@ -274,6 +276,7 @@ uint32_t check_game_start(uint32_t mode, uint32_t seat_credits)
 			return press_start(mode, seat_credits);
 		case MENU_CLASSIC:
 			console.classic = true;
+			console.classic_start = false;
 			return press_start(mode, seat_credits);
 		case MENU_REVERSE:
 			console_reverse_start();
@@ -284,6 +287,37 @@ uint32_t check_game_start(uint32_t mode, uint32_t seat_credits)
 		default:
 			return mode;
 	}
+}
+
+/* CLASSIC: CLASSIC_EXTRA seconds more than the arcade's in every part of the race (Sebas: friendlier, and
+   apart from ARCADE), in the host's record: once the car has given the start's (player_car_update: 40
+   seconds and the TIME setting, before the race starts; the record holds the entries' count before it; the
+   copies of it the screens read, host_record, and their time displays' for the countdown, car time_left,
+   too), and
+   with each checkpoint's that the game adds (the first past it, before the goal) */
+void console_classic_time(uint8_t passes)
+{
+	const uint32_t race = screen->race;
+	const uint16_t start_time = (uint16_t)((game->race_copies[0].master_time_difficulty_0 + 0x28u) * 0x1Eu);
+
+	if (!console.classic || screen->is_host == 0u)
+		return;
+	if (!console.classic_start && screen->race_started == 0u && RACE(race)->time_left == start_time)
+	{
+		RACE(race)->time_left += CLASSIC_EXTRA * 0x1Eu;
+		for (uint32_t seat = SCREEN_1; seat <= SCREEN_2; seat += SCREEN_2 - SCREEN_1)
+		{
+			if (SCREEN(seat)->in_game == 0u || SCREEN(seat)->host_record == 0u)
+				continue;
+			if (RACE(SCREEN(seat)->host_record)->time_left == start_time)
+				RACE(SCREEN(seat)->host_record)->time_left += CLASSIC_EXTRA * 0x1Eu;    /* (the copy it reads) */
+			if (CAR(seat + SCREEN_CAR)->time_left == start_time)
+				CAR(seat + SCREEN_CAR)->time_left += CLASSIC_EXTRA * 0x1Eu;
+		}
+		console.classic_start = true;
+	}
+	if (RACE(race)->pass_count != passes && RACE(race)->pass_order == 0u && RACE(race)->pass_checkpoint != 5u)
+		RACE(race)->time_left += CLASSIC_EXTRA * 0x1Eu;
 }
 
 /* The car select's WAITING FOR CHALLENGERS! (then JUST A MOMENT PLEASE) once the player's choices are made,

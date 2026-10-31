@@ -2,10 +2,10 @@
 # Description: build of the OutRunners runtime and its development tools
 # Version:     0.1.0
 # Created:     11-10-2026
-# Modified:    30-10-2026
+# Modified:    31-10-2026
 # Author:      Sebastian Toyos
 cmake_minimum_required(VERSION 3.20)
-project(outrunners C CXX)
+project(outrunners VERSION 1.0.0 LANGUAGES C CXX)    # (the release's: OPTIONS shows it, the devices' packages carry it)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -170,7 +170,7 @@ if(ORUNNERS_DECOMPILED AND ORUNNERS_SOUND_DECOMPILED)
 		runtime/src/assets_midi.c runtime/src/assets_pack.c runtime/src/json.c runtime/src/png.c runtime/src/inflate.c
 		${ORUNNERS_DECOMPILED} ${ORUNNERS_CONSOLE_SOURCES})
 	target_include_directories(orunners_game_console PUBLIC runtime/include ${ORUNNERS_DECOMPILED_DIR} console)
-	target_compile_definitions(orunners_game_console PUBLIC ORUNNERS_CONSOLE)
+	target_compile_definitions(orunners_game_console PUBLIC ORUNNERS_CONSOLE ORUNNERS_VERSION="${PROJECT_VERSION}")
 	target_link_libraries(orunners_game_console PUBLIC s32runtime)
 	if(WIN32)
 		target_link_libraries(orunners_game_console PUBLIC ws2_32)    # (the network's sockets: console/net_udp.c)

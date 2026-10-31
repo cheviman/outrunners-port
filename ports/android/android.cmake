@@ -3,7 +3,7 @@
 #              their source, and the APKs around them: the game's, for OutRunners APK, and this computer's own
 # Version:     0.1.0
 # Created:     30-10-2026
-# Modified:    30-10-2026
+# Modified:    31-10-2026
 # Author:      Sebastian Toyos
 #
 # Included by CMakeLists.txt when the toolchain is the NDK's (build/cmake/android.toolchain.cmake, with
@@ -25,8 +25,9 @@
 target_compile_definitions(orunners_game_console PUBLIC ORUNNERS_HANDHELD ORUNNERS_SYSTEM_EXIT ORUNNERS_SCREEN_WIDE
 	ORUNNERS_TOUCH)
 
-set(ORUNNERS_ANDROID_VERSION 1.0.0)
-set(ORUNNERS_ANDROID_VERSION_CODE 10000)  # (major * 10000 + minor * 100 + patch)
+set(ORUNNERS_ANDROID_VERSION ${PROJECT_VERSION})
+math(EXPR ORUNNERS_ANDROID_VERSION_CODE    # (major * 10000 + minor * 100 + patch)
+	"${PROJECT_VERSION_MAJOR} * 10000 + ${PROJECT_VERSION_MINOR} * 100 + ${PROJECT_VERSION_PATCH}")
 set(ORUNNERS_ANDROID_TARGET_SDK 35)
 set(ORUNNERS_ANDROID_MIN_SDK 24)    # (Android 7: the APK's signature is v2's alone, as OutRunners APK signs it)
 string(REGEX MATCH "[0-9]+" ORUNNERS_ANDROID_PLATFORM_LEVEL "${ANDROID_PLATFORM}")

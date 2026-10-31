@@ -4,7 +4,7 @@
  *                 menu, DELUXE, NETWORK with its rooms, and OPTIONS with its pages
  *    Version:     0.1.0
  *    Created:     29-10-2026
- *    Modified:    30-10-2026
+ *    Modified:    31-10-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
@@ -33,6 +33,8 @@
 #define ITEM_STEP           13         /* a menu line, the font as it is */
 #define PAGE_Y              40         /* OPTIONS' pages: their first line */
 #define PAGE_STEP           14
+#define VERSION_Y           188        /* OPTIONS: the game's version, at the bottom right (over the title's (C) SEGA 1992) */
+#define VERSION_MARGIN      3          /* and its right edge, to the screen's */
 #define TITLE_HELD          0x10u      /* the title's opening frames, kept from running out (title_screen frames) */
 #define TITLE_TIME          0x1C2u     /* the title's 15 seconds (mode_timer) */
 #define DIFFICULTIES        8
@@ -56,6 +58,7 @@ enum
 	PAGE_TIME,
 	PAGE_SOUND_TEST,
 	PAGE_VIDEO,
+	PAGE_STEERING,
 	PAGE_CONTROLS,
 	PAGE_NETWORK,
 	PAGE_NAME,
@@ -65,7 +68,7 @@ enum
 
 static const char *const menu_items[] = { "ARCADE", "2 PLAYERS", "NETWORK", "& KNUCKLES", "OPTIONS", "EXIT" };
 static const char *const deluxe_items[] = { "CLASSIC", "TIME ATTACK", "FULL", "REVERSE", "BACK" };
-static const char *const options_items[] = { "CONTROLS", "DIFFICULTY", "TIME", "VIDEO", "VOLUME", "SOUND TEST",
+static const char *const options_items[] = { "CONTROLS", "DIFFICULTY", "TIME", "VIDEO", "VOLUME", "SOUND TEST", "STEERING", "FPS",
 	"BACK" };
 static const char *const network_items[] = { "HOST", "JOIN", "NAME", "PLAYERS", "BACK" };
 /* the letters NAME goes through: the font's (a space shown as _ while it is written) */
@@ -85,7 +88,7 @@ static const char *const difficulties[DIFFICULTIES] = { "VERY EASY", "EASIER", "
 enum { MENU_ARCADE, MENU_TWO_PLAYERS, MENU_NETWORK, MENU_DELUXE, MENU_OPTIONS, MENU_EXIT };
 enum { DELUXE_CLASSIC, DELUXE_TIME_ATTACK, DELUXE_FULL, DELUXE_REVERSE, DELUXE_BACK };
 enum { OPTIONS_CONTROLS, OPTIONS_DIFFICULTY, OPTIONS_TIME, OPTIONS_VIDEO, OPTIONS_VOLUME, OPTIONS_SOUND_TEST,
-	OPTIONS_BACK };
+	OPTIONS_STEERING, OPTIONS_FPS, OPTIONS_BACK };
 enum { NETWORK_HOST, NETWORK_JOIN, NETWORK_NAME, NETWORK_PLAYERS, NETWORK_BACK };
 
 /* The lines a build shows of the title's menu and of OPTIONS: a computer's, all of them. A game device's
@@ -124,7 +127,7 @@ static const int options_lines[] = {
 #ifndef ORUNNERS_HANDHELD
 	OPTIONS_VIDEO,
 #endif
-	OPTIONS_VOLUME, OPTIONS_SOUND_TEST, OPTIONS_BACK
+	OPTIONS_VOLUME, OPTIONS_SOUND_TEST, OPTIONS_STEERING, OPTIONS_FPS, OPTIONS_BACK
 };
 
 /* NETWORK's lines: PLAYERS where a second player may play (2 PLAYERS offered) */
@@ -144,6 +147,7 @@ static void set_network_lines(void)
 		console_network_set_players(1);
 }
 enum { VIDEO_WINDOW, VIDEO_FULL_SCREEN, VIDEO_PIXELS, VIDEO_WIDE, VIDEO_TWO_PLAYERS, VIDEO_BACK, VIDEO_ITEMS };
+enum { STEERING_DEAD_ZONE, STEERING_SENSITIVITY, STEERING_SPEED, STEERING_BACK, STEERING_ITEMS };
 /* CONTROLS' lines: PLAYER, the controls, DEFAULTS, BACK */
 enum { CONTROLS_PLAYER, CONTROLS_FIRST, CONTROLS_DEFAULTS = CONTROLS_FIRST + CONTROLS, CONTROLS_BACK,
 	CONTROLS_LINES };
@@ -164,7 +168,8 @@ static struct
 	int name_at;            /* NAME: the letter being changed */
 } menu = { .controls_waiting = -1 };
 
-console_window console_window_settings = { 2, false, PIXELS_SHARP, false, false, 5, "PLAYER", false };
+console_window console_window_settings = { .window_scale = 2, .pixels = PIXELS_SHARP, .volume = 5, .name = "PLAYER",
+	.dead_zone = DEAD_ZONE_NORMAL, .sensitivity = STEERING_NORMAL, .steering_speed = STEERING_NORMAL };
 
 /* ---- drawing ---- */
 
@@ -267,6 +272,7 @@ static int lines_of(int page)
 		case PAGE_TIME: return TIME_STAGES + 1;
 		case PAGE_SOUND_TEST: return 2;
 		case PAGE_VIDEO: return VIDEO_ITEMS;
+		case PAGE_STEERING: return STEERING_ITEMS;
 		case PAGE_CONTROLS: return 0;    /* (its grid moves its own way: controls_move) */
 		case PAGE_NETWORK: return network_line_count;
 		case PAGE_NAME: return 0;        /* (its letters move their own way: name_frame) */
@@ -352,6 +358,11 @@ static void options_frame(uint32_t pressed)
 		console_window_settings.volume = step(console_window_settings.volume, by, 0, 10);
 		console_window_settings.changed = true;
 	}
+	if (item == OPTIONS_FPS && (by || (pressed & ACTION_BIT(ACTION_ACCEPT))))
+	{
+		console_window_settings.fps = !console_window_settings.fps;
+		console_window_settings.changed = true;
+	}
 	if (pressed & ACTION_BIT(ACTION_ACCEPT))
 		switch (item)
 		{
@@ -370,6 +381,10 @@ static void options_frame(uint32_t pressed)
 			case OPTIONS_VIDEO:
 				menu.options_choice = menu.choice;
 				open_page(PAGE_VIDEO, 0);
+				return;
+			case OPTIONS_STEERING:
+				menu.options_choice = menu.choice;
+				open_page(PAGE_STEERING, 0);
 				return;
 			case OPTIONS_BACK:
 				save_game_settings();
@@ -393,8 +408,13 @@ static void options_frame(uint32_t pressed)
 			snprintf(value, sizeof(value), "< %d >", console_window_settings.volume);
 			shown = value;
 		}
+		else if (options_lines[index] == OPTIONS_FPS)
+			shown = console_window_settings.fps ? "< ON >" : "< OFF >";
 		line(index, options_items[options_lines[index]], shown);
 	}
+	/* the game's version at the bottom right (of WIDE's wider screen too) */
+	console_text(SCREEN_WIDTH + console_wide_side() - VERSION_MARGIN - console_text_width("V" ORUNNERS_VERSION, 1), VERSION_Y, 1,
+		ITEM_COLOUR, "V" ORUNNERS_VERSION);
 	darken_page();
 }
 
@@ -498,6 +518,46 @@ static void video_frame(uint32_t pressed)
 	line(VIDEO_WIDE, "WIDE", value);
 	line(VIDEO_TWO_PLAYERS, "2 PLAYERS", window->vertical ? "< VERTICAL >" : "< HORIZONTAL >");
 	line(VIDEO_BACK, "BACK", NULL);
+	darken_page();
+}
+
+/* STEERING: the sticks' dead zone and sensitivity, the keys' and pads' speed (ports/sdl2/main.c) */
+static void steering_frame(uint32_t pressed)
+{
+	console_window *window = &console_window_settings;
+	char value[16];
+	const int by = change(pressed);
+
+	switch (by ? menu.choice : STEERING_ITEMS)
+	{
+		case STEERING_DEAD_ZONE:
+			window->dead_zone = step(window->dead_zone, by * DEAD_ZONE_STEP, 0, DEAD_ZONE_MOST);
+			window->changed = true;
+			break;
+		case STEERING_SENSITIVITY:
+			window->sensitivity = step(window->sensitivity, by, 1, STEERING_LEVELS);
+			window->changed = true;
+			break;
+		case STEERING_SPEED:
+			window->steering_speed = step(window->steering_speed, by, 1, STEERING_LEVELS);
+			window->changed = true;
+			break;
+		default:
+			break;
+	}
+	if ((pressed & ACTION_BIT(ACTION_ACCEPT)) && menu.choice == STEERING_BACK)
+	{
+		open_page(PAGE_OPTIONS, menu.options_choice);
+		return;
+	}
+	page_heading("STEERING");
+	snprintf(value, sizeof(value), "< %d%% >", window->dead_zone);
+	line(STEERING_DEAD_ZONE, "DEAD ZONE", value);
+	snprintf(value, sizeof(value), "< %d >", window->sensitivity);
+	line(STEERING_SENSITIVITY, "SENSITIVITY", value);
+	snprintf(value, sizeof(value), "< %d >", window->steering_speed);
+	line(STEERING_SPEED, "SPEED", value);
+	line(STEERING_BACK, "BACK", NULL);
 	darken_page();
 }
 
@@ -846,7 +906,15 @@ static void list_frame(const char *const *items, const int *lines, int count)
 
 /* ---- the frame ---- */
 
-/* The port's author under the title's (C) SEGA 1992, while the title shows it */
+/* OPTIONS and the pages it opens */
+static bool options_page(int page)
+{
+	return page == PAGE_OPTIONS || page == PAGE_TIME || page == PAGE_SOUND_TEST || page == PAGE_VIDEO
+		|| page == PAGE_STEERING || page == PAGE_CONTROLS;
+}
+
+/* The port's author under the title's (C) SEGA 1992, while the title shows it (not under OPTIONS' pages,
+   which the version's corner is: Sebas) */
 static void draw_signature(void)
 {
 	for (uint32_t picture = console_find_object(title_picture_draw_ADDRESS, 0u); picture;
@@ -884,7 +952,8 @@ int console_menu_frame(uint32_t mode)
 		}
 		return MENU_NOTHING;
 	}
-	draw_signature();
+	if (!options_page(menu.page))
+		draw_signature();
 
 	/* in a network room, its page over the title's opening (after a race too) */
 	if (console_network_in_room() && menu.page != PAGE_ROOM)
@@ -1051,6 +1120,7 @@ int console_menu_frame(uint32_t mode)
 		case PAGE_TIME: time_frame(pressed); break;
 		case PAGE_SOUND_TEST: sound_test_frame(pressed); break;
 		case PAGE_VIDEO: video_frame(pressed); break;
+		case PAGE_STEERING: steering_frame(pressed); break;
 		case PAGE_CONTROLS: controls_frame(pressed); break;
 		default: break;
 	}

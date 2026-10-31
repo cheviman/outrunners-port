@@ -790,9 +790,31 @@ void road_object_stream_read(void)
 	original_road_object_stream_read();
 }
 
+/* WIDE's background through a change: whole. A change's page words are a set of four (background_page_words):
+   the coming background whole, then its left and its right column swapped for the next one's (with a page
+   that joins them), then the next one whole; the game swaps each column while the view's turn keeps it out of
+   its 320 columns, which WIDE's sides show. The sides keep the whole one shown in the middle instead: the
+   first of the set through the left column's swap, the last from the right one's on (the palettes' fades
+   cover the change, as the game's) */
+static void wide_background_pages(uint32_t pages_before)
+{
+	const uint32_t written = current_object->race_background.next_page_words - 4u;
+	struct tilemap_pages *const pages = TILEMAP_PAGES(current_object->race_background.page_word_address);
+	uint32_t entry;
+
+	if (console_wide_side() == 0 || pages->pages == pages_before || written < background_page_words_ADDRESS
+		|| written >= background_page_words_ADDRESS + 8u * 4u * 4u)
+		return;
+	entry = (written - background_page_words_ADDRESS) / 4u % 4u;
+	if (entry == 1u)
+		pages->pages = BACKGROUND_PAGE_WORD_STEPS(written - 4u)[0];
+	else if (entry == 2u)
+		pages->pages = BACKGROUND_PAGE_WORD_STEPS(written + 4u)[0];
+}
+
 /* The background at a fork: the stage's own (stage_backgrounds; the game takes the fork's stage and the
    branch, which lead forward to its own choice), and none new for the pre-stage, which has none */
-void race_background_update(void)
+static void fork_background_update(void)
 {
 	const uint8_t built_stage = screen->built_stage;
 	const uint8_t branch = player_car->branch;
@@ -818,11 +840,22 @@ void race_background_update(void)
 	player_car->branch = branch;
 }
 
+/* The background: the route's own at its forks, whole on WIDE's sides through a change */
+void race_background_update(void)
+{
+	const bool changing = current_object->state == 2u;
+	const uint32_t pages_before = changing ? TILEMAP_PAGES(current_object->race_background.page_word_address)->pages : 0u;
+
+	fork_background_update();
+	if (changing && current_object->state == 2u)
+		wide_background_pages(pages_before);
+}
+
 /* The race's checkpoints: the time a fork adds the route's next stage's (the game's is by the stage its
    forward fork leads to, and has no goal stage's), from a goal stage as from the last fork's (the game
    reads its forks by the stage). REVERSE's time is the game's turned round (Sebas): the whole race's at the
    start, its first course a goal's, the longest, and nothing at the checkpoints, as the game's own race
-   gathers it course by course */
+   gathers it course by course. CLASSIC's seconds more on the game's own route (console_classic_time) */
 void race_progress_update(uint32_t *p_host_record, uint32_t *p_racer_copy)
 {
 	const uint32_t race = screen->race, race_copy = screen->race_copy;
@@ -830,7 +863,9 @@ void race_progress_update(uint32_t *p_host_record, uint32_t *p_racer_copy)
 
 	if (!route_here())
 	{
+		passes = RACE(race)->pass_count;
 		original_race_progress_update(p_host_record, p_racer_copy);
+		console_classic_time(passes);
 		return;
 	}
 	if (routes.running == ROUTE_REVERSE && !routes.time_given && RACE(race)->time_left != 0u)
