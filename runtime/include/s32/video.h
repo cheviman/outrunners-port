@@ -58,6 +58,95 @@ void s32_video_draw_frame(void);
    its width is 320 or 416 */
 const uint32_t *s32_video_frame(int screen, int *width);
 
+/* A port that mixes the screens on its GPU (docs/gpu_video.md): s32_video_draw_layers in place of
+   s32_video_draw_frame draws the frame's layers alone, and s32_video_mixing_of hands what a screen's mixer
+   reads (false for a screen that is off: black). The layers in the mixer's order (S32_VIDEO_LAYER_*); a pixel
+   of a layer is a palette offset, 0 transparent; a mixing entry is one place in a sprite group's order of the
+   layers from the top down, the backdrop last. s32_video_frame keeps the CPU's last mixed frame */
+enum
+{
+	S32_VIDEO_LAYER_TEXT,
+	S32_VIDEO_LAYER_NBG0,
+	S32_VIDEO_LAYER_NBG1,
+	S32_VIDEO_LAYER_NBG2,
+	S32_VIDEO_LAYER_NBG3,
+	S32_VIDEO_LAYER_BITMAP,
+	S32_VIDEO_LAYER_SPRITES,
+	S32_VIDEO_LAYER_BACKDROP,
+	S32_VIDEO_LAYERS
+};
+
+typedef struct
+{
+	uint16_t palette_base;
+	uint16_t sprite_blend;      /* the sprite groups this layer blends with */
+	uint8_t blend;              /* the layers this one blends with (a bit each) */
+	uint8_t layer;              /* S32_VIDEO_LAYER_ */
+	uint8_t shift;              /* of the pixel, before the palette base is added */
+	uint8_t offsets;            /* the colour offsets 0 or 1, or none (2) */
+} s32_mix_entry;
+
+typedef struct
+{
+	const uint16_t *layers[S32_VIDEO_LAYERS];    /* S32_VIDEO_MAX_WIDTH x S32_VIDEO_HEIGHT each, the sprites' the
+	                                                screen's buffer shown; NULL: not drawn this frame */
+	const bool *empty[S32_VIDEO_LAYERS];         /* a layer's rows with nothing drawn (S32_VIDEO_HEIGHT), or NULL */
+	const uint16_t *palette;                     /* the screen's, xBBBBBGGGGGRRRRR */
+	const uint8_t *extra_marks;                  /* the sprites' marks of the extra palette and the ghosts, or NULL */
+	const uint16_t *extra_palette;
+	const bool *extra_set;
+	int blend_factor;
+	int group_shift, group_mask;                 /* a sprite pixel's group */
+	int shadow_mask, sprite_bits, shadow_pen;
+	int sprite_flips;                            /* bit 0 across, bit 1 up and down */
+	int offsets[3][3];                           /* the two colour offsets and none: red, green, blue */
+	s32_mix_entry orders[16][8];                 /* by sprite group */
+	int left, right, top, bottom;                /* the visible pixels */
+} s32_video_mixing;
+
+void s32_video_draw_layers(void);
+bool s32_video_mixing_of(int screen, s32_video_mixing *mixing);
+
+/* And a port that draws the layers on its GPU too: s32_video_layers_for_gpu in place of
+   s32_video_draw_layers says what each layer draws with, row by row, the GPU doing what page_pixel,
+   text_pixel and bitmap_pixel do for each pixel (video.c); the tiles' pens (16 rows of 16, a byte a pen) for
+   its textures. A layer's clip runs alternate between drawn and cleared from first_drawn, the last run over a
+   column the one that counts, up to the one that ends past the right edge */
+enum
+{
+	S32_GPU_TILEMAP,            /* rows: source column at the left edge, its step, pages (left | right << 8), line;
+	                               the column's shift (20 zoomed, 0 scrolled), the tile bank */
+	S32_GPU_TEXT,               /* control: register 0x5C; flip: the screen's */
+	S32_GPU_BITMAP,             /* rows: the start in video RAM; control: the colour, scroll: x, bits8 */
+	S32_GPU_BACKDROP            /* rows: the colour */
+};
+
+typedef struct
+{
+	int kind;
+	bool first_drawn;
+	uint16_t runs[S32_VIDEO_HEIGHT][16];
+	uint32_t rows[S32_VIDEO_HEIGHT][4];
+	int shift;
+	int bank;
+	int control;
+	int scroll;
+	bool flip;
+	bool bits8;
+} s32_gpu_layer;
+
+typedef struct
+{
+	int drawn;                  /* the layers on (a bit by S32_VIDEO_LAYER_), the backdrop always */
+	int left, right, top, bottom;
+	int side;                   /* WIDE's */
+	s32_gpu_layer layers[S32_VIDEO_LAYERS];
+} s32_gpu_layers;
+
+void s32_video_layers_for_gpu(s32_gpu_layers *layers);
+uint32_t s32_video_tile_count(void);
+const uint8_t *s32_video_tile_pens(uint32_t tile);
+
 /* The screens a port shows (bit 0 the left, bit 1 the right; both unless it says otherwise, as the headless
    runs and their hashes have them): the video draws those alone, their sprites, the layers their mixers
    take and their mixing, and a screen left out keeps its last frame */

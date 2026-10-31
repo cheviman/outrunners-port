@@ -27,8 +27,10 @@ else()
 	set(ORUNNERS_SWITCH_SDL2 PkgConfig::ORUNNERS_SWITCH_SDL2_PKG)
 endif()
 
-add_executable(OutRunners ports/sdl2/main.c ports/sdl2/controls.c)
+add_executable(OutRunners ports/sdl2/main.c ports/sdl2/controls.c ports/sdl2/gpu_video.c)
 target_link_libraries(OutRunners PRIVATE orunners_game_console orunners_sound ${ORUNNERS_SWITCH_SDL2})
+# (the board's video drawn on the GPU, OpenGL ES 3.0 in SDL's context: docs/gpu_video.md)
+target_compile_definitions(OutRunners PRIVATE ORUNNERS_GPU_VIDEO ORUNNERS_GPU_DEFAULT)
 set_target_properties(OutRunners PROPERTIES SUFFIX ".elf")
 
 # devkitPro's tools: the NACP (the title's name, author and version), the NSO, main.npdm and the .nro

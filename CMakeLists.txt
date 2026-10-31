@@ -269,8 +269,10 @@ if(ORUNNERS_DECOMPILED AND ORUNNERS_SOUND_DECOMPILED)
 		# (OutRunners draws its CONTROLS page's keys and buttons with Kenney's Input Prompts Pixel, a picture
 		# beside it, in the .app's Resources on macOS)
 		add_executable(outrunners WIN32 MACOSX_BUNDLE ports/sdl2/main.c ports/sdl2/controls.c ports/sdl2/first_run.c
-			ports/sdl2/letters.c ports/sdl2/prompts/input_prompts.bmp ports/sdl2/font/font.bmp)
+			ports/sdl2/letters.c ports/sdl2/gpu_video.c ports/sdl2/prompts/input_prompts.bmp ports/sdl2/font/font.bmp)
 		target_link_libraries(outrunners PRIVATE orunners_game_console orunners_sound orunners_extract ${ORUNNERS_SDL2})
+		# (the board's video mixed on the GPU, --gpu: docs/gpu_video.md)
+		target_compile_definitions(outrunners PRIVATE ORUNNERS_GPU_VIDEO)
 		# a development aid: OutRunners with Android's touch controls, the mouse a finger, to look at them in a
 		# window of any shape
 		option(ORUNNERS_TOUCH_TEST "Build OutRunners with Android's touch controls, the mouse as a finger" OFF)

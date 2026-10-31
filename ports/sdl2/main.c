@@ -73,6 +73,9 @@
 #ifdef ORUNNERS_TOUCH
 #include "touch.h"
 #endif
+#ifdef ORUNNERS_GPU_VIDEO
+#include "gpu_video.h"
+#endif
 
 #include <SDL.h>
 
@@ -655,6 +658,56 @@ static const uint32_t *with_controls(const uint32_t *pixels)
 }
 #endif
 
+#ifdef ORUNNERS_GPU_VIDEO
+/* ---- the board's video mixed on the GPU (docs/gpu_video.md) ---- */
+
+#ifdef ORUNNERS_GPU_DEFAULT
+static bool gpu_wanted = true;          /* (a device's build: the GPU draws the video unless it cannot) */
+static bool gpu_checked = true;         /* (and checks its first frames against the CPU's, for the log) */
+#else
+static bool gpu_wanted;                 /* --gpu */
+static bool gpu_checked;                /* --gpu-check */
+#endif
+static bool gpu_es;                     /* --gpu-es: OpenGL ES 3.0 (the devices') */
+static bool gpu_on;                     /* the GPU mixes the screens (gpu_video_open) */
+static bool gpu_frame;                  /* this frame's: the GPU's (not where the port's pictures go over the CPU's) */
+static uint64_t gpu_checked_frames, gpu_different_pixels;
+
+/* A screen's frame mixed on the GPU at 'place', its columns from 'first'; with --gpu-check compared with the
+   CPU's ('pixels', the same place's), the pixels that differ counted and the first said */
+static void gpu_screen(int screen, const SDL_Rect *place, int first, const uint32_t *pixels)
+{
+	static uint32_t read[S32_VIDEO_MAX_WIDTH * S32_VIDEO_HEIGHT];
+	s32_video_mixing mixing;
+
+	if (!s32_video_mixing_of(screen, &mixing))
+	{
+		static const uint32_t black[S32_VIDEO_MAX_WIDTH * S32_VIDEO_HEIGHT];
+
+		SDL_UpdateTexture(texture, place, black, S32_VIDEO_MAX_WIDTH * (int)sizeof(uint32_t));
+		return;
+	}
+	gpu_video_mix(texture, place, first, &mixing);
+	if (!gpu_checked || !gpu_video_read(texture, place, read, S32_VIDEO_MAX_WIDTH))
+		return;
+	for (int y = 0; y < place->h; y++)
+		for (int x = 0; x < place->w; x++)
+			if ((read[y * S32_VIDEO_MAX_WIDTH + x] ^ pixels[y * S32_VIDEO_MAX_WIDTH + x]) & 0xFFFFFFu)
+			{
+				if (gpu_different_pixels++ == 0)
+					fprintf(stderr, "GPU check: screen %d, pixel %d,%d: the GPU's %06X, the CPU's %06X\n", screen, x, y,
+						read[y * S32_VIDEO_MAX_WIDTH + x], pixels[y * S32_VIDEO_MAX_WIDTH + x] & 0xFFFFFFu);
+			}
+	if (++gpu_checked_frames % 300 == 0)
+		fprintf(stderr, "GPU check: %llu screens' frames, %llu pixels different\n",
+			(unsigned long long)gpu_checked_frames, (unsigned long long)gpu_different_pixels);
+#ifdef ORUNNERS_GPU_DEFAULT
+	if (gpu_checked_frames == 300)
+		gpu_checked = false;    /* (a device's own check, its first frames: in the log) */
+#endif
+}
+#endif
+
 /* The frames drawn into the window */
 static void show_screens(void)
 {
@@ -703,6 +756,11 @@ static void show_screens(void)
 			place.x += (cell - width) / 2;
 			place.w = width;
 		}
+#ifdef ORUNNERS_GPU_VIDEO
+		if (gpu_frame)
+			gpu_screen(screen, &place, width > cell ? (width - cell) / 2 : 0, pixels);
+		else
+#endif
 		SDL_UpdateTexture(texture, &place, pixels, S32_VIDEO_MAX_WIDTH * (int)sizeof(uint32_t));
 		source.w = stacked ? cell : source.w + cell;
 		source.h = stacked ? source.h + S32_VIDEO_HEIGHT : S32_VIDEO_HEIGHT;
@@ -718,6 +776,32 @@ static void show_screens(void)
 static uint64_t pace_video, pace_showing;    /* a handheld's log: the frames' time drawing them, showing them */
 #endif
 
+/* The frame's video: the GPU mixes it where it can, the CPU draws it whole where the port's own pictures go
+   over its frame (the pause's, CONTROLS', the route map beside the race) and, with --gpu-check, besides */
+static void draw_video(void)
+{
+#ifdef ORUNNERS_GPU_VIDEO
+	int ignored_x, ignored_y;
+
+	gpu_frame = gpu_on && !pause_shown && !(prompt_sheet && console_controls_place(0, &ignored_x, &ignored_y));
+#ifdef ORUNNERS_TOUCH
+	gpu_frame = gpu_frame && !console_side_map_shown();
+#endif
+	if (gpu_frame)
+	{
+		static s32_gpu_layers layers;
+
+		if (gpu_checked)
+			s32_video_draw_frame();
+		s32_video_layers_for_gpu(&layers);
+		if (!gpu_video_draw_layers(&layers))
+			s32_video_draw_layers();    /* (the layers the CPU's, the mixing the GPU's) */
+		return;
+	}
+#endif
+	s32_video_draw_frame();
+}
+
 static void on_frame_shown(void)
 {
 	/* the video draws the screens the window shows alone (both where the frames' hashes are written, or the
@@ -731,13 +815,13 @@ static void on_frame_shown(void)
 	const uint64_t start = SDL_GetPerformanceCounter();
 	uint64_t drawn;
 
-	s32_video_draw_frame();
+	draw_video();
 	drawn = SDL_GetPerformanceCounter();
 	show_screens();
 	pace_video += drawn - start;
 	pace_showing += SDL_GetPerformanceCounter() - drawn;
 #else
-	s32_video_draw_frame();
+	draw_video();
 	show_screens();
 #endif
 }
@@ -1323,6 +1407,10 @@ static void run_network_wait(void)
 
 	if (audio)
 		SDL_PauseAudioDevice(audio, 1);
+#ifdef ORUNNERS_GPU_VIDEO
+	if (gpu_on)
+		s32_video_draw_frame();    /* (the CPU's frame: the GPU's was shown) */
+#endif
 	for (int screen = 0; screen < 2; screen++)
 		memcpy(frozen[screen], s32_video_frame(screen, &pause_widths[screen]), sizeof(frozen[screen]));
 	make_words_picture(frozen, list, console_network_wait_sprites(list, sizeof(list)));
@@ -1351,6 +1439,10 @@ static void run_pause(void)
 	pause_requested = false;
 	if (audio)
 		SDL_PauseAudioDevice(audio, 1);
+#ifdef ORUNNERS_GPU_VIDEO
+	if (gpu_on)
+		s32_video_draw_frame();    /* (the CPU's frame: the GPU's was shown) */
+#endif
 	for (int screen = 0; screen < 2; screen++)
 		memcpy(frozen[screen], s32_video_frame(screen, &pause_widths[screen]), sizeof(frozen[screen]));
 	make_pause_picture(frozen, choice);
@@ -1741,6 +1833,14 @@ int main(int argc, char **argv)
 			fast = true;
 		else if (strcmp(argv[index], "--assets") == 0 && index + 1 < argc)
 			assets_path = argv[++index];
+#ifdef ORUNNERS_GPU_VIDEO
+		else if (strcmp(argv[index], "--gpu") == 0)
+			gpu_wanted = true;
+		else if (strcmp(argv[index], "--gpu-check") == 0)
+			gpu_wanted = gpu_checked = true;
+		else if (strcmp(argv[index], "--gpu-es") == 0)
+			gpu_wanted = gpu_es = true;    /* (OpenGL ES on a computer, as the devices have it) */
+#endif
 		else
 			return fail("Unknown option.", USAGE);
 	}
@@ -1896,13 +1996,47 @@ int main(int argc, char **argv)
 	if (window)
 		apply_window_settings();
 #endif
+#ifdef ORUNNERS_GPU_VIDEO
+	if (gpu_wanted)
+	{
+		/* the GPU draws the video in the renderer's own context: OpenGL on a computer, OpenGL ES 3.0 on the
+		   devices (SDL's ES renderer keeps a version asked for that is 2.0 or more) */
+#if defined(__SWITCH__) || defined(__ANDROID__)
+		gpu_es = true;
+#endif
+		if (gpu_es)
+		{
+			SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+			SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+			SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+			SDL_SetHint(SDL_HINT_RENDER_DRIVER, "opengles2");
+		}
+		else
+			SDL_SetHint(SDL_HINT_RENDER_DRIVER, "opengl");
+	}
 	renderer = window ? SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED) : NULL;
+	if (window && !renderer && gpu_wanted)
+	{
+		/* (no such context: the renderer as before, the CPU drawing the video) */
+		SDL_GL_ResetAttributes();
+		SDL_SetHint(SDL_HINT_RENDER_DRIVER, "");
+		gpu_wanted = false;
+		renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+	}
+#else
+	renderer = window ? SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED) : NULL;
+#endif
 	if (window && !renderer)
 		renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
 	texture = renderer ? SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING,
 		2 * S32_VIDEO_MAX_WIDTH, 2 * S32_VIDEO_HEIGHT) : NULL;    /* (room for two screens, either way) */
 	if (!texture)
 		return fail("The window could not be opened.", SDL_GetError());
+#ifdef ORUNNERS_GPU_VIDEO
+	gpu_on = gpu_wanted && gpu_video_open(renderer);
+	if (gpu_wanted && !gpu_on)
+		fprintf(stderr, "The CPU mixes the screens: the GPU's mixing could not be set up\n");
+#endif
 	SDL_RenderSetIntegerScale(renderer, SDL_FALSE);
 	SDL_SetTextureScaleMode(texture, SDL_ScaleModeNearest);
 #ifdef ORUNNERS_TOUCH
