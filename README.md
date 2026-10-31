@@ -49,12 +49,14 @@ What any tool makes is yours alone, with the game's data in it: never share it.
   - 2 PLAYERS: both seats in one race, their screens side by side or one over the other; on a tablet or an
     open Fold, the two screens facing each other, each player with their own touch controls.
   - NETWORK: rooms of up to four devices on the local network (below).
-  - & KNUCKLES: CLASSIC (the arcade's game as it is, the right seat's START joins it), TIME ATTACK (no
-    time limit, the fastest run raced again as a see-through ghost), FULL (all 31 courses in one race),
-    REVERSE (from a goal picked on the route map back to the start).
+  - & KNUCKLES: CLASSIC (the arcade's game, 5 seconds more in every part, the right seat's START joins
+    it), TIME ATTACK (no time limit, the fastest run raced again as a see-through ghost), FULL (all 31
+    courses in one race), REVERSE (from a goal picked on the route map back to the start).
   - OPTIONS: CONTROLS (keys and game controller buttons for each player), DIFFICULTY, TIME (by stage),
     VIDEO (the window's size, full screen, PIXELS sharp, smooth, bilinear or CRT, WIDE off, 16:9 or 20:9,
-    2 PLAYERS' layout), VOLUME, SOUND TEST.
+    2 PLAYERS' layout), VOLUME, SOUND TEST, STEERING (the sticks' dead zone and sensitivity, the keys' and
+    pads' speed), FPS (the frames a second on the picture and in the window's title); the version at its
+    bottom right.
 - **The pause** in a race (Escape, Enter or a game controller's Start): CONTINUE, QUIT GAME.
 - **The keys**: the arrows steer, accelerate and brake; Q and A shift up and down; space is the radio,
   `[` and `]` its songs; Enter starts and pauses. A game controller: the d-pad or the left stick steers,
