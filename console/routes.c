@@ -812,6 +812,27 @@ static void wide_background_pages(uint32_t pages_before)
 		pages->pages = BACKGROUND_PAGE_WORD_STEPS(written + 4u)[0];
 }
 
+/* A change's columns swapped in the order the view's turn takes them out of sight, on a route's (FULL and
+   REVERSE: glitches at their stages' changes, a player's report). The game picks the set of page words by
+   the fork's branch, as its road turns the view the branch's way: the branch a route gives for its stage's
+   background (fork_background_update) need not be the way the view turns, and the column in sight changed
+   at once. The set the turn needs instead (a turn to the right takes the left column first, the branch 0
+   set), from its second step on: the first is the same in both */
+static void turn_background_pages(uint32_t pages_before)
+{
+	const uint32_t written = current_object->race_background.next_page_words - 4u;
+	const int16_t turn = (int16_t)((uint32_t)player_car->view_yaw << 4) >> 4;
+	uint32_t set;
+
+	if (!route_here() || TILEMAP_PAGES(current_object->race_background.page_word_address)->pages == pages_before
+		|| written < background_page_words_ADDRESS || written >= background_page_words_ADDRESS + 8u * 4u * 4u
+		|| (written - background_page_words_ADDRESS) / 4u % 4u != 1u)
+		return;
+	set = background_page_words_ADDRESS + (current_object->race_background.page_half * 2u + (turn < 0 ? 1u : 0u)) * 4u * 4u;
+	TILEMAP_PAGES(current_object->race_background.page_word_address)->pages = BACKGROUND_PAGE_WORD_STEPS(set + 4u)[0];
+	current_object->race_background.next_page_words = set + 8u;
+}
+
 /* The background at a fork: the stage's own (stage_backgrounds; the game takes the fork's stage and the
    branch, which lead forward to its own choice), and none new for the pre-stage, which has none */
 static void fork_background_update(void)
@@ -840,7 +861,8 @@ static void fork_background_update(void)
 	player_car->branch = branch;
 }
 
-/* The background: the route's own at its forks, whole on WIDE's sides through a change */
+/* The background: the route's own at its forks, its columns swapped the way the view turns, whole on WIDE's
+   sides through a change */
 void race_background_update(void)
 {
 	const bool changing = current_object->state == 2u;
@@ -848,7 +870,10 @@ void race_background_update(void)
 
 	fork_background_update();
 	if (changing && current_object->state == 2u)
+	{
+		turn_background_pages(pages_before);
 		wide_background_pages(pages_before);
+	}
 }
 
 /* The race's checkpoints: the time a fork adds the route's next stage's (the game's is by the stage its

@@ -222,6 +222,11 @@ merged here; this repository adds console/, the ports and their documents.
   of its 320, and WIDE's sides showed the half-swapped pages. WIDE keeps the background whole: the change's
   first set through the left column's swap, its last from the right one's on (routes.c); the turn reaches
   only about 0x2A8, so waiting for more turn could not hide it.
+- FULL's and REVERSE's background changes (a player's report: glitches between the stages): the game picks
+  the order its columns are swapped in by the fork's branch, which a route gives for its stage's
+  background, so 13 of FULL's 33 changes swapped the column in sight at once (the clouds turned into the
+  city in a frame, 4:3 too). The order now the view's turn's (turn_background_pages, routes.c): all 33 and
+  REVERSE's 5 out of sight, as the game's own.
 - The route map beside the race (a tall screen, the Fold opened) in CLASSIC too: its right seat joins while
   the race takes entries, before the race and its map.
 - CLASSIC 5 seconds more than ARCADE in every part (Sebas: friendlier, and apart from ARCADE): at the start
