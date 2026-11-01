@@ -4,7 +4,7 @@
  *                 at any size
  *    Version:     0.1.0
  *    Created:     29-10-2026
- *    Modified:    29-10-2026
+ *    Modified:    01-11-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
@@ -137,7 +137,7 @@ void console_text(int x, int y, int scale, uint16_t colour, const char *text)
 #define PAUSE_CHOSEN        0x00B0u
 #define SPRITE_END          0xC000u    /* the list's end command */
 
-static const char *const pause_items[CONSOLE_PAUSE_ITEMS] = { "CONTINUE", "QUIT GAME" };
+static const char *const pause_items[CONSOLE_PAUSE_ITEMS] = { "CONTINUE", "RESTART", "QUIT GAME" };
 
 /* One line of text into the list, as console_text puts it into the screen's: centred */
 static size_t pause_line(uint8_t *list, size_t at, size_t room, int y, int scale, uint16_t colour, const char *text)
@@ -175,9 +175,10 @@ size_t console_pause_sprites(uint8_t *list, size_t room, int choice)
 	if (room < 16u)
 		return 0;
 	at = pause_line(list, at, room, PAUSE_Y, 2, PAUSE_CHOSEN, "PAUSE");
-	for (int item = 0; item < CONSOLE_PAUSE_ITEMS; item++)
-		at = pause_line(list, at, room, PAUSE_LINES_Y + item * PAUSE_LINE_STEP, 1,
-			item == choice ? PAUSE_CHOSEN : PAUSE_TEXT, pause_items[item]);
+	for (int item = 0, line = 0; item < CONSOLE_PAUSE_ITEMS; item++)
+		if (item != CONSOLE_PAUSE_RESTART || console_can_restart())
+			at = pause_line(list, at, room, PAUSE_LINES_Y + line++ * PAUSE_LINE_STEP, 1,
+				item == choice ? PAUSE_CHOSEN : PAUSE_TEXT, pause_items[item]);
 	memset(&list[at], 0, 16);
 	list[at + 1] = (uint8_t)(SPRITE_END >> 8);
 	return at + 16u;

@@ -4,7 +4,7 @@
  *                 what it tells the port
  *    Version:     0.1.0
  *    Created:     29-10-2026
- *    Modified:    30-10-2026
+ *    Modified:    01-11-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
@@ -25,8 +25,22 @@
 #define CLASSIC_EXTRA       5u       /* CLASSIC's seconds more, at the start and at each checkpoint */
 #define SCREEN_CAR          0x1000u  /* the screen's car, beside its block (the register player_car) */
 #define TRANSMISSION_MANUAL 1u       /* car transmission (car_select_wheel_transmissions): 0 automatic */
+#define WHEEL_CENTRE        0x80u    /* screen wheel: the middle (the car select's turntable stays) */
+#define WHEEL_MANUAL        0x20u    /* screen wheel: where the car select picks the manual transmission */
 
 console_state console;
+
+/* The pause's RESTART: the start of the game being played as the menus made it, and what a restart takes
+   again */
+static struct
+{
+	int started;                     /* MENU_START_ONE to MENU_CLASSIC; MENU_NOTHING: the network's, or none */
+	bool pending;                    /* RESTART picked: the same start once the left seat is at the title */
+	int goal;                        /* REVERSE's goal stage */
+	uint8_t choosing;                /* the seats (bit 0 the left) whose car select takes the choices again */
+	uint8_t models[2];               /* by seat: the car, and its transmission */
+	uint8_t transmissions[2];
+} restart;
 
 /* ---- the coins ---- */
 
@@ -157,6 +171,37 @@ static uint32_t press_start(uint32_t mode, uint32_t seat_credits)
 	return original_check_game_start(mode, seat_credits);
 }
 
+/* A game the menus start ('start', MENU_START_ONE to MENU_CLASSIC), or a RESTART of it: its own set-up,
+   then the left seat's START (REVERSE: from 'goal', 0 for the one the route map picks) */
+static uint32_t start_game(int start, int goal, uint32_t mode, uint32_t seat_credits)
+{
+	restart.started = start;
+	switch (start)
+	{
+		case MENU_START_TWO:
+			console.two_players = true;
+			console.join_right = true;
+			break;
+		case MENU_TIME_ATTACK:
+			console.time_attack = true;
+			console_ghost_start();
+			break;
+		case MENU_FULL:
+			console_full_start();
+			break;
+		case MENU_CLASSIC:
+			console.classic = true;
+			console.classic_start = false;
+			break;
+		case MENU_REVERSE:
+			console_reverse_start(goal);
+			break;
+		default:
+			break;
+	}
+	return press_start(mode, seat_credits);
+}
+
 /* The steps of game mode 6 (and of the demo's race, game mode 4) from the race's set-up to its fade out
    (game_mode_play): the race on the screen */
 static bool racing(uint32_t screen_block)
@@ -185,6 +230,8 @@ static bool side_map_due(uint32_t mode)
    title's menu, whose ARCADE and 2 PLAYERS start the game as the arcade's START does (menu.c) */
 uint32_t check_game_start(uint32_t mode, uint32_t seat_credits)
 {
+	int menu;
+
 	if (console.quit_seats & (1u << screen->index))
 	{
 		/* (the pause's QUIT GAME: a game being played ends, back to the title) */
@@ -257,30 +304,25 @@ uint32_t check_game_start(uint32_t mode, uint32_t seat_credits)
 			console.join_right = true;
 		}
 		console_menu_frame(GAME_MODE_PLAY);    /* (its pages closed) */
+		restart.started = MENU_NOTHING;    /* (no RESTART) */
 		return press_start(mode, seat_credits);
 	}
-	switch (console_menu_frame(mode))
+	if (restart.pending && mode >= GAME_MODE_TITLE && mode <= GAME_MODE_RANKING)
+	{
+		/* the pause's RESTART, back at the title: the same game again */
+		restart.pending = false;
+		console_menu_frame(GAME_MODE_PLAY);    /* (its pages closed) */
+		return start_game(restart.started, restart.goal, mode, seat_credits);
+	}
+	switch (menu = console_menu_frame(mode))
 	{
 		case MENU_START_ONE:
-			return press_start(mode, seat_credits);
 		case MENU_START_TWO:
-			console.two_players = true;
-			console.join_right = true;
-			return press_start(mode, seat_credits);
 		case MENU_TIME_ATTACK:
-			console.time_attack = true;
-			console_ghost_start();
-			return press_start(mode, seat_credits);
 		case MENU_FULL:
-			console_full_start();
-			return press_start(mode, seat_credits);
 		case MENU_CLASSIC:
-			console.classic = true;
-			console.classic_start = false;
-			return press_start(mode, seat_credits);
 		case MENU_REVERSE:
-			console_reverse_start();
-			return press_start(mode, seat_credits);
+			return start_game(menu, 0, mode, seat_credits);
 		case MENU_TITLE:
 			AS32(screen->game_mode) = GAME_MODE_RESTART;
 			return GAME_MODE_RESTART;
@@ -426,6 +468,65 @@ bool console_manual_gears(int player)
 void console_quit_game(void)
 {
 	console.quit_seats = 3u;
+}
+
+/* ---- the pause's RESTART ---- */
+
+bool console_can_restart(void)
+{
+	return console_can_pause() && restart.started != MENU_NOTHING && !console_network_linked();
+}
+
+void console_restart_game(void)
+{
+	if (!console_can_restart())
+		return;
+	restart.models[0] = CAR(SCREEN_1 + SCREEN_CAR)->model;
+	restart.transmissions[0] = CAR(SCREEN_1 + SCREEN_CAR)->transmission;
+	restart.models[1] = CAR(SCREEN_2 + SCREEN_CAR)->model;
+	restart.transmissions[1] = CAR(SCREEN_2 + SCREEN_CAR)->transmission;
+	restart.goal = console_reverse_goal();
+	restart.choosing = restart.started == MENU_START_TWO ? 3u : 1u;    /* (CLASSIC's challenger joins again) */
+	restart.pending = true;
+	console_quit_game();
+}
+
+/* The car select (game_mode_play step 3), on a seat a RESTART started: the turntable at the car chosen before
+   from its start, as the game puts its default car there, then that car and the transmission chosen before
+   confirmed as the player's START would, the wheel held where it picks them; the game's own elsewhere */
+void car_select_run(void)
+{
+	const uint8_t seat = (uint8_t)(1u << screen->index);
+	const uint32_t state = current_object->state;
+	const uint8_t wheel = screen->wheel;
+	const uint32_t pressed = screen->buttons_pressed;
+
+	if ((restart.choosing & seat) == 0u)
+	{
+		original_car_select_run();
+		return;
+	}
+	if (state == 4u || state == 5u)
+	{
+		/* (4 the car, the turntable still; 5 the transmission) */
+		screen->wheel = (uint8_t)(state == 5u && restart.transmissions[screen->index] == TRANSMISSION_MANUAL
+			? WHEEL_MANUAL : WHEEL_CENTRE);
+		screen->buttons_pressed |= START_BUTTON;
+	}
+	original_car_select_run();
+	screen->wheel = wheel;
+	screen->buttons_pressed = pressed;
+	if (state == 1u && current_object->state != 1u)
+	{
+		/* (as state 1 sets its default car up) */
+		const uint32_t model = restart.models[screen->index];
+
+		player_car->model = (uint8_t)model;
+		VIDEO_REGISTER_WORDS(current_object->car_select.scroll_x_address)[0] = (uint16_t)(0u - (model << 7));
+		current_object->car_select.angle = model << 9;
+	}
+	if (current_object->car_select.transmission_chosen != 0u)
+		restart.choosing &= (uint8_t)~seat;
 }
 
 void console_side_map_wanted(bool wanted)

@@ -3,7 +3,7 @@
  *    Description: what the console build tells the port
  *    Version:     0.1.0
  *    Created:     29-10-2026
- *    Modified:    31-10-2026
+ *    Modified:    01-11-2026
  *    Author:      Sebastian Toyos
  */
 #ifndef ORUNNERS_CONSOLE_H
@@ -51,6 +51,12 @@ bool console_quit_requested(void);
 bool console_can_pause(void);
 void console_quit_game(void);
 
+/* The pause's RESTART (issue 4), where it is offered (a game the menus started, not the network's): the
+   games being played end as QUIT GAME's, and the same game starts again, its cars and transmissions chosen
+   on the car select as before (REVERSE from the same goal) */
+bool console_can_restart(void);
+void console_restart_game(void);
+
 /* True while player 'player''s seat (0 the left) races with the manual transmission (the car select's
    choice): the touch controls' gear buttons are shown then alone */
 bool console_manual_gears(int player);
@@ -60,11 +66,13 @@ bool console_manual_gears(int player);
 void console_offer_two_players(bool offered);
 
 
-/* The pause's words, PAUSE and its lines (CONTINUE, QUIT GAME), in the game's letters: sprite entries for
-   s32_video_overlay_sprites into 'list' ('room' bytes), the line 'choice' in colour; their size in bytes */
+/* The pause's words, PAUSE and its lines (CONTINUE, RESTART where console_can_restart, QUIT GAME), in the
+   game's letters: sprite entries for s32_video_overlay_sprites into 'list' ('room' bytes), the line 'choice'
+   in colour; their size in bytes */
 enum
 {
 	CONSOLE_PAUSE_CONTINUE,
+	CONSOLE_PAUSE_RESTART,
 	CONSOLE_PAUSE_QUIT,
 	CONSOLE_PAUSE_ITEMS
 };

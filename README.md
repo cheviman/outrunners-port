@@ -57,10 +57,12 @@ What any tool makes is yours alone, with the game's data in it: never share it.
     2 PLAYERS' layout), VOLUME, SOUND TEST, STEERING (the sticks' dead zone and sensitivity, the keys' and
     pads' speed), FPS (the frames a second on the picture and in the window's title); the version at its
     bottom right.
-- **The pause** in a race (Escape, Enter or a game controller's Start): CONTINUE, QUIT GAME.
+- **The pause** in a race (Escape, Enter or a game controller's Start): CONTINUE, RESTART (the same game
+  again, the same cars and transmissions chosen on the car select by themselves; not in NETWORK), QUIT GAME.
 - **The keys**: the arrows steer, accelerate and brake; Q and A shift up and down; space is the radio,
   `[` and `]` its songs; Enter starts and pauses. A game controller: the d-pad or the left stick steers,
-  A accelerates, B brakes, the shoulders shift. OPTIONS > CONTROLS changes them.
+  the right trigger or A accelerates, the left trigger or B brakes (a trigger as far as it is pressed), the
+  shoulders shift. OPTIONS > CONTROLS changes them, the triggers and the sticks' buttons too.
 - **Android's touch controls**: the wheel, GAS and BRAKE, the gears' buttons with the manual transmission,
   START and the radio. On a tall screen (an open Fold, a tablet) the picture goes to the top and the controls
   under it, over the game's own route map following the car.

@@ -4,14 +4,15 @@
  *                 file that keeps them (controls.ini)
  *    Version:     0.1.0
  *    Created:     29-10-2026
- *    Modified:    30-10-2026
+ *    Modified:    01-11-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
  *    The defaults below; controls.ini, beside the executable, keeps what the console's CONTROLS page
- *    changes: a section a player, "[player 1]", and a line a control, "gas = Up | a" (SDL's names of the keys,
- *    then of the buttons), as SegaSonic's. A player's game controller is the one plugged in in their turn;
- *    its left stick and its triggers turn the wheel and press the pedals besides (the window port).
+ *    changes: a section a player, "[player 1]", and a line a control, "gas = Up | righttrigger, a" (SDL's names
+ *    of the keys, then of the buttons and the triggers), as SegaSonic's. A player's game controller is the one
+ *    plugged in in their turn; its left stick turns the wheel besides (the window port). A trigger is one more
+ *    button, the pedals' by default, which it presses as far as it goes.
  */
 #include "controls.h"
 
@@ -21,6 +22,10 @@
 #define NO_KEY     SDL_SCANCODE_UNKNOWN
 #define NO_BUTTON  SDL_CONTROLLER_BUTTON_INVALID
 #define LINE_SIZE  256
+
+/* controls.ini's version: 2 has the triggers among the buttons (1, before, had none, and the triggers
+   pressed the pedals besides) */
+#define FILE_VERSION  2
 
 /* The controls' names in controls.ini */
 static const char *const control_names[CONTROLS] = {
@@ -48,26 +53,35 @@ static const SDL_Scancode default_keys[CONTROL_PLAYERS][CONTROLS][CONTROL_KEYS] 
 	},
 };
 
+/* (a control with one button: none is SDL_CONTROLLER_BUTTON_INVALID, not 0, which is A) */
+#define ONE_BUTTON(first)  { first, NO_BUTTON, NO_BUTTON }
+
 #ifdef ORUNNERS_ANBERNIC_BUTTONS
-/* Anbernic's handhelds (Sebas): the pad's left and right turn the wheel, L1 the gas and L2 the brake (its
-   trigger, as the pedals' axis the window port reads), Y and B shift up and down, SELECT the music, the pad's
-   down and up the songs */
-static const SDL_GameControllerButton default_buttons[CONTROLS] = {
-	[CONTROL_STEER_LEFT] = SDL_CONTROLLER_BUTTON_DPAD_LEFT, [CONTROL_STEER_RIGHT] = SDL_CONTROLLER_BUTTON_DPAD_RIGHT,
-	[CONTROL_GAS] = SDL_CONTROLLER_BUTTON_LEFTSHOULDER, [CONTROL_BRAKE] = SDL_CONTROLLER_BUTTON_INVALID,
-	[CONTROL_SHIFT_UP] = SDL_CONTROLLER_BUTTON_Y, [CONTROL_SHIFT_DOWN] = SDL_CONTROLLER_BUTTON_B,
-	[CONTROL_MUSIC] = SDL_CONTROLLER_BUTTON_BACK, [CONTROL_SONG_BACK] = SDL_CONTROLLER_BUTTON_DPAD_DOWN,
-	[CONTROL_SONG_NEXT] = SDL_CONTROLLER_BUTTON_DPAD_UP, [CONTROL_START] = SDL_CONTROLLER_BUTTON_START,
+/* Anbernic's handhelds (Sebas): the pad's left and right turn the wheel, L1 the gas (R2 too) and L2 the
+   brake, Y and B shift up and down, SELECT the music, the pad's down and up the songs */
+static const SDL_GameControllerButton default_buttons[CONTROLS][CONTROL_BUTTONS] = {
+	[CONTROL_STEER_LEFT] = ONE_BUTTON(SDL_CONTROLLER_BUTTON_DPAD_LEFT),
+	[CONTROL_STEER_RIGHT] = ONE_BUTTON(SDL_CONTROLLER_BUTTON_DPAD_RIGHT),
+	[CONTROL_GAS] = { SDL_CONTROLLER_BUTTON_LEFTSHOULDER, CONTROL_RIGHT_TRIGGER, NO_BUTTON },
+	[CONTROL_BRAKE] = ONE_BUTTON(CONTROL_LEFT_TRIGGER),
+	[CONTROL_SHIFT_UP] = ONE_BUTTON(SDL_CONTROLLER_BUTTON_Y), [CONTROL_SHIFT_DOWN] = ONE_BUTTON(SDL_CONTROLLER_BUTTON_B),
+	[CONTROL_MUSIC] = ONE_BUTTON(SDL_CONTROLLER_BUTTON_BACK),
+	[CONTROL_SONG_BACK] = ONE_BUTTON(SDL_CONTROLLER_BUTTON_DPAD_DOWN),
+	[CONTROL_SONG_NEXT] = ONE_BUTTON(SDL_CONTROLLER_BUTTON_DPAD_UP), [CONTROL_START] = ONE_BUTTON(SDL_CONTROLLER_BUTTON_START),
 };
 #else
-/* Every player's game controller: the pad's left and right turn the wheel (as the stick does), A the gas and
-   B the brake (as the triggers do), the shoulders shift, Y the music, the pad's down and up the songs */
-static const SDL_GameControllerButton default_buttons[CONTROLS] = {
-	[CONTROL_STEER_LEFT] = SDL_CONTROLLER_BUTTON_DPAD_LEFT, [CONTROL_STEER_RIGHT] = SDL_CONTROLLER_BUTTON_DPAD_RIGHT,
-	[CONTROL_GAS] = SDL_CONTROLLER_BUTTON_A, [CONTROL_BRAKE] = SDL_CONTROLLER_BUTTON_B,
-	[CONTROL_SHIFT_UP] = SDL_CONTROLLER_BUTTON_RIGHTSHOULDER, [CONTROL_SHIFT_DOWN] = SDL_CONTROLLER_BUTTON_LEFTSHOULDER,
-	[CONTROL_MUSIC] = SDL_CONTROLLER_BUTTON_Y, [CONTROL_SONG_BACK] = SDL_CONTROLLER_BUTTON_DPAD_DOWN,
-	[CONTROL_SONG_NEXT] = SDL_CONTROLLER_BUTTON_DPAD_UP, [CONTROL_START] = SDL_CONTROLLER_BUTTON_START,
+/* Every player's game controller: the pad's left and right turn the wheel (as the stick does), the right
+   trigger or A the gas and the left trigger or B the brake, the shoulders shift, Y the music, the pad's down
+   and up the songs */
+static const SDL_GameControllerButton default_buttons[CONTROLS][CONTROL_BUTTONS] = {
+	[CONTROL_STEER_LEFT] = ONE_BUTTON(SDL_CONTROLLER_BUTTON_DPAD_LEFT),
+	[CONTROL_STEER_RIGHT] = ONE_BUTTON(SDL_CONTROLLER_BUTTON_DPAD_RIGHT),
+	[CONTROL_GAS] = { CONTROL_RIGHT_TRIGGER, SDL_CONTROLLER_BUTTON_A, NO_BUTTON },
+	[CONTROL_BRAKE] = { CONTROL_LEFT_TRIGGER, SDL_CONTROLLER_BUTTON_B, NO_BUTTON },
+	[CONTROL_SHIFT_UP] = ONE_BUTTON(SDL_CONTROLLER_BUTTON_RIGHTSHOULDER),
+	[CONTROL_SHIFT_DOWN] = ONE_BUTTON(SDL_CONTROLLER_BUTTON_LEFTSHOULDER),
+	[CONTROL_MUSIC] = ONE_BUTTON(SDL_CONTROLLER_BUTTON_Y), [CONTROL_SONG_BACK] = ONE_BUTTON(SDL_CONTROLLER_BUTTON_DPAD_DOWN),
+	[CONTROL_SONG_NEXT] = ONE_BUTTON(SDL_CONTROLLER_BUTTON_DPAD_UP), [CONTROL_START] = ONE_BUTTON(SDL_CONTROLLER_BUTTON_START),
 };
 #endif
 
@@ -84,10 +98,14 @@ static void set_defaults(int player)
 		binding->name = control_names[control];
 		for (int key = 0; key < CONTROL_KEYS; key++)
 			binding->keys[key] = default_keys[player][control][key];    /* (0 is SDL_SCANCODE_UNKNOWN: none) */
-		binding->buttons[0] = default_buttons[control];
-		for (int button = 1; button < CONTROL_BUTTONS; button++)
-			binding->buttons[button] = NO_BUTTON;
+		for (int button = 0; button < CONTROL_BUTTONS; button++)
+			binding->buttons[button] = default_buttons[control][button];
 	}
+}
+
+static bool is_trigger(SDL_GameControllerButton button)
+{
+	return button == CONTROL_LEFT_TRIGGER || button == CONTROL_RIGHT_TRIGGER;
 }
 
 bool controls_holds(int player, SDL_GameController *pad, int control)
@@ -99,9 +117,26 @@ bool controls_holds(int player, SDL_GameController *pad, int control)
 		if (binding->keys[key] != NO_KEY && keys[binding->keys[key]])
 			return true;
 	for (int button = 0; pad && button < CONTROL_BUTTONS; button++)
-		if (binding->buttons[button] != NO_BUTTON && SDL_GameControllerGetButton(pad, binding->buttons[button]))
+		if (binding->buttons[button] != NO_BUTTON && !is_trigger(binding->buttons[button])
+			&& SDL_GameControllerGetButton(pad, binding->buttons[button]))
 			return true;
 	return false;
+}
+
+int controls_trigger_travel(int player, SDL_GameController *pad, int control)
+{
+	const control_binding *binding = &control_bindings[player][control];
+	int travel = 0;
+
+	for (int button = 0; pad && button < CONTROL_BUTTONS; button++)
+		if (is_trigger(binding->buttons[button]))
+		{
+			const int axis = SDL_GameControllerGetAxis(pad, binding->buttons[button] == CONTROL_LEFT_TRIGGER
+				? SDL_CONTROLLER_AXIS_TRIGGERLEFT : SDL_CONTROLLER_AXIS_TRIGGERRIGHT);
+
+			travel = axis > travel ? axis : travel;
+		}
+	return travel;
 }
 
 /* ---- controls.ini ---- */
@@ -116,6 +151,26 @@ static char *trimmed(char *text)
 	while (end > text && (end[-1] == ' ' || end[-1] == '\t' || end[-1] == '\r' || end[-1] == '\n'))
 		*--end = 0;
 	return text;
+}
+
+/* A button's name in controls.ini: SDL's, the triggers' its axes' ("lefttrigger", "righttrigger") */
+static const char *button_name(SDL_GameControllerButton button)
+{
+	if (is_trigger(button))
+		return SDL_GameControllerGetStringForAxis(button == CONTROL_LEFT_TRIGGER
+			? SDL_CONTROLLER_AXIS_TRIGGERLEFT : SDL_CONTROLLER_AXIS_TRIGGERRIGHT);
+	return SDL_GameControllerGetStringForButton(button);
+}
+
+static SDL_GameControllerButton named_button(const char *name)
+{
+	const SDL_GameControllerAxis axis = SDL_GameControllerGetAxisFromString(name);
+
+	if (axis == SDL_CONTROLLER_AXIS_TRIGGERLEFT)
+		return CONTROL_LEFT_TRIGGER;
+	if (axis == SDL_CONTROLLER_AXIS_TRIGGERRIGHT)
+		return CONTROL_RIGHT_TRIGGER;
+	return SDL_GameControllerGetButtonFromString(name);
 }
 
 /* One line "name = Key, Key | button, button": the player's control it names takes those, in place of its
@@ -157,15 +212,30 @@ static void read_line(int player, char *line)
 		if (next)
 			*next++ = 0;
 		if (*trimmed(part))
-			binding->buttons[slot++] = SDL_GameControllerGetButtonFromString(trimmed(part));
+			binding->buttons[slot++] = named_button(trimmed(part));
 	}
+}
+
+/* A file of version 1 (no triggers among its buttons, which pressed the pedals besides): the right trigger
+   one more button of the gas, the left one of the brake, after the file's own */
+static void add_pedal_trigger(int player, int control, SDL_GameControllerButton trigger)
+{
+	control_binding *binding = &control_bindings[player][control];
+	int slot;
+
+	for (slot = 0; slot < CONTROL_BUTTONS && binding->buttons[slot] != trigger; slot++)
+		if (binding->buttons[slot] == NO_BUTTON)
+		{
+			binding->buttons[slot] = trigger;
+			return;
+		}
 }
 
 void controls_open(const char *path)
 {
 	FILE *file;
 	char line[LINE_SIZE];
-	int player = 0, number = 0;
+	int player = 0, number = 0, version = 1;
 
 	for (int each = 0; each < CONTROL_PLAYERS; each++)
 		set_defaults(each);
@@ -178,13 +248,25 @@ void controls_open(const char *path)
 	}
 	while (fgets(line, sizeof(line), file))
 	{
-		/* "[player N]" starts that player's lines (the lines before any are player 1's) */
-		if (sscanf(trimmed(line), "[player %d]", &number) == 1)
+		/* "version = N" before the players; "[player N]" starts that player's lines (the lines before any are
+		   player 1's) */
+		if (sscanf(trimmed(line), "version = %d", &number) == 1)
+			version = number;
+		else if (sscanf(trimmed(line), "[player %d]", &number) == 1)
 			player = number >= 1 && number <= CONTROL_PLAYERS ? number - 1 : -1;
 		else if (player >= 0)
 			read_line(player, line);
 	}
 	fclose(file);
+	if (version < FILE_VERSION)
+	{
+		for (int each = 0; each < CONTROL_PLAYERS; each++)
+		{
+			add_pedal_trigger(each, CONTROL_GAS, CONTROL_RIGHT_TRIGGER);
+			add_pedal_trigger(each, CONTROL_BRAKE, CONTROL_LEFT_TRIGGER);
+		}
+		controls_save();
+	}
 }
 
 void controls_save(void)
@@ -194,7 +276,9 @@ void controls_save(void)
 	if (!file)
 		return;
 	fputs("; The console's controls, a section a player: a control a line, its keys (SDL's names), then after |\n"
-		"; its game controller buttons. OPTIONS > CONTROLS writes this file; it can be changed by hand too.\n", file);
+		"; its game controller buttons and triggers. OPTIONS > CONTROLS writes this file; it can be changed by\n"
+		"; hand too.\n", file);
+	fprintf(file, "version = %d\n", FILE_VERSION);
 	for (int player = 0; player < CONTROL_PLAYERS; player++)
 	{
 		fprintf(file, "\n[player %d]\n", player + 1);
@@ -215,8 +299,7 @@ void controls_save(void)
 			for (int button = 0; button < CONTROL_BUTTONS; button++)
 				if (binding->buttons[button] != NO_BUTTON)
 				{
-					fprintf(file, "%s %s", first ? "" : ",",
-						SDL_GameControllerGetStringForButton(binding->buttons[button]));
+					fprintf(file, "%s %s", first ? "" : ",", button_name(binding->buttons[button]));
 					first = false;
 				}
 			fputs("\n", file);
@@ -231,13 +314,25 @@ void controls_defaults(int player)
 	controls_save();
 }
 
-/* The key or button the player pressed for 'control': its first one, the one it had before moving on to the
-   second (a key that was already the control's moves to the front) */
+/* The key or button the player pressed for 'control': its first one, the ones it had before moving on (one
+   that was already the control's moves to the front, the last falls off); the player's other controls let go
+   of it */
 void controls_bind_key(int player, int control, SDL_Scancode key)
 {
 	control_binding *binding = &control_bindings[player][control];
 	int slot;
 
+	for (int other = 0; other < CONTROLS; other++)
+	{
+		SDL_Scancode *keys = control_bindings[player][other].keys;
+
+		for (slot = CONTROL_KEYS - 1; other != control && slot >= 0; slot--)
+			if (keys[slot] == key)
+			{
+				memmove(&keys[slot], &keys[slot + 1], (size_t)(CONTROL_KEYS - 1 - slot) * sizeof(keys[0]));
+				keys[CONTROL_KEYS - 1] = NO_KEY;
+			}
+	}
 	for (slot = 0; slot < CONTROL_KEYS - 1 && binding->keys[slot] != key; slot++)
 		;
 	memmove(&binding->keys[1], &binding->keys[0], (size_t)slot * sizeof(binding->keys[0]));
@@ -248,9 +343,22 @@ void controls_bind_key(int player, int control, SDL_Scancode key)
 void controls_bind_button(int player, int control, SDL_GameControllerButton button)
 {
 	control_binding *binding = &control_bindings[player][control];
+	int slot;
 
-	if (binding->buttons[0] != button)
-		binding->buttons[1] = binding->buttons[0];
+	for (int other = 0; other < CONTROLS; other++)
+	{
+		SDL_GameControllerButton *buttons = control_bindings[player][other].buttons;
+
+		for (slot = CONTROL_BUTTONS - 1; other != control && slot >= 0; slot--)
+			if (buttons[slot] == button)
+			{
+				memmove(&buttons[slot], &buttons[slot + 1], (size_t)(CONTROL_BUTTONS - 1 - slot) * sizeof(buttons[0]));
+				buttons[CONTROL_BUTTONS - 1] = NO_BUTTON;
+			}
+	}
+	for (slot = 0; slot < CONTROL_BUTTONS - 1 && binding->buttons[slot] != button; slot++)
+		;
+	memmove(&binding->buttons[1], &binding->buttons[0], (size_t)slot * sizeof(binding->buttons[0]));
 	binding->buttons[0] = button;
 	controls_save();
 }

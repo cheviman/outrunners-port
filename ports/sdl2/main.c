@@ -4,7 +4,7 @@
  *                 keeps the pace, around the same game and board the headless runs check
  *    Version:     0.1.0
  *    Created:     21-10-2026
- *    Modified:    31-10-2026
+ *    Modified:    01-11-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
@@ -653,10 +653,10 @@ static const prompt button_prompts[] = {
 	{ SDL_CONTROLLER_BUTTON_DPAD_DOWN, 1, 3, 1 }, { SDL_CONTROLLER_BUTTON_DPAD_LEFT, 1, 4, 1 },
 	{ SDL_CONTROLLER_BUTTON_BACK, 18, 4, 1 }, { SDL_CONTROLLER_BUTTON_START, 18, 5, 1 },
 	{ SDL_CONTROLLER_BUTTON_LEFTSHOULDER, 18, 7, 1 }, { SDL_CONTROLLER_BUTTON_RIGHTSHOULDER, 18, 8, 1 },
+	{ CONTROL_LEFT_TRIGGER, 18, 9, 1 }, { CONTROL_RIGHT_TRIGGER, 18, 10, 1 },
+	{ SDL_CONTROLLER_BUTTON_LEFTSTICK, 12, 16, 1 }, { SDL_CONTROLLER_BUTTON_RIGHTSTICK, 14, 16, 1 },
+	{ SDL_CONTROLLER_BUTTON_GUIDE, 18, 2, 1 }, { SDL_CONTROLLER_BUTTON_MISC1, 18, 6, 1 },
 };
-/* the triggers, which press the pedals on any controller (LT and RT) */
-static const prompt left_trigger_prompt = { SDL_CONTROLLER_BUTTON_INVALID, 18, 9, 1 };
-static const prompt right_trigger_prompt = { SDL_CONTROLLER_BUTTON_INVALID, 18, 10, 1 };
 
 #define PROMPT_SIZE  16
 #define PROMPT_CLEAR 0xFFFF00FFu    /* magenta: the sheet's see-through */
@@ -726,9 +726,6 @@ static const uint32_t *with_controls(const uint32_t *pixels)
 		}
 		if ((icon = find_prompt(button_prompts, SDL_arraysize(button_prompts), bindings[control].buttons[0])) != NULL)
 			draw_prompt(icon, x + CONSOLE_CONTROLS_BUTTON_X, y);
-		else if (control == CONTROL_BRAKE || control == CONTROL_GAS)
-			draw_prompt(control == CONTROL_BRAKE ? &left_trigger_prompt : &right_trigger_prompt,
-				x + CONSOLE_CONTROLS_BUTTON_X, y);    /* (a pedal without a button: its trigger, which presses it always) */
 	}
 	return controls_picture;
 }
@@ -1045,6 +1042,24 @@ static uint32_t read_actions(const Uint8 *keys)
 	}
 	return held;
 }
+
+/* A trigger takes the control CONTROLS waits for from halfway down (of 32767) */
+#define TRIGGER_BOUND  16384
+
+/* The button or trigger pressed on game controller 'which' for the control CONTROLS waits for, when it is
+   the shown player's */
+static void bind_button(SDL_JoystickID which, SDL_GameControllerButton button)
+{
+	const int player = console_controls_player();
+
+	if (player < PLAYERS && controllers[player]
+		&& SDL_JoystickInstanceID(SDL_GameControllerGetJoystick(controllers[player])) == which)
+	{
+		controls_bind_button(player, console_controls_waiting(), button);
+		console_controls_bound();
+		actions_taken = true;
+	}
+}
 #endif
 
 /* ---- the controls ---- */
@@ -1122,19 +1137,16 @@ static void read_events(void)
 				break;
 #ifdef ORUNNERS_CONSOLE
 			case SDL_CONTROLLERBUTTONDOWN:
+				/* ... or a button of the game controller plugged in for that player */
 				if (console_controls_waiting() >= 0)
-				{
-					/* ... or a button of the game controller plugged in for that player */
-					for (int player = 0; player < PLAYERS; player++)
-						if (controllers[player] && player == console_controls_player()
-							&& SDL_JoystickInstanceID(SDL_GameControllerGetJoystick(controllers[player])) == event.cbutton.which)
-						{
-							controls_bind_button(player, console_controls_waiting(),
-								(SDL_GameControllerButton)event.cbutton.button);
-							console_controls_bound();
-							actions_taken = true;
-						}
-				}
+					bind_button(event.cbutton.which, (SDL_GameControllerButton)event.cbutton.button);
+				break;
+			case SDL_CONTROLLERAXISMOTION:
+				/* ... or one of its triggers, pressed halfway */
+				if (console_controls_waiting() >= 0 && event.caxis.value >= TRIGGER_BOUND
+					&& (event.caxis.axis == SDL_CONTROLLER_AXIS_TRIGGERLEFT || event.caxis.axis == SDL_CONTROLLER_AXIS_TRIGGERRIGHT))
+					bind_button(event.caxis.which, event.caxis.axis == SDL_CONTROLLER_AXIS_TRIGGERLEFT
+						? CONTROL_LEFT_TRIGGER : CONTROL_RIGHT_TRIGGER);
 				break;
 #endif
 			case SDL_CONTROLLERDEVICEADDED:
@@ -1212,23 +1224,29 @@ static int press(int position, bool held)
 	return clamp(position + (held ? PEDAL_PRESS : -PEDAL_LIFT), 0, 0xff);
 }
 
-/* a trigger's travel as a pedal's */
-static int trigger_pedal(SDL_GameController *pad, SDL_GameControllerAxis axis)
+/* a trigger's travel (of 32767) as a pedal's */
+static int trigger_pedal(int travel)
 {
-	return SDL_GameControllerGetAxis(pad, axis) * 0xff / 32767;
+	return travel * 0xff / 32767;
 }
 
 /* the state of every control once a frame, where the board reads them (VBLANK) */
 #ifdef ORUNNERS_CONSOLE
 /* True while one of the player's keys or controller's buttons for 'control' is held, or a finger on the
-   player's touch controls (Android's) */
-static bool holds(int player, SDL_GameController *pad, int control)
+   player's touch controls (Android's); the pedals' triggers press them as far as they go (trigger_pedal) */
+static bool holds_buttons(int player, SDL_GameController *pad, int control)
 {
 #ifdef ORUNNERS_TOUCH
 	if (player < TOUCH_PLAYERS && touch_holds(player, control))
 		return true;
 #endif
 	return controls_holds(player, pad, control);
+}
+
+/* ... or one of the control's triggers pressed at all */
+static bool holds(int player, SDL_GameController *pad, int control)
+{
+	return holds_buttons(player, pad, control) || controls_trigger_travel(player, pad, control) > TRIGGER_PRESSED;
 }
 #endif
 
@@ -1293,8 +1311,8 @@ static void on_controls_update(void)
 
 		wheel[player] = steer(wheel[player], holds(player, pad, CONTROL_STEER_LEFT),
 			holds(player, pad, CONTROL_STEER_RIGHT));
-		gas[player] = press(gas[player], holds(player, pad, CONTROL_GAS));
-		brake[player] = press(brake[player], holds(player, pad, CONTROL_BRAKE));
+		gas[player] = press(gas[player], holds_buttons(player, pad, CONTROL_GAS));
+		brake[player] = press(brake[player], holds_buttons(player, pad, CONTROL_BRAKE));
 		shift_up[player] = holds(player, pad, CONTROL_SHIFT_UP);
 		shift_down[player] = holds(player, pad, CONTROL_SHIFT_DOWN);
 		music[player] = holds(player, pad, CONTROL_MUSIC);
@@ -1330,11 +1348,17 @@ static void on_controls_update(void)
 #endif
 		if (!pad)
 			continue;
-		/* the controller's stick and triggers, where they are moved, over the keyboard's */
+		/* the controller's stick and triggers, where they are moved, over the keyboard's (the console's
+		   triggers, the pedals' that CONTROLS gives them) */
 		{
 			const int stick = SDL_GameControllerGetAxis(pad, SDL_CONTROLLER_AXIS_LEFTX);
-			const int pad_gas = trigger_pedal(pad, SDL_CONTROLLER_AXIS_TRIGGERRIGHT);
-			const int pad_brake = trigger_pedal(pad, SDL_CONTROLLER_AXIS_TRIGGERLEFT);
+#ifdef ORUNNERS_CONSOLE
+			const int pad_gas = trigger_pedal(controls_trigger_travel(player, pad, CONTROL_GAS));
+			const int pad_brake = trigger_pedal(controls_trigger_travel(player, pad, CONTROL_BRAKE));
+#else
+			const int pad_gas = trigger_pedal(SDL_GameControllerGetAxis(pad, SDL_CONTROLLER_AXIS_TRIGGERRIGHT));
+			const int pad_brake = trigger_pedal(SDL_GameControllerGetAxis(pad, SDL_CONTROLLER_AXIS_TRIGGERLEFT));
+#endif
 
 			stick_wheel(stick, &wheels[player]);
 			if (pad_gas > gases[player])
@@ -1461,7 +1485,8 @@ static void run_network_wait(void)
 }
 
 /* The game stopped, its sound too, the picture in grey under PAUSE: Escape, Enter or a game controller's
-   Start goes on, as CONTINUE does; QUIT GAME ends the games being played (console_quit_game) */
+   Start goes on, as CONTINUE does; RESTART starts the same game again (console_restart_game), QUIT GAME ends
+   the games being played (console_quit_game) */
 static void run_pause(void)
 {
 	static uint32_t frozen[2][S32_VIDEO_MAX_WIDTH * S32_VIDEO_HEIGHT];
@@ -1486,12 +1511,19 @@ static void run_pause(void)
 		held = now;
 		if (pressed & (ACTION_BIT(ACTION_UP) | ACTION_BIT(ACTION_DOWN)))
 		{
-			choice = choice == CONSOLE_PAUSE_CONTINUE ? CONSOLE_PAUSE_QUIT : CONSOLE_PAUSE_CONTINUE;
+			/* the next line up or down, round; RESTART where it is offered */
+			const int step = (pressed & ACTION_BIT(ACTION_UP)) ? CONSOLE_PAUSE_ITEMS - 1 : 1;
+
+			do
+				choice = (choice + step) % CONSOLE_PAUSE_ITEMS;
+			while (choice == CONSOLE_PAUSE_RESTART && !console_can_restart());
 			make_pause_picture(frozen, choice);
 		}
 		if (pressed & ACTION_BIT(ACTION_ACCEPT))
 		{
-			if (choice == CONSOLE_PAUSE_QUIT)
+			if (choice == CONSOLE_PAUSE_RESTART)
+				console_restart_game();
+			else if (choice == CONSOLE_PAUSE_QUIT)
 				console_quit_game();
 			break;
 		}

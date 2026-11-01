@@ -618,6 +618,7 @@ void demo_caption_update(void);
 /* scenes/car_select.c: the car select: the attendant and the turntable, the cars, the transmission, the flags of the other cabinets' choices, the countdown and the entry traffic */
 void car_select_start(void);
 void car_select_run(void);
+void CONSOLE_ORIGINAL(car_select_run)(void);
 void car_select_turn_to_choice(void);
 uint32_t car_select_update_rowscroll(void);
 void car_select_skew_floor_next(void);

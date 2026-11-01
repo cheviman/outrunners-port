@@ -236,6 +236,30 @@ merged here; this repository adds console/, the ports and their documents.
   own 3 x 5), the version at the bottom right (CMake's project version, the devices' packages' too); the
   signature only on the title.
 
+## Done (01-11-2026)
+
+- CONTROLS' triggers (issue 2): a trigger is one more button of the bindings (CONTROL_LEFT_TRIGGER and
+  CONTROL_RIGHT_TRIGGER, past SDL's own; "lefttrigger" and "righttrigger" in controls.ini), bound pressed
+  halfway; by default the right one the gas and the left one the brake (Sebas), which they press as far as
+  they go, from any travel; bound to any other control, it holds it from any travel past its rest's wobble.
+  Before, they pressed the pedals always and CONTROLS could not take them. A control keeps three buttons; a
+  key or button bound leaves the player's other controls. controls.ini's version 2: a file without it
+  (1.1.0's) gets the triggers on the pedals after its own buttons, as they were.
+- CONTROLS' pictures of L3, R3, the Guide button, the triggers and Share (Kenney's sheet): those bound
+  showed an empty place, and the pedals' a trigger whatever they were.
+- The pause's RESTART (issue 4; Sebas: through the car select): the game ends as QUIT GAME's and starts
+  again as the menus started it (ARCADE, 2 PLAYERS, TIME ATTACK, FULL, CLASSIC, REVERSE from the same goal,
+  its route map skipped), once the left seat is at the title; on the car select (car_select_run, the
+  console's) the turntable is at the car chosen before from its start and the console confirms it and the
+  transmission chosen before as START would, the wheel held where it picks them: about 7.5 seconds from
+  RESTART to the start line, the game's own scenes. Not in NETWORK (the other devices' races); CLASSIC's
+  challenger joins again with START. A game a snapshot could not restart: the game's two tasks run on
+  native stacks. Checked with the console headless (--restart N): ARCADE with another car and the manual
+  transmission, REVERSE, 2 PLAYERS.
+- The reference's build on a newer GCC (issue 6): emu.h of arcade-decomp's stand-ins takes <cmath> itself
+  (the V60's float conversions), and a text with nothing to put in it no longer goes to snprintf as its
+  format.
+
 ## To do
 
 - The network on a network shared with strangers: a room's code to join it (today a device on the same local

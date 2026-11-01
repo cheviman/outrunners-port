@@ -3,7 +3,7 @@
  *    Description: what the console build's files share among themselves
  *    Version:     0.1.0
  *    Created:     29-10-2026
- *    Modified:    29-10-2026
+ *    Modified:    01-11-2026
  *    Author:      Sebastian Toyos
  */
 #ifndef ORUNNERS_CONSOLE_INTERNAL_H
@@ -85,10 +85,12 @@ void console_ghost_frame(void);
 bool console_presentation_frame(uint32_t pressed);
 
 
-/* & KNUCKLES' routes (routes.c): REVERSE started (its goal picked on the route map after the car select),
-   FULL, and their part of the left seat's frame before the game mode's code, with the actions pressed */
-void console_reverse_start(void);
+/* & KNUCKLES' routes (routes.c): REVERSE started (from 'goal', the stage; 0: picked on the route map after
+   the car select), FULL, and their part of the left seat's frame before the game mode's code, with the
+   actions pressed */
+void console_reverse_start(int goal);
 void console_full_start(void);
+int console_reverse_goal(void);    /* (a REVERSE game's goal stage, once picked; 0 otherwise) */
 bool console_routes_frame(uint32_t mode, uint32_t pressed);    /* (true: the left seat's game waits) */
 bool console_routes_running(void);    /* (a game of FULL or REVERSE: its route is not the game's) */
 

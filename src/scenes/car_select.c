@@ -34,7 +34,7 @@ void car_select_start(void)
    the race's other players (players_not_ready), DJ message 3C; 9 60 frames, then fade_out_music and the
    game's next step (screen game_mode byte 2); 10 stays. Every frame from 4 on: car_select_turn_to_choice
    and car_select_update_rowscroll; time_left down by one and shown in seconds. */
-void car_select_run(void)
+void CONSOLE_ORIGINAL(car_select_run)(void)
 {
 	uint32_t zero = 0;
 	uint8_t car_index = 0, car_sound = 0, dj_message = 0, group_index = 0, new_turn = 0, sound_code = 0, turn_now = 0;

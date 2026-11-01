@@ -4,7 +4,7 @@
  *                 OPTIONS > CONTROLS), and the file that keeps them (controls.ini)
  *    Version:     0.1.0
  *    Created:     29-10-2026
- *    Modified:    29-10-2026
+ *    Modified:    01-11-2026
  *    Author:      Sebastian Toyos
  */
 #ifndef ORUNNERS_PORT_CONTROLS_H
@@ -16,13 +16,20 @@
 #include <stdbool.h>
 
 #define CONTROL_KEYS     2
-#define CONTROL_BUTTONS  2
+#define CONTROL_BUTTONS  3
+
+/* The triggers as buttons of the bindings, past SDL's own (its game controller has them as axes) */
+#define CONTROL_LEFT_TRIGGER   ((SDL_GameControllerButton)SDL_CONTROLLER_BUTTON_MAX)
+#define CONTROL_RIGHT_TRIGGER  ((SDL_GameControllerButton)(SDL_CONTROLLER_BUTTON_MAX + 1))
+
+/* A trigger holds its control from any travel past its rest's wobble (of 32767) */
+#define TRIGGER_PRESSED  1024
 
 typedef struct
 {
 	const char *name;                                   /* as the settings file says it */
 	SDL_Scancode keys[CONTROL_KEYS];                    /* SDL_SCANCODE_UNKNOWN: none */
-	SDL_GameControllerButton buttons[CONTROL_BUTTONS];  /* SDL_CONTROLLER_BUTTON_INVALID: none */
+	SDL_GameControllerButton buttons[CONTROL_BUTTONS];  /* SDL_CONTROLLER_BUTTON_INVALID: none; or a trigger */
 } control_binding;
 
 /* Each seat's: their keys, and the buttons of their own game controller (the first one plugged in is
@@ -34,11 +41,16 @@ void controls_open(const char *path);
 void controls_save(void);
 void controls_defaults(int player);    /* (and saved) */
 
-/* The key or button pressed for a player's control on the CONTROLS page: its first one now (and saved) */
+/* The key or button pressed for a player's control on the CONTROLS page: its first one now, and no longer
+   any other control's of the player's (and saved) */
 void controls_bind_key(int player, int control, SDL_Scancode key);
 void controls_bind_button(int player, int control, SDL_GameControllerButton button);
 
-/* True while one of the player's keys or their game controller's buttons for 'control' is held */
+/* True while one of the player's keys or their game controller's buttons for 'control' is held, its
+   triggers apart */
 bool controls_holds(int player, SDL_GameController *pad, int control);
+
+/* How far the player's game controller's triggers for 'control' are pressed, the furthest: 0 to 32767 */
+int controls_trigger_travel(int player, SDL_GameController *pad, int control);
 
 #endif

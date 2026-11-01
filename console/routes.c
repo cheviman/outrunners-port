@@ -4,7 +4,7 @@
  *                 the 31 stages one after another from the pre-stage to the last goal
  *    Version:     0.1.0
  *    Created:     29-10-2026
- *    Modified:    29-10-2026
+ *    Modified:    01-11-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
@@ -109,6 +109,7 @@ static struct
 	uint8_t parents[STAGES][2];        /* REVERSE's: by branch (the same twice for one parent) */
 	int running;                       /* ROUTE_* of the game started */
 	int goal;                          /* REVERSE: the picked goal's stage */
+	int given_goal;                    /* REVERSE: the goal its start gave (the pause's RESTART); 0: the map's */
 	bool time_given;                   /* REVERSE: the start's time is in the race's time_left */
 	int8_t start_difficulty;           /* REVERSE: the TIME setting of the start (the race's master_time_difficulty
 	                                      0), while the start's own time is in its place */
@@ -514,10 +515,11 @@ bool console_routes_running(void)
 	return routes.running != ROUTE_NONE;
 }
 
-void console_reverse_start(void)
+void console_reverse_start(int goal)
 {
 	build_reverse();
-	routes.goal = 0;    /* (picked on the route map, once the car select is over) */
+	routes.goal = 0;    /* (picked on the route map, once the car select is over, or given) */
+	routes.given_goal = goal;
 	routes.time_given = true;    /* (nothing in the setting until the goal is picked) */
 	routes.running = ROUTE_REVERSE;
 }
@@ -543,6 +545,11 @@ static int reverse_checkpoint_time(int checkpoint)
 		later += reverse_checkpoint_given(after);
 	owed = REVERSE_START_EXTRA * 0x1E - later;
 	return owed <= 0 ? given : (owed >= given ? 0 : given - owed);
+}
+
+int console_reverse_goal(void)
+{
+	return routes.running == ROUTE_REVERSE ? routes.goal : 0;
 }
 
 void console_full_start(void)
@@ -711,23 +718,27 @@ bool console_routes_frame(uint32_t mode, uint32_t pressed)
 		return false;
 	if (routes.goal == 0)
 	{
-		if (!console_route_select_running())
-			console_route_select_start(RACE(screen->race)->model);
-		switch (console_route_select_frame(pressed))
+		if (routes.given_goal == 0)
 		{
-			case ROUTE_SELECT_START:
-				routes.goal = FIRST_GOAL + console_route_select_goal();
-				/* (the race's start: REVERSE_START_EXTRA more in the setting the car adds to its 40 seconds) */
-				routes.start_difficulty = game->master_time_difficulty[0];
-				game->master_time_difficulty[0] = (int8_t)(game->master_time_difficulty[0] + REVERSE_START_EXTRA);
-				routes.time_given = false;
-				break;
-			case ROUTE_SELECT_BACK:
-				console_quit_game();
-				return true;
-			default:
-				return true;
+			if (!console_route_select_running())
+				console_route_select_start(RACE(screen->race)->model);
+			switch (console_route_select_frame(pressed))
+			{
+				case ROUTE_SELECT_START:
+					routes.given_goal = FIRST_GOAL + console_route_select_goal();
+					break;
+				case ROUTE_SELECT_BACK:
+					console_quit_game();
+					return true;
+				default:
+					return true;
+			}
 		}
+		routes.goal = routes.given_goal;
+		/* (the race's start: REVERSE_START_EXTRA more in the setting the car adds to its 40 seconds) */
+		routes.start_difficulty = game->master_time_difficulty[0];
+		game->master_time_difficulty[0] = (int8_t)(game->master_time_difficulty[0] + REVERSE_START_EXTRA);
+		routes.time_given = false;
 	}
 	screen->first_stage = (uint8_t)routes.goal;
 	screen->route_stage = (uint8_t)routes.goal;

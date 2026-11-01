@@ -4,7 +4,7 @@
  *                 functions the window port calls, by name only
  *    Version:     0.1.0
  *    Created:     30-10-2026
- *    Modified:    31-10-2026
+ *    Modified:    01-11-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
@@ -99,6 +99,11 @@ void SDL_GameControllerGetAxis(void)
 {
 }
 
+void SDL_GameControllerGetAxisFromString(void);
+void SDL_GameControllerGetAxisFromString(void)
+{
+}
+
 void SDL_GameControllerGetButton(void);
 void SDL_GameControllerGetButton(void)
 {
@@ -111,6 +116,11 @@ void SDL_GameControllerGetButtonFromString(void)
 
 void SDL_GameControllerGetJoystick(void);
 void SDL_GameControllerGetJoystick(void)
+{
+}
+
+void SDL_GameControllerGetStringForAxis(void);
+void SDL_GameControllerGetStringForAxis(void)
 {
 }
 

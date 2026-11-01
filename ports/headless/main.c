@@ -5,7 +5,7 @@
  *                 format tools/core/system32/reference/s32ref uses
  *    Version:     0.1.0
  *    Created:     11-10-2026
- *    Modified:    30-10-2026
+ *    Modified:    01-11-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
@@ -65,7 +65,7 @@
 	" [--sprite-census FILE] [--tile-census FILE] [--memory-census FILE] [--assets FOLDER|PACK.assets]" \
 	" [--write-pack PACK.assets] [--workers N] [--screens 1|2] [--sound-wav FILE]" \
 	" (orunners_console_headless: [--actions FILE] [--wide | --wide-20-9] [--autopilot] [--ghost-folder DIR]" \
-	" [--pause-dump N] [--side-map] [--real-time] [--name NAME] [--network-log FRAMES])\n"
+	" [--pause-dump N] [--side-map] [--real-time] [--name NAME] [--network-log FRAMES] [--restart N])\n"
 #define MAX_VIDEO_DUMPS 64
 #define CENSUS_SLOTS (1u << 22)     /* open addressing for the censuses' hashes */
 #define TILE_CENSUS_EVERY 30        /* the tilemaps are looked at every this many frames */
@@ -378,6 +378,7 @@ static struct
 } actions[MAX_ACTIONS];
 static size_t action_count;
 static bool autopilot;    /* --autopilot: player 1's wheel keeps the car on the road (console_test_autopilot) */
+static uint64_t restart_frame;    /* --restart: the pause's RESTART picked at that frame (console_restart_game) */
 
 static const char *load_actions(const char *path)
 {
@@ -421,6 +422,8 @@ static void on_controls_update(void)
 	s32_video_set_wide_side(console_wide_side());
 	if (autopilot)
 		s32_board.input.analog[0] = (uint8_t)console_test_autopilot();    /* (player 1's wheel) */
+	if (restart_frame != 0u && s32_board.frame == restart_frame)
+		console_restart_game();
 #endif
 }
 
@@ -521,6 +524,8 @@ int main(int argc, char **argv)
 			console_window_settings.wide = WIDE_20_9;
 		else if (strcmp(argv[index], "--autopilot") == 0)
 			autopilot = true;
+		else if (strcmp(argv[index], "--restart") == 0 && index + 1 < argc)
+			restart_frame = strtoull(argv[++index], NULL, 10);
 		else if (strcmp(argv[index], "--side-map") == 0)
 			console_side_map_wanted(true);    /* (a tall screen's room: the route map beside the race) */
 		else if (strcmp(argv[index], "--pause-dump") == 0 && index + 1 < argc)
