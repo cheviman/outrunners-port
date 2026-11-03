@@ -18,10 +18,20 @@
 #include "game/extract.h"
 
 #include <SDL.h>
+#ifdef ORUNNERS_IOS
+#include "ios.h"
+#endif
 
 #include <stdio.h>
 #include <string.h>
 
+#ifdef ORUNNERS_IOS
+#define ASK_FOR_SET     "Tap to choose the arcade ROM set"    /* (nothing drops on a phone: ios_pick_rom_set) */
+#define WINDOW_FLAGS    SDL_WINDOW_FULLSCREEN_DESKTOP
+#else
+#define ASK_FOR_SET     "Drop the arcade ROM set here"
+#define WINDOW_FLAGS    0
+#endif
 #define ROM_SET_FILE    "orunners.zip"
 #define ROM_SET_FOLDER  "rom"
 #define ROM_SET_PROBE   "epr-15620.ic37"    /* a file of the set by MAME's name: a folder of its files */
@@ -83,7 +93,7 @@ static void draw_window(SDL_Renderer *renderer, const letters *font, const char 
 		letters_draw(renderer, font, "Reading the ROM set...", y, 2, white, WINDOW_WIDTH);
 	else
 	{
-		letters_draw(renderer, font, "Drop the arcade ROM set here", y, 2, white, WINDOW_WIDTH);
+		letters_draw(renderer, font, ASK_FOR_SET, y, 2, white, WINDOW_WIDTH);
 		y += LETTERS_CELL * 2 + LINE_GAP;
 		letters_draw(renderer, font, "orunners.zip: MAME's set, World", y, 1, white, WINDOW_WIDTH);
 		y += LETTERS_CELL + LINE_GAP;
@@ -176,7 +186,7 @@ int first_run(const char *title, const char *base, const char *saves, const char
 		|| (app_folder(base, beside_app, sizeof(beside_app)) && extracted_from(beside_app, folder, problem, sizeof(problem)))
 		|| ((!base || !saves || strcmp(base, saves) != 0) && extracted_from(saves, folder, problem, sizeof(problem))))
 		return 1;
-	window = SDL_CreateWindow(title, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WINDOW_WIDTH, WINDOW_HEIGHT, 0);
+	window = SDL_CreateWindow(title, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_FLAGS);
 	renderer = window ? SDL_CreateRenderer(window, -1, 0) : NULL;
 	if (!renderer || !letters_load(renderer, base, &font))
 	{
@@ -192,6 +202,7 @@ int first_run(const char *title, const char *base, const char *saves, const char
 		SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, title, message, NULL);
 		return 0;
 	}
+	SDL_RenderSetLogicalSize(renderer, WINDOW_WIDTH, WINDOW_HEIGHT);    /* (a phone's window is its screen) */
 	SDL_EventState(SDL_DROPFILE, SDL_ENABLE);
 	draw_window(renderer, &font, title, problem, 0);
 	while (running && !done)
@@ -217,6 +228,10 @@ int first_run(const char *title, const char *base, const char *saves, const char
 				draw_window(renderer, &font, title, problem, 0);
 			}
 		}
+#ifdef ORUNNERS_IOS
+		else if (event.type == SDL_FINGERUP)
+			ios_pick_rom_set(window);    /* (what is chosen comes back as a file dropped) */
+#endif
 		else if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_EXPOSED)
 			draw_window(renderer, &font, title, problem, 0);
 	}

@@ -1,7 +1,7 @@
 /**
  *    Name:        net_udp.c
  *    Description: the network's sockets: UDP, non-blocking, on Windows (Winsock), the Switch (libnx's BSD
- *                 sockets) and the rest (POSIX: Linux, macOS, Android)
+ *                 sockets) and the rest (POSIX: Linux, macOS, Android, iOS)
  *    Version:     0.1.0
  *    Created:     30-10-2026
  *    Modified:    30-10-2026
@@ -29,12 +29,18 @@ typedef SOCKET net_socket;
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#ifdef ORUNNERS_IOS
+#include <ifaddrs.h>
+#include <net/if.h>
+#endif
 typedef int net_socket;
 #define NO_SOCKET       (-1)
 #define close_socket    close
 #endif
 
-static net_socket game_socket = NO_SOCKET, beacon_socket = NO_SOCKET;
+#define SWEEP_ADDRESSES 256    /* of a local network: a larger one's, the /24 around this device */
+
+static net_socket game_socket = NO_SOCKET, beacon_socket = NO_SOCKET, seeker_socket = NO_SOCKET;
 static bool started;
 
 /* The system's sockets, once (Winsock, libnx's) */
@@ -137,6 +143,9 @@ bool net_open(void)
 void net_close(void)
 {
 	net_stop_beacons();
+	if (seeker_socket != NO_SOCKET)
+		close_socket(seeker_socket);
+	seeker_socket = NO_SOCKET;
 	if (game_socket != NO_SOCKET)
 		close_socket(game_socket);
 	game_socket = NO_SOCKET;
@@ -179,3 +188,62 @@ size_t net_receive_beacon(void *data, size_t room, net_address *from)
 {
 	return beacon_socket == NO_SOCKET ? 0 : receive_on(beacon_socket, data, room, from);
 }
+
+bool net_listen_seekers(void)
+{
+	if (seeker_socket == NO_SOCKET)
+		seeker_socket = open_socket(NET_SEEK_PORT, true);
+	return seeker_socket != NO_SOCKET;
+}
+
+size_t net_receive_seeker(void *data, size_t room, net_address *from)
+{
+	return seeker_socket == NO_SOCKET ? 0 : receive_on(seeker_socket, data, room, from);
+}
+
+#ifdef ORUNNERS_IOS
+/* True for a private address: the local networks' (a phone's cellular one has none of the kind that broadcasts) */
+static bool private_address(uint32_t ip)
+{
+	return (ip >> 24) == 10 || (ip >> 20) == 0xAC1u || (ip >> 16) == 0xC0A8u;
+}
+
+void net_send_sweep(uint16_t port, const void *data, size_t size)
+{
+	struct ifaddrs *interfaces, *entry;
+
+	if (getifaddrs(&interfaces) != 0)
+		return;
+	for (entry = interfaces; entry; entry = entry->ifa_next)
+	{
+		uint32_t ip, mask, first, last;
+
+		if (!entry->ifa_addr || !entry->ifa_netmask || entry->ifa_addr->sa_family != AF_INET
+			|| !(entry->ifa_flags & IFF_UP) || !(entry->ifa_flags & IFF_BROADCAST))
+			continue;
+		ip = ntohl(((const struct sockaddr_in *)entry->ifa_addr)->sin_addr.s_addr);
+		mask = ntohl(((const struct sockaddr_in *)entry->ifa_netmask)->sin_addr.s_addr);
+		if (!private_address(ip))
+			continue;
+		if (~mask >= SWEEP_ADDRESSES)
+			mask = 0xFFFFFF00u;
+		first = (ip & mask) + 1;
+		last = (ip | ~mask) - 1;
+		for (uint32_t address = first; address <= last; address++)
+		{
+			const net_address to = { address, port };
+
+			if (address != ip)
+				net_send(to, data, size);
+		}
+	}
+	freeifaddrs(interfaces);
+}
+#else
+void net_send_sweep(uint16_t port, const void *data, size_t size)
+{
+	(void)port;
+	(void)data;
+	(void)size;
+}
+#endif

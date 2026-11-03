@@ -82,8 +82,8 @@ Computers, phones and the Switch play together.
 
 A device that stops being heard holds the race for a moment (WAIT); after 3 seconds it is out of it, as a car
 out of time, and the race goes on without it. If the one gone hosted the race or the room, the next device
-hosts it on, from where it was. The game uses UDP: the rooms' beacons on port 27720, and a port of the
-system's choosing for the race; a firewall that asks about the game should let it reach the private network.
+hosts it on, from where it was. The game uses UDP: the rooms' beacons on port 27720, a host's answers to
+iOS devices on 27721, and a port of the system's choosing for the race; a firewall that asks about the game should let it reach the private network.
 
 How it works: each device sends its two race records to every other one each frame, as the cabinets' link
 board would, and the game reads them as it reads the board's (`console/network.c`, with the sockets in
@@ -96,7 +96,7 @@ The window games build as the rest of this repository does ("Getting started" be
 `OutRunners Arcade` (target `orunners`) and `OutRunners` (target `outrunners`) beside the tools in
 `build/bin/`. `orunners_console_headless` runs the console version without a window, from scripts of its
 menu's actions (`--actions`, `tests/console/`). The devices' builds and their tools are in `ports/switch/`,
-`ports/android/` and `ports/anbernic/`, each with its README; `console/PLAN.md` holds the console version's
+`ports/android/`, `ports/ios/` and `ports/anbernic/`, each with its README; `console/PLAN.md` holds the console version's
 plan and what is done.
 
 The rest of this README is the decompilation's, which this repository carries

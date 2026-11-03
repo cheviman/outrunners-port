@@ -15,6 +15,7 @@
 #include <stdint.h>
 
 #define NET_BEACON_PORT   27720          /* where the rooms' beacons go, every device's on the network */
+#define NET_SEEK_PORT     27721          /* where a room's host hears a device that cannot hear its beacons */
 #define NET_BROADCAST     0xFFFFFFFFu    /* 255.255.255.255: every device on the local network */
 #define NET_LOOPBACK      0x7F000001u    /* 127.0.0.1: this one (a second game on the same computer) */
 
@@ -42,5 +43,13 @@ size_t net_receive(void *data, size_t room, net_address *from);
 bool net_listen_beacons(void);
 void net_stop_beacons(void);
 size_t net_receive_beacon(void *data, size_t room, net_address *from);
+
+/* The seekers' socket, on NET_SEEK_PORT, shared with other games on the same device: while a device hosts a room */
+bool net_listen_seekers(void);
+size_t net_receive_seeker(void *data, size_t room, net_address *from);
+
+/* Where the system refuses broadcasts (iOS: they ask for Apple's multicast entitlement): a datagram to 'port' of
+   every other address of the local networks, one by one. Nothing elsewhere, where NET_BROADCAST reaches them */
+void net_send_sweep(uint16_t port, const void *data, size_t size);
 
 #endif
