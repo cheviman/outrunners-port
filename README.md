@@ -1,7 +1,7 @@
 # OutRunners — port
 
 Sega's 1992 arcade game *OutRunners* (Sega System Multi 32) as a native game for computers, the Nintendo
-Switch, Android and Anbernic's handhelds, built on its decompilation,
+Switch, the New Nintendo 3DS, iOS, Android and Anbernic's handhelds, built on its decompilation,
 [outrunners-decomp](https://github.com/cheviman/outrunners-decomp): the game's program decompiled into C and
 checked frame by frame against MAME in picture and sound. Two games come out of the same C:
 
@@ -96,7 +96,7 @@ The window games build as the rest of this repository does ("Getting started" be
 `OutRunners Arcade` (target `orunners`) and `OutRunners` (target `outrunners`) beside the tools in
 `build/bin/`. `orunners_console_headless` runs the console version without a window, from scripts of its
 menu's actions (`--actions`, `tests/console/`). The devices' builds and their tools are in `ports/switch/`,
-`ports/android/`, `ports/ios/` and `ports/anbernic/`, each with its README; `console/PLAN.md` holds the console version's
+`ports/android/`, `ports/ios/`, `ports/3ds/` and `ports/anbernic/`, each with its README; `console/PLAN.md` holds the console version's
 plan and what is done.
 
 The rest of this README is the decompilation's, which this repository carries

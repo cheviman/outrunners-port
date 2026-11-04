@@ -70,7 +70,7 @@ set(ORUNNERS_SWITCH OFF)
 if(NINTENDO_SWITCH OR CMAKE_SYSTEM_NAME STREQUAL "NintendoSwitch")
 	set(ORUNNERS_SWITCH ON)
 endif()
-if(UNIX AND NOT ORUNNERS_SWITCH)
+if(UNIX AND NOT ORUNNERS_SWITCH AND NOT NINTENDO_3DS)
 	find_package(Threads REQUIRED)
 	target_link_libraries(s32runtime PUBLIC Threads::Threads)
 endif()
@@ -187,7 +187,7 @@ if(ORUNNERS_DECOMPILED AND ORUNNERS_SOUND_DECOMPILED)
 	# main.npdm, control.nacp, icon.jpg), the assets pack of the player's ROM set (the first run's steps, the
 	# console game's loader) and the keys of the player's console. A command line; with SDL2 also a window
 	# (below, with the game's window)
-	if(NOT ORUNNERS_SWITCH AND NOT ORUNNERS_ANBERNIC AND NOT ANDROID AND NOT IOS)
+	if(NOT ORUNNERS_SWITCH AND NOT ORUNNERS_ANBERNIC AND NOT ANDROID AND NOT IOS AND NOT NINTENDO_3DS)
 		add_executable(orunners_nsp ports/switch/nsp/main.c ports/switch/nsp/make_nsp.c ports/switch/nsp/formats.c
 			ports/switch/nsp/crypto.c ports/switch/nsp/rom_pack.c)
 		target_link_libraries(orunners_nsp PRIVATE orunners_game_console orunners_sound orunners_extract)
@@ -217,6 +217,16 @@ if(ORUNNERS_DECOMPILED AND ORUNNERS_SOUND_DECOMPILED)
 		set_target_properties(orunners_apk_maker PROPERTIES OUTPUT_NAME "OutRunners APK")
 	endif()
 
+	# A development aid: ports/3ds/gpu.c on this computer, against a software stand-in for citro3d, beside the board's
+	# own frames (ports/3ds/check)
+	option(ORUNNERS_SCENE_CHECK "Build the check of the 3DS's GPU renderer" OFF)
+	if(ORUNNERS_SCENE_CHECK)
+		target_compile_definitions(s32runtime PUBLIC S32_VIDEO_SCENE S32_SCENE_CHECK)
+		add_executable(orunners_scene_check ports/headless/main.c ports/3ds/gpu.c ports/3ds/check/check.c ports/3ds/check/fake.c)
+		target_include_directories(orunners_scene_check PRIVATE ports/3ds/check/fake ports/3ds)
+		target_link_libraries(orunners_scene_check PRIVATE orunners_game_console orunners_sound)
+	endif()
+
 	# The devices' builds, each with its toolchain: the Nintendo Switch (devkitPro's: its .nro and its .nsp's
 	# pieces, ports/switch), Android (the NDK's: libmain.so in its APKs, ports/android), iOS (Xcode's: an .app
 	# and its .ipa, ports/ios) and Anbernic's H700 handhelds (ports/anbernic)
@@ -227,6 +237,8 @@ if(ORUNNERS_DECOMPILED AND ORUNNERS_SOUND_DECOMPILED)
 		include(${CMAKE_SOURCE_DIR}/ports/android/android.cmake)
 	elseif(IOS)
 		include(${CMAKE_SOURCE_DIR}/ports/ios/ios.cmake)
+	elseif(NINTENDO_3DS)
+		include(${CMAKE_SOURCE_DIR}/ports/3ds/3ds.cmake)
 	elseif(ORUNNERS_ANBERNIC)
 		include(${CMAKE_SOURCE_DIR}/ports/anbernic/anbernic.cmake)
 	endif()
@@ -234,7 +246,7 @@ if(ORUNNERS_DECOMPILED AND ORUNNERS_SOUND_DECOMPILED)
 	# The game in a window (ports/sdl2): SDL2 from the system, or on Windows the development package
 	# unpacked in build/downloads/sdl2 (SDL2_DIR picks another), a library beside the executable; or, with
 	# ORUNNERS_STATIC_SDL2, SDL2 built from its own source into the executable
-	if(ORUNNERS_ANBERNIC OR ORUNNERS_SWITCH OR ANDROID OR IOS)
+	if(ORUNNERS_ANBERNIC OR ORUNNERS_SWITCH OR ANDROID OR IOS OR NINTENDO_3DS)
 		set(SDL2_FOUND FALSE)    # (the device's own build above: no computer's window ports)
 	elseif(ORUNNERS_STATIC_SDL2)
 		include(FetchContent)

@@ -1,0 +1,27 @@
+; Name:        scene.v.pica
+; Description: the frame's vertices: a position in the screen's pixels, a texture place, a colour
+; Author:      yoshisuga
+
+.fvec projection[4]
+.constf bytes(0.00392157, 0.00392157, 0.00392157, 0.00392157)
+.constf one(1.0, 1.0, 1.0, 1.0)
+
+.out out_position position
+.out out_place texcoord0
+.out out_colour color
+
+.alias in_position v0
+.alias in_place v1
+.alias in_colour v2
+
+.proc main
+	mov r0.xyz, in_position
+	mov r0.w, one
+	dp4 out_position.x, projection[0], r0
+	dp4 out_position.y, projection[1], r0
+	dp4 out_position.z, projection[2], r0
+	dp4 out_position.w, projection[3], r0
+	mov out_place, in_place
+	mul out_colour, bytes, in_colour
+	end
+.end

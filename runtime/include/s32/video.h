@@ -101,6 +101,137 @@ void s32_video_extra_colour(int screen, uint32_t index, uint16_t colour);
 void s32_video_overlay_sprites(const uint8_t *list, size_t size);
 void s32_video_overlay_end(void);
 
+#ifdef S32_VIDEO_SCENE
+/* A frame as a GPU can draw it (ports/3ds): what the mixer and the layers would draw from, instead of the frame's
+   pixels. The sprites' list is kept, not drawn, when the board sends it. Only what OutRunners uses of the board is
+   here: no clip windows and no shadows, a group for each sprite and one blend for each layer */
+#define S32_SCENE_LAYERS   8
+#define S32_SCENE_SPRITES  1024
+#define S32_SCENE_RAM_WORDS 8
+#define S32_SCENE_TEXT     0        /* a layer's index, as the mixer's order */
+#define S32_SCENE_NBG0     1
+#define S32_SCENE_BITMAP   5
+#define S32_SCENE_SPRITE   6
+#define S32_SCENE_BACKDROP 7
+
+typedef struct
+{
+	uint8_t index;                  /* S32_SCENE_ */
+	bool blended;                   /* half seen through to what is under it */
+	uint8_t shift;                  /* of a pixel, before the palette base is added */
+	uint16_t palette_base;
+	int8_t offsets[3];              /* added to its red, green, blue: 5 bits a channel */
+} s32_scene_layer;
+
+/* A row of a tilemap: the pages of its source, the source row and the column at the screen's left edge */
+typedef struct
+{
+	int16_t pages[2];
+	int16_t line;
+	uint16_t column;
+} s32_scene_row;
+
+/* The columns of each row that a layer's clip windows let through, from the frame's left */
+#define S32_SCENE_SPANS 4
+typedef struct
+{
+	uint8_t count;
+	uint16_t spans[S32_SCENE_SPANS][2];      /* first column, one past the last */
+} s32_scene_clip_row;
+
+typedef struct
+{
+	s32_scene_clip_row rows[S32_VIDEO_HEIGHT];
+} s32_scene_clip;
+
+typedef struct
+{
+	int bank;
+	s32_scene_row rows[S32_VIDEO_HEIGHT];
+} s32_scene_tilemap;
+
+typedef struct
+{
+	int16_t x, y;                   /* its top left corner on the screen */
+	int16_t width, height;          /* there */
+	int16_t clip_left, clip_right, clip_top, clip_bottom;    /* the frame's area it shows in, edges included */
+	uint32_t address;
+	uint8_t bank;
+	uint8_t words;                  /* a row's, in the source */
+	uint8_t rows;
+	uint8_t end_pen;
+	bool bits8, flip_x, flip_y, indirect, from_ram;
+	bool shadow;                    /* it darkens what is under it instead */
+	bool extra_colours;             /* its pixels take the extra palette's colours, where it has them */
+	bool ghost;                     /* half seen through */
+	uint16_t color;
+	uint16_t transparent_bits;
+	uint16_t table[16];
+	uint32_t ram_words[S32_SCENE_RAM_WORDS];    /* from_ram's graphics, as they were when the list went out */
+} s32_scene_sprite;
+
+typedef struct
+{
+	bool on;                        /* the screen's on */
+	int width;                      /* of the frame: 320, 416 or WIDE's */
+	int side;                       /* WIDE's columns at each side */
+	int blend_factor;               /* under a blended layer: of 8, the part of it that shows, plus one */
+	int layer_count;
+	s32_scene_layer layers[S32_SCENE_LAYERS];    /* from the top down, the backdrop last, without the sprites */
+	uint8_t sprites_above[S32_SCENE_LAYERS];     /* by sprite group: how many layers are over it */
+	uint8_t group_shift, group_mask;
+	int8_t sprite_offsets[3];       /* as a layer's */
+	uint16_t sprite_bits;           /* of a sprite's pixel, under its group */
+	uint16_t shadow_pen;            /* such a pixel darkens the layers under it, at half */
+	bool drawn[S32_SCENE_BACKDROP];              /* by layer */
+	s32_scene_tilemap tilemaps[4];
+	s32_scene_clip clips[S32_SCENE_BACKDROP];    /* by layer */
+	uint16_t text_control;
+	uint32_t bitmap_color;
+	int bitmap_x, bitmap_y;
+	bool bitmap_bits8;
+	uint16_t backdrop[S32_VIDEO_HEIGHT];         /* the colour of each row, as the palette has it */
+	const s32_scene_sprite *sprites;
+	int sprite_count;
+} s32_scene;
+
+/* From now on the sprites' lists are kept for s32_video_scene */
+void s32_video_use_scene(void);
+
+/* While true the sprites are drawn into the buffers too, for s32_video_draw_frame to show beside the scene: checks */
+extern bool s32_video_scene_raster;
+
+/* This frame */
+void s32_video_scene(s32_scene *scene);
+
+/* The colour of a pixel of a kept sprite, as the mixer would look it up */
+uint16_t s32_video_scene_sprite_color(const s32_scene_sprite *sprite, uint16_t pixel);
+
+/* The word of sprite graphics a kept sprite's address reaches */
+uint32_t s32_video_scene_sprite_word(const s32_scene_sprite *sprite, uint32_t address);
+#endif
+
+#ifdef S32_VIDEO_STATS
+/* What the frames took, for a port tuning its renderer: time in ticks, and what the sprites and the mixer saw */
+typedef struct
+{
+	uint64_t ticks_layers, ticks_mix;
+	uint32_t frames;
+	uint32_t sprites, shadows, indirect, from_ram, bits8, pixels, unique;
+	uint32_t blended_frames, offset_frames, clipped_frames;
+	uint32_t layer_frames[8];
+	uint32_t row_scroll_frames[4];          /* NBG2 and 3's row scroll, then their row select */
+	uint32_t zoom_frames[2];                /* NBG0 and 1 zoomed */
+	uint64_t ticks_layer[6];                /* by LAYER_ */
+	uint32_t pages_changed, palette_changed;
+	uint32_t bitmap_pages_changed;          /* of video RAM's first 0x20000 bytes, in 0x400 */
+	char order[16];                         /* the last frame's mixer, top down: T 0 1 2 3 B S D */
+	uint8_t groups;
+} s32_video_stats_t;
+extern s32_video_stats_t s32_video_stats;
+uint64_t s32_video_stats_now(void);
+#endif
+
 /* For tools that look at what the sprites are drawn with (the asset extractor's census): called for every
    sprite the list draws, before it is drawn, with the screen it goes to, its graphics' place in the sprite
    ROM (32-bit words, bank << 20 | offset), its size in words and rows, whether it is 8 bits a pen, whether it

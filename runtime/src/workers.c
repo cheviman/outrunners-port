@@ -35,6 +35,15 @@ typedef CondVar pool_signal;
 #define WAIT(signal, lock) condvarWait(signal, lock)
 #define WAKE_ALL(signal) condvarWakeAll(signal)
 #define WAKE(signal) condvarWakeOne(signal)
+#elif defined(__3DS__)
+#include <3ds.h>
+typedef LightLock pool_lock;
+typedef CondVar pool_signal;
+#define LOCK(lock) LightLock_Lock(lock)
+#define UNLOCK(lock) LightLock_Unlock(lock)
+#define WAIT(signal, lock) CondVar_Wait(signal, lock)
+#define WAKE_ALL(signal) CondVar_Broadcast(signal)
+#define WAKE(signal) CondVar_Signal(signal)
 #else
 #include <pthread.h>
 typedef pthread_mutex_t pool_lock;
@@ -111,7 +120,7 @@ static DWORD WINAPI worker_entry(LPVOID number)
 	worker_loop((int)(intptr_t)number);
 	return 0;
 }
-#elif defined(__SWITCH__)
+#elif defined(__SWITCH__) || defined(__3DS__)
 static void worker_entry(void *number)
 {
 	worker_loop((int)(intptr_t)number);
@@ -138,6 +147,10 @@ void s32_workers_start(int count)
 	mutexInit(&pool.lock);
 	condvarInit(&pool.job_ready);
 	condvarInit(&pool.job_done);
+#elif defined(__3DS__)
+	LightLock_Init(&pool.lock);
+	CondVar_Init(&pool.job_ready);
+	CondVar_Init(&pool.job_done);
 #else
 	pthread_mutex_init(&pool.lock, NULL);
 	pthread_cond_init(&pool.job_ready, NULL);
@@ -155,6 +168,11 @@ void s32_workers_start(int count)
 		/* (an application has cores 0 to 2 and runs on 0: the workers on 1 and 2) */
 		if (R_FAILED(threadCreate(&pool.threads[number], worker_entry, (void *)(intptr_t)number, NULL, 0x10000,
 			0x2C, 1 + number % 2)) || R_FAILED(threadStart(&pool.threads[number])))
+			break;
+#elif defined(__3DS__)
+		/* (core 0 is the game's and 2 the sound's, ports/3ds/main.c: what core 1 leaves, then core 3 where
+		   the system lets it) */
+		if (!threadCreate(worker_entry, (void *)(intptr_t)number, 0x10000, 0x30, number == 0 ? 1 : 3, true))
 			break;
 #else
 		pthread_t thread;

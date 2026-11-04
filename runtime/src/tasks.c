@@ -1,7 +1,7 @@
 /**
  *    Name:        tasks.c
  *    Description: native stacks for the game's tasks (host/tasks.h): fibers on Windows, the registers on the
- *                 task's stack on the Switch, Android and iOS (aarch64), ucontext elsewhere
+ *                 task's stack on the Switch, Android and iOS (aarch64) and the 3DS (ARM), ucontext elsewhere
  *    Version:     0.1.0
  *    Created:     20-10-2026
  *    Modified:    30-10-2026
@@ -23,7 +23,11 @@
 #include <string.h>
 
 /* the C of a task nests as deep as the game's calls do, with the locals of the generated code */
+#ifdef __3DS__
+#define TASK_STACK_SIZE (2u << 20)    /* (its heap is all real memory, and short) */
+#else
 #define TASK_STACK_SIZE (16u << 20)
+#endif
 
 #ifdef _WIN32
 
@@ -85,12 +89,18 @@ void host_task_switch(host_task *to)
 	SwitchToFiber(to->fiber);
 }
 
-#elif defined(__aarch64__) && (defined(__SWITCH__) || defined(__ANDROID__) || TARGET_OS_IPHONE)
+#elif (defined(__aarch64__) && (defined(__SWITCH__) || defined(__ANDROID__) || TARGET_OS_IPHONE)) || defined(__3DS__)
 
 /* The Switch's C library, Android's and iOS's have no ucontext: a task's registers are kept on its own stack. What
    a call keeps for its caller (AAPCS64: x19-x29, the return address x30, d8-d15) is pushed where the task
    stops and popped where it goes on; the stack pointer is all the task keeps beside it */
+#ifdef __3DS__
+#define SAVED_BYTES 100    /* AAPCS: d8-d15, then r4-r11 and the return address */
+#define SAVED_RETURN 24    /* (in 4 byte words) */
+#else
 #define SAVED_BYTES 160    /* x19-x30 and d8-d15, 8 bytes each */
+#define SAVED_RETURN 11    /* (x30, in 8 byte words) */
+#endif
 
 void host_switch_stacks(void **from_stack, void *to_stack);
 
@@ -102,6 +112,21 @@ void host_switch_stacks(void **from_stack, void *to_stack);
 #define SWITCH_STACKS_END ".size host_switch_stacks, .-host_switch_stacks\n"
 #endif
 
+#ifdef __3DS__
+__asm__(
+	".text\n"
+	".arm\n"
+	".global host_switch_stacks\n"
+	".type host_switch_stacks, %function\n"
+	"host_switch_stacks:\n"
+	"	push {r4-r11, lr}\n"
+	"	vpush {d8-d15}\n"
+	"	str sp, [r0]\n"
+	"	mov sp, r1\n"
+	"	vpop {d8-d15}\n"
+	"	pop {r4-r11, pc}\n"
+	".size host_switch_stacks, .-host_switch_stacks\n");
+#else
 __asm__(
 	".text\n"
 	SWITCH_STACKS_START
@@ -132,6 +157,7 @@ __asm__(
 	"	add sp, sp, #160\n"
 	"	ret\n"
 	SWITCH_STACKS_END);
+#endif
 
 struct host_task
 {
@@ -160,7 +186,7 @@ static void run_task(void)
 host_task *host_task_create(void (*start)(void))
 {
 	host_task *task = calloc(1, sizeof(*task));
-	uint64_t *registers;
+	uintptr_t *registers;
 
 	if (task)
 		task->stack = malloc(TASK_STACK_SIZE);
@@ -170,10 +196,10 @@ host_task *host_task_create(void (*start)(void))
 		exit(3);
 	}
 	task->start = start;
-	/* its first switch pops registers that return into run_task, at the top of its stack (16-byte aligned) */
-	registers = (uint64_t *)(((uintptr_t)task->stack + TASK_STACK_SIZE - SAVED_BYTES) & ~(uintptr_t)15);
+	/* its first switch pops registers that return into run_task, leaving the top of its stack (16-byte aligned) */
+	registers = (uintptr_t *)((((uintptr_t)task->stack + TASK_STACK_SIZE) & ~(uintptr_t)15) - SAVED_BYTES);
 	memset(registers, 0, SAVED_BYTES);
-	registers[11] = (uint64_t)(uintptr_t)run_task;    /* (x30: where the first ret goes) */
+	registers[SAVED_RETURN] = (uintptr_t)run_task;    /* (where the first return goes) */
 	task->stack_pointer = registers;
 	return task;
 }

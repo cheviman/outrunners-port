@@ -245,6 +245,17 @@ static void on_irq_changed(bool asserted)
 	program_irq_line(asserted);
 }
 
+#ifdef S32_SCENE_CHECK
+void scene_check_frame(void);
+
+/* ports/3ds/check: the GPU's frame beside the board's */
+static void on_frame_shown_checked(void)
+{
+	s32_video_draw_frame();
+	scene_check_frame();
+}
+#endif
+
 static void on_log(const char *message)
 {
 	fprintf(stderr, "[s32] %s\n", message);
@@ -645,6 +656,11 @@ int main(int argc, char **argv)
 		s32_video_init_graphics(assets_graphics());
 #endif
 	s32_video_show_screens(screens == 1 ? 1 : 3);
+#ifdef S32_SCENE_CHECK
+	s32_video_use_scene();
+	s32_video_scene_raster = true;
+	s32_board.frame_shown = on_frame_shown_checked;
+#endif
 	if (sound_hashes_path || sound_wav)
 	{
 #ifdef ORUNNERS_SCAFFOLD
