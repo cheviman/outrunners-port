@@ -8,11 +8,12 @@ is too slow and has too little memory.
 You need homebrew on the console (Luma3DS and the Homebrew Launcher), and your own ROM set: **nothing of the game is in
 the .3dsx**.
 
-1. Make the assets pack on a computer: run the computer's OutRunners once with your `orunners.zip` (it keeps
-   `outrunners.assets` in `~/Library/Application Support/OutRunners/` on a Mac, `~/.local/share/OutRunners/` on Linux,
-   beside the game on Windows), or `orunners_console_headless --assets assets --write-pack outrunners.assets`.
-2. Copy it to the SD card as `sdmc:/3ds/outrunners/outrunners.assets` (31 MB).
-3. Copy `OutRunners.3dsx` to `sdmc:/3ds/` and start it from the Homebrew Launcher.
+1. Copy `OutRunners.3dsx` to `sdmc:/3ds/`, and your `orunners.zip` (MAME's set, World) to `sdmc:/3ds/outrunners/`.
+2. Start it from the Homebrew Launcher.
+
+The first run takes the game's graphics and sounds out of the zip, once, into `outrunners.assets` in that folder: about
+five minutes on a New 3DS, with nothing moving on the screen. After that the game starts at once, and the zip can go.
+Holding L and R while the game starts makes the pack again.
 
 Sound asks for the DSP firmware, `sdmc:/3ds/dspfirm.cdc` (dumped with DSP1 from the Homebrew Launcher); without it the
 game plays silent.

@@ -6,7 +6,7 @@
 # Author:      yoshisuga
 #
 # Included by CMakeLists.txt when the toolchain is the 3DS's. There is no SDL2 there: ports/3ds/main.c is the
-# game's whole host, and ports/3ds/gpu.c draws its frames with the PICA200 from the scene video.c describes. Its assets pack (outrunners.assets, made on a computer) is on the SD card
+# game's whole host, and ports/3ds/gpu.c draws its frames with the PICA200 from the scene video.c describes. Its assets pack (outrunners.assets) is on the SD card, made on the first run from the player's orunners.zip
 
 target_compile_definitions(orunners_game_console PUBLIC ORUNNERS_HANDHELD ORUNNERS_SYSTEM_EXIT ORUNNERS_SCREEN_WIDE)
 target_compile_definitions(s32runtime PUBLIC S32_FM_SILENT S32_VIDEO_SCENE)
@@ -21,8 +21,9 @@ set_source_files_properties(${ORUNNERS_DECOMPILED_DIR}/system/test_mode.c PROPER
 ctr_add_shader_library(outrunners_shader ports/3ds/scene.v.pica)
 dkp_add_embedded_binary_library(outrunners_shader_data outrunners_shader)
 
-add_executable(OutRunners ports/3ds/main.c ports/3ds/gpu.c)
-target_link_libraries(OutRunners PRIVATE orunners_game_console orunners_sound outrunners_shader_data citro3d)
+add_executable(OutRunners ports/3ds/main.c ports/3ds/gpu.c ports/switch/nsp/rom_pack.c)
+target_include_directories(OutRunners PRIVATE ports/switch/nsp)
+target_link_libraries(OutRunners PRIVATE orunners_game_console orunners_sound orunners_extract outrunners_shader_data citro3d)
 ctr_generate_smdh(OutRunners.smdh NAME "OutRunners" DESCRIPTION "OutRunners" AUTHOR "OutRunners port"
 	ICON ${CMAKE_SOURCE_DIR}/ports/3ds/icon.png)
 ctr_create_3dsx(OutRunners SMDH OutRunners.smdh)

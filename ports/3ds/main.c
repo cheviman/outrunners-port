@@ -12,7 +12,8 @@
  *    240's middle. The sound board runs on a core of its own, a frame of its time at each frame's end, while the
  *    game goes on with the next: the two speak as the real boards do, through the RAM they share and the
  *    interrupt, only later than the board's time would have it (the other ports keep the two in step, for the
- *    checks; here the game has no time to wait for it). The assets pack and what the game writes are in sdmc:/3ds/outrunners/. The times of its
+ *    checks; here the game has no time to wait for it). The assets pack and what the game writes are in sdmc:/3ds/outrunners/; the first run makes the pack
+ *    from orunners.zip there. The times of its
  *    frames go to stdout, which 3dslink -s shows on the computer.
  *
  *    Controls: the circle pad or the d-pad steers and moves the menus' cursor, A is the gas (the menus' accept),
@@ -27,6 +28,7 @@
 #include "game/assets.h"
 #include "console.h"
 #include "gpu.h"
+#include "rom_pack.h"
 
 #include <3ds.h>
 
@@ -58,6 +60,7 @@
 #define CIRCLE_ACTION    80          /* past this, the menus' arrows */
 #define BACKUP_RAM_START 0x1f00      /* what the game keeps of the sound board's RAM */
 #define BACKUP_RAM_SIZE  0xfa
+#define PACK_PATH        FOLDER "outrunners.assets"
 #define SOUND_BUFFERS    8
 #define SOUND_SAMPLES    2048        /* stereo samples a buffer, at most */
 #define TICKS_FRAME      (SYSCLOCK_ARM11 / 60)
@@ -425,11 +428,31 @@ static void on_log(const char *message)
 	(void)message;
 }
 
+/* Words on the bottom screen, for the first run and what goes wrong: the frames take it back after */
+static bool words_shown;
+
+static void show_words(const char *words)
+{
+	if (!words_shown)
+	{
+		consoleInit(GFX_BOTTOM, NULL);
+		words_shown = true;
+	}
+	printf("%s\n", words);
+	gfxFlushBuffers();
+	gspWaitForVBlank();
+}
+
 /* What went wrong, on the bottom screen until START */
 static int fail(const char *what, const char *detail)
 {
-	consoleInit(GFX_BOTTOM, NULL);
+	if (!words_shown)
+	{
+		consoleInit(GFX_BOTTOM, NULL);
+		words_shown = true;
+	}
 	printf("%s\n%s\n\nSTART leaves\n", what, detail ? detail : "");
+	gfxFlushBuffers();
 	while (aptMainLoop())
 	{
 		gspWaitForVBlank();
@@ -440,6 +463,55 @@ static int fail(const char *what, const char *detail)
 	return 1;
 }
 
+/* The player's ROM set, where the SD card has one, or NULL */
+static const char *find_rom_set(void)
+{
+	static const char *const places[] = { FOLDER "orunners.zip", "sdmc:/3ds/orunners.zip", "sdmc:/orunners.zip" };
+
+	for (size_t place = 0; place < sizeof(places) / sizeof(places[0]); place++)
+	{
+		FILE *probe = fopen(places[place], "rb");
+
+		if (probe)
+		{
+			fclose(probe);
+			return places[place];
+		}
+	}
+	return NULL;
+}
+
+/* The game's assets: the pack on the SD card, or the first run's, made once from the player's ROM set (L and R held
+   while the game starts make it again): NULL, or what failed. rom_pack_make leaves them loaded */
+static const char *load_assets(void)
+{
+	const char *rom_set;
+	const char *problem = NULL;
+	bool again;
+
+	hidScanInput();
+	again = (hidKeysHeld() & (KEY_L | KEY_R)) == (KEY_L | KEY_R);
+	if (!again)
+	{
+		/* (in the game's folder, or where 3dslink leaves what it is sent) */
+		problem = assets_load_pack(PACK_PATH);
+		if (problem)
+			problem = assets_load_pack("sdmc:/3ds/outrunners.assets");
+		if (!problem)
+			return NULL;
+	}
+	if ((rom_set = find_rom_set()) == NULL)
+		return "No orunners.zip on the SD card.\nPut it in sdmc:/3ds/outrunners/";
+	show_words("OutRunners: first run");
+	show_words("Taking the game's graphics and sounds");
+	show_words("out of orunners.zip, once.");
+	show_words("");
+	show_words("This takes about five minutes,");
+	show_words("with nothing moving on the screen.");
+	show_words("Please leave the console on.");
+	return rom_pack_make(rom_set, PACK_PATH);
+}
+
 int main(int argc, char **argv)
 {
 	const char *problem;
@@ -448,7 +520,6 @@ int main(int argc, char **argv)
 	(void)argv;
 	osSetSpeedupEnable(true);
 	gfxInit(GSP_RGBA8_OES, GSP_RGBA8_OES, false);
-	gpu_open();
 	mkdir("sdmc:/3ds", 0777);
 	mkdir(FOLDER, 0777);
 	console_window_settings.full_screen = true;
@@ -456,12 +527,15 @@ int main(int argc, char **argv)
 	console_window_settings.pixels = PIXELS_SHARP;
 	console_window_settings.vertical = false;
 	console_ghost_folder(FOLDER);
-	/* (in the game's folder, or where 3dslink leaves what it is sent) */
-	problem = assets_load_pack(FOLDER "outrunners.assets");
-	if (problem)
-		problem = assets_load_pack("sdmc:/3ds/outrunners.assets");
-	if (problem)
+	if ((problem = load_assets()) != NULL)
 		return fail("The game's assets cannot be read:", problem);
+	if (words_shown)
+	{
+		/* (the bottom screen back from the words, for the frames) */
+		gfxSetScreenFormat(GFX_BOTTOM, GSP_RGBA8_OES);
+		gfxSetDoubleBuffering(GFX_BOTTOM, true);
+	}
+	gpu_open();
 	APT_SetAppCpuTimeLimit(CORE1_LIMIT);
 	s32_workers_start(VIDEO_WORKERS);
 	open_sound();
