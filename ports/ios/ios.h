@@ -13,6 +13,8 @@
 
 #include <SDL.h>
 
+#include <stdbool.h>
+
 /* Until the system gives the app its scene, and SDL's window goes in it: before SDL starts */
 void ios_wait_for_scene(void);
 
@@ -23,5 +25,15 @@ char *ios_documents_folder(void);
 /* The system's file picker over 'window', for a .zip: the file chosen comes as an SDL_DROPFILE event, a copy of
    it in the app's own folders */
 void ios_pick_rom_set(SDL_Window *window);
+
+/* The phone's tilt as a wheel, its gyroscope and accelerometer's gravity: whether it has them; on, centred on the
+   phone as it is held; off */
+bool ios_tilt_available(void);
+void ios_tilt_start(void);
+void ios_tilt_stop(void);
+
+/* How far it is turned like a wheel, about the axis through its screen, from where it was centred: -1 (all the way
+   to the left) to 1 */
+double ios_tilt(void);
 
 #endif

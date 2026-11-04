@@ -8,6 +8,14 @@ title's menu. Going to the background pauses a race and writes what the game kee
 Unlike Android's APK, **the app carries nothing of the game**: it takes its assets out of your ROM set on the phone, the
 first time it runs, as a computer's game does. So the .ipa is the same for every player.
 
+## Gyro steering
+
+**GYRO**, beside START, turns the wheel with the phone: hold it as you like and tap GYRO, which lights up, and turn it
+like a steering wheel, all the way at 30 degrees. It is measured from how the phone was held at that tap, so tap it off
+and on to centre it again. A thumb on the touch wheel goes over it for as long as it stays there, the menus are moved
+with the thumb alone, and it starts off each time the game does. It is the first player's, and 2 PLAYERS with the
+screens facing has none.
+
 ## The ROM set
 
 The first run looks for `orunners.zip` (MAME's set, World) in the app's folder, and otherwise asks for it: tap the
@@ -95,6 +103,7 @@ go out, so an app signed with the entitlement needs nothing else.
 - The file picker opens, but choosing a set in it has not been tried.
 - NETWORK's discovery in the simulator (below). Two real devices have not raced yet.
 - Folding and unfolding mid-game has not been tried on the phone.
+- Gyro steering is new: its direction and strength are worth a check on your phone.
 
 Nothing of the game is in this repository. OutRunners is a trademark of SEGA; this project is not affiliated with or
 endorsed by SEGA, nor with Apple.

@@ -47,7 +47,7 @@ target_link_libraries(OutRunners PRIVATE orunners_game_console orunners_sound or
 if(TARGET SDL2::SDL2main)
 	target_link_libraries(OutRunners PRIVATE SDL2::SDL2main)
 endif()
-target_link_libraries(OutRunners PRIVATE "-framework UniformTypeIdentifiers")
+target_link_libraries(OutRunners PRIVATE "-framework CoreMotion" "-framework UniformTypeIdentifiers")
 set_source_files_properties(ports/ios/ios.m PROPERTIES COMPILE_OPTIONS -fobjc-arc)
 configure_file(ports/ios/Info.plist.in ${CMAKE_BINARY_DIR}/Info.plist @ONLY)
 set_target_properties(OutRunners PROPERTIES
