@@ -12,9 +12,9 @@
  *    240's middle. The sound board runs on a core of its own, a frame of its time at each frame's end, while the
  *    game goes on with the next: the two speak as the real boards do, through the RAM they share and the
  *    interrupt, only later than the board's time would have it (the other ports keep the two in step, for the
- *    checks; here the game has no time to wait for it). The assets pack and what the game writes are in sdmc:/3ds/outrunners/; the first run makes the pack
- *    from orunners.zip there. The times of its
- *    frames go to stdout, which 3dslink -s shows on the computer.
+ *    checks; here the game has no time to wait for it). The assets pack and what the game writes are in
+ *    sdmc:/3ds/outrunners/; the first run makes the pack from orunners.zip there. The bottom screen shows the
+ *    cabinet's other monitor, where the console version runs the race's route map.
  *
  *    Controls: the circle pad or the d-pad steers and moves the menus' cursor, A is the gas (the menus' accept),
  *    B the brake (their back), R and L shift up and down, X the radio, ZL and ZR the song before and after, START
