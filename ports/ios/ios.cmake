@@ -27,6 +27,9 @@ else()
 	set(ORUNNERS_IOS_ACTOOL_PLATFORM iphoneos)
 endif()
 
+# (a release says nothing of the computer it was built on: SDL's __FILE__s)
+add_compile_options(-fmacro-prefix-map=${CMAKE_SOURCE_DIR}/=)
+
 # SDL2 from its source, as the releases' (FETCHCONTENT_SOURCE_DIR_SDL2 picks a copy already here)
 include(FetchContent)
 FetchContent_Declare(SDL2 GIT_REPOSITORY https://github.com/libsdl-org/SDL.git GIT_TAG release-2.32.10
