@@ -161,6 +161,7 @@ typedef struct
 	uint8_t rows;
 	uint8_t end_pen;
 	bool bits8, flip_x, flip_y, indirect, from_ram;
+	uint8_t screen;                 /* the monitor it goes to */
 	bool shadow;                    /* it darkens what is under it instead */
 	bool extra_colours;             /* its pixels take the extra palette's colours, where it has them */
 	bool ghost;                     /* half seen through */
@@ -172,6 +173,7 @@ typedef struct
 
 typedef struct
 {
+	int screen;
 	bool on;                        /* the screen's on */
 	int width;                      /* of the frame: 320, 416 or WIDE's */
 	int side;                       /* WIDE's columns at each side */
@@ -201,8 +203,8 @@ void s32_video_use_scene(void);
 /* While true the sprites are drawn into the buffers too, for s32_video_draw_frame to show beside the scene: checks */
 extern bool s32_video_scene_raster;
 
-/* This frame */
-void s32_video_scene(s32_scene *scene);
+/* This frame of a monitor: 'screen', 0 or 1. Its sprites are the list's whose 'screen' it is */
+void s32_video_scene(s32_scene *scene, int screen);
 
 /* The colour of a pixel of a kept sprite, as the mixer would look it up */
 uint16_t s32_video_scene_sprite_color(const s32_scene_sprite *sprite, uint16_t pixel);

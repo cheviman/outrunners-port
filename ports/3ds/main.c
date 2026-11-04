@@ -16,8 +16,8 @@
  *    frames go to stdout, which 3dslink -s shows on the computer.
  *
  *    Controls: the circle pad or the d-pad steers and moves the menus' cursor, A is the gas (the menus' accept),
- *    B the brake (their back), R and L shift up and down, X the radio, START starts, SELECT and START together
- *    leave the game.
+ *    B the brake (their back), R and L shift up and down, X the radio, ZL and ZR the song before and after, START
+ *    starts, SELECT and START together leave the game.
  */
 #include "s32/machine.h"
 #include "s32/program.h"
@@ -194,7 +194,8 @@ static void save_in_the_background(void)
 
 static void on_frame_shown(void)
 {
-	static s32_scene scene;
+	static s32_scene scene, beside;
+	bool map;
 
 	/* (the game's time comes first: behind it, frames go undrawn) */
 	if (svcGetSystemTick() > next_frame + TICKS_FRAME && skipped < SKIPPED_MOST)
@@ -203,8 +204,11 @@ static void on_frame_shown(void)
 		return;
 	}
 	skipped = 0;
-	s32_video_scene(&scene);
-	gpu_draw(&scene);
+	map = console_side_map_shown();
+	s32_video_scene(&scene, 0);
+	if (map)
+		s32_video_scene(&beside, 1);
+	gpu_draw(&scene, map ? &beside : NULL);
 }
 
 /* ---- the controls ---- */
@@ -288,7 +292,7 @@ static void on_controls_update(void)
 
 	/* the first player's 315-5296, active low; the second's let alone */
 	input->port_a[0] = (uint8_t)(0xff & ~((keys & KEY_R) ? 0x01 : 0) & ~((keys & KEY_L) ? 0x02 : 0));
-	input->port_b[0] = (uint8_t)(0xff & ~((keys & KEY_X) ? 0x01 : 0));
+	input->port_b[0] = (uint8_t)(0xff & ~((keys & KEY_X) ? 0x01 : 0) & ~((keys & KEY_ZL) ? 0x02 : 0) & ~((keys & KEY_ZR) ? 0x04 : 0));
 	input->port_e[0] = (uint8_t)(0xff & ~(start ? 0x10 : 0));
 	input->port_a[1] = input->port_b[1] = input->port_e[1] = 0xff;
 	input->analog[0] = (uint8_t)wheels;
@@ -307,8 +311,7 @@ static void open_sound(void)
 
 	if (R_FAILED(ndspInit()))
 	{
-		printf("no sound: sdmc:/3ds/dspfirm.cdc?\n");
-		return;
+		return;    /* (no sdmc:/3ds/dspfirm.cdc) */
 	}
 	sound_memory = linearAlloc(SOUND_BUFFERS * SOUND_SAMPLES * 2 * sizeof(int16_t));
 	if (!sound_memory)
@@ -425,6 +428,7 @@ static void on_log(const char *message)
 /* What went wrong, on the bottom screen until START */
 static int fail(const char *what, const char *detail)
 {
+	consoleInit(GFX_BOTTOM, NULL);
 	printf("%s\n%s\n\nSTART leaves\n", what, detail ? detail : "");
 	while (aptMainLoop())
 	{
@@ -443,9 +447,7 @@ int main(int argc, char **argv)
 	(void)argc;
 	(void)argv;
 	osSetSpeedupEnable(true);
-	gfxInit(GSP_RGBA8_OES, GSP_BGR8_OES, false);
-	consoleInit(GFX_BOTTOM, NULL);
-	gfxSetDoubleBuffering(GFX_BOTTOM, false);
+	gfxInit(GSP_RGBA8_OES, GSP_RGBA8_OES, false);
 	gpu_open();
 	mkdir("sdmc:/3ds", 0777);
 	mkdir(FOLDER, 0777);
@@ -473,7 +475,7 @@ int main(int argc, char **argv)
 	s32_video_init_graphics(assets_graphics());
 	s32_board.frame_shown = on_frame_shown;
 	s32_video_use_scene();
-	s32_video_show_screens(1);    /* (the cabinet's second monitor has sprites of its own: the attract's, while we race) */
+	console_side_map_wanted(true);    /* (the other monitor, unseen with one player, shows the race's route map: the bottom screen) */
 	s32_board.sound_at = assets_sound_data;
 	s32_board.pcm_at = assets_pcm_byte;
 	sound_chips_attach();

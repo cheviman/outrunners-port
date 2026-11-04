@@ -22,9 +22,13 @@ game plays silent.
 | Circle pad or d-pad | the wheel, the menus' cursor |
 | A, B | gas and accept, brake and back |
 | R, L | shift up, shift down |
-| X | the radio |
+| X | the radio: music on and off, or the next song, as in the arcade |
+| ZL, ZR | the song before, the song after |
 | START | start |
 | SELECT + START | leave the game |
+
+The bottom screen shows the race's route map, the game's own, with your car on it and a large speedometer in its corner
+(ARCADE and TIME ATTACK; it is the cabinet's other monitor, and it stays dark in the menus).
 
 The 3D slider sets the depth: the road goes from the screen at the bottom into it at the horizon, what stands by the
 road goes in with it, and your car, the words and the HUD stay at the screen. With the slider down it is the plain picture.

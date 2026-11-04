@@ -106,6 +106,7 @@ typedef struct sprite_drawing
 	bool indirect;              /* pens go through a table of 16 colors */
 	bool shadow;                /* darkens what is under it instead */
 	bool bits8;
+	int screen;
 	int color;
 	int transparent_bits;       /* an indirect color with all these bits set is transparent */
 	uint16_t table[16];
@@ -963,6 +964,7 @@ static int draw_sprite(uint32_t entry, int x_offset, int y_offset, const area *i
 	int y_accumulator = 0;
 	uint32_t address = sprite_word(entry + 6) | (uint32_t)(height_word & 0xf000) << 4;
 
+	sprite.screen = screen;
 	sprite.inside = inside;
 	sprite.outside = outside;
 	sprite.extra = (uint8_t)(!video.extra_used ? 0
@@ -1393,6 +1395,7 @@ static void scene_keep_sprite(const sprite_drawing *sprite, const uint16_t *tabl
 	kept->address = address;
 	kept->from_ram = from_ram;
 	kept->shadow = sprite->shadow;
+	kept->screen = (uint8_t)sprite->screen;
 	kept->extra_colours = (sprite->extra & EXTRA_COLOURS) != 0;
 	kept->ghost = (sprite->extra & EXTRA_GHOST) != 0;
 	if (from_ram)
@@ -1414,7 +1417,7 @@ static void scene_keep_sprite(const sprite_drawing *sprite, const uint16_t *tabl
 
 uint16_t s32_video_scene_sprite_color(const s32_scene_sprite *sprite, uint16_t pixel)
 {
-	const int screen = 0;
+	const int screen = sprite->screen;
 	const uint16_t sprite_control = mixer_register(screen, 0x4c);
 	const sprite_grouping grouping = groupings[sprite_control & 0x0f];
 	const int group = (pixel >> grouping.shift) & grouping.mask;
@@ -1562,10 +1565,9 @@ static void scene_mix(s32_scene *scene, int screen, int drawn)
 	}
 }
 
-void s32_video_scene(s32_scene *scene)
+void s32_video_scene(s32_scene *scene, int screen)
 {
 	const bool board_wide = bit(video_register(0x00), 15);
-	const int screen = 0;
 	int wanted = 0;
 	int drawn = 0;
 	const uint16_t off = video_register(0x02);
@@ -1575,6 +1577,7 @@ void s32_video_scene(s32_scene *scene)
 	scene->width = board_wide ? 416 : 320 + 2 * video.wide_side;
 	video.side = board_wide ? 0 : video.wide_side;
 	scene->side = video.side;
+	scene->screen = screen;
 	video.visible = (area){ 0, scene->width - 1, 0, HEIGHT - 1 };
 	scene->on = s32_display_enabled(screen);
 	if (!scene->on)

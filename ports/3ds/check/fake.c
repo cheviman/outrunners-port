@@ -14,16 +14,22 @@
 typedef struct { float x, y, z, u, v; uint32_t colour; } vertex;
 
 uint8_t check_screen[240][400][3];
+uint8_t check_bottom[240][320][3];
+static uint8_t (*drawing)[3];
+static int drawing_width = 400;
 static const vertex *vertices;
 static C3D_Tex *bound;
 static C3D_TexEnv stages[3];
 static float source_part = 1.0f;
 static float target_part = 0.0f;
 static float constant_alpha;
-static C3D_RenderTarget target;
+static C3D_RenderTarget targets[3];
+static int target_count;
+static const C3D_RenderTarget *bottom_target;
 static uint8_t morton[8][8];
 static float depths[240][400];
 static bool depth_writes;
+static bool depth_tests = true;
 
 void C3D_Init(size_t size)
 {
@@ -34,11 +40,25 @@ void C3D_Init(size_t size)
 }
 
 void C3D_Fini(void) { }
-C3D_RenderTarget *C3D_RenderTargetCreate(int w, int h, GPU_COLORBUF c, GPU_DEPTHBUF d) { (void)w; (void)h; (void)c; (void)d; return &target; }
-void C3D_RenderTargetSetOutput(C3D_RenderTarget *t, gfxScreen_t s, gfx3dSide_t side, u32 f) { (void)t; (void)s; (void)side; (void)f; }
-void C3D_RenderTargetClear(C3D_RenderTarget *t, int w, u32 c, u32 d) { (void)t; (void)w; (void)c; (void)d; memset(check_screen, 0, sizeof(check_screen)); memset(depths, 0, sizeof(depths)); }
+C3D_RenderTarget *C3D_RenderTargetCreate(int w, int h, GPU_COLORBUF c, GPU_DEPTHBUF d) { (void)w; (void)h; (void)c; (void)d; return &targets[target_count++]; }
+void C3D_RenderTargetSetOutput(C3D_RenderTarget *t, gfxScreen_t s, gfx3dSide_t side, u32 f) { (void)side; (void)f; if (s == GFX_BOTTOM) bottom_target = t; }
+void C3D_RenderTargetClear(C3D_RenderTarget *t, int w, u32 c, u32 d)
+{
+	(void)w; (void)c; (void)d;
+	if (t == bottom_target)
+		memset(check_bottom, 0, sizeof(check_bottom));
+	else
+		memset(check_screen, 0, sizeof(check_screen));
+	memset(depths, 0, sizeof(depths));
+}
+
 bool C3D_FrameBegin(int flags) { (void)flags; return true; }
-void C3D_FrameDrawOn(C3D_RenderTarget *t) { (void)t; }
+void C3D_FrameDrawOn(C3D_RenderTarget *t)
+{
+	drawing = t == bottom_target ? &check_bottom[0][0] : &check_screen[0][0];
+	drawing_width = t == bottom_target ? 320 : 400;
+}
+
 void C3D_FrameEnd(int flags) { (void)flags; }
 
 bool C3D_TexInit(C3D_Tex *t, u16 w, u16 h, GPU_TEXCOLOR f)
@@ -53,7 +73,7 @@ bool C3D_TexInit(C3D_Tex *t, u16 w, u16 h, GPU_TEXCOLOR f)
 
 void C3D_TexDelete(C3D_Tex *t) { free(t->data); t->data = NULL; }
 void C3D_TexBind(int unit, C3D_Tex *t) { (void)unit; bound = t; }
-void C3D_DepthTest(bool e, GPU_TESTFUNC f, GPU_WRITEMASK w) { (void)e; (void)f; depth_writes = w == GPU_WRITE_ALL; }
+void C3D_DepthTest(bool e, GPU_TESTFUNC f, GPU_WRITEMASK w) { (void)f; depth_tests = e && f != GPU_ALWAYS; depth_writes = w == GPU_WRITE_ALL; }
 C3D_TexEnv *C3D_GetTexEnv(int stage) { return &stages[stage]; }
 void C3D_TexEnvInit(C3D_TexEnv *e) { memset(e, 0, sizeof(*e)); }
 void C3D_TexEnvSrc(C3D_TexEnv *e, C3D_Part p, GPU_SRC a, GPU_SRC b, int c) { (void)p; (void)b; (void)c; e->source = a; }
@@ -101,7 +121,7 @@ static void draw_quad(const vertex *q)
 		{
 			float colour[3];
 
-			if (x < 0 || x >= 400)
+			if (x < 0 || x >= drawing_width)
 				continue;
 			if (textured)
 			{
@@ -117,7 +137,7 @@ static void draw_quad(const vertex *q)
 			else
 				for (int channel = 0; channel < 3; channel++)
 					colour[channel] = (float)((q[0].colour >> (8 * channel)) & 255) / 255.0f;
-			if (q[0].z <= depths[y][x])
+			if (depth_tests && q[0].z <= depths[y][x])
 				continue;
 			if (depth_writes)
 				depths[y][x] = q[0].z;
@@ -132,9 +152,10 @@ static void draw_quad(const vertex *q)
 					}
 			for (int channel = 0; channel < 3; channel++)
 			{
-				const float value = colour[channel] * 255.0f * source_part + (float)check_screen[y][x][channel] * target_part;
+				uint8_t *out = &drawing[y * drawing_width + x][channel];
+				const float value = colour[channel] * 255.0f * source_part + (float)*out * target_part;
 
-				check_screen[y][x][channel] = (uint8_t)(value + 0.5f);
+				*out = (uint8_t)(value + 0.5f);
 			}
 		}
 	}

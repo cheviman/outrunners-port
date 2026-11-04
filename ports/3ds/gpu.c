@@ -29,14 +29,15 @@
 #include <math.h>
 #include <string.h>
 
-#define SCREEN_WIDTH     400
+#define TOP_WIDTH        400
+#define BOTTOM_WIDTH     320
 #define SCREEN_HEIGHT    240
 #define TOP              ((SCREEN_HEIGHT - S32_VIDEO_HEIGHT) / 2)
 #define PAGE_WIDTH       512
 #define PAGE_HEIGHT      256
 #define BITMAP_HEIGHT    512         /* of 4 bits a pixel; 256 of 8 */
 #define PAGE_CELLS       512         /* 32 x 16 */
-#define PAGE_SLOTS       20
+#define PAGE_SLOTS       28
 #define TEXT_CELLS       2048        /* 64 x 32 */
 #define TEXT_CHARACTERS  512
 #define PALETTE_BLOCKS   (S32_PALETTE_ENTRIES / 16)
@@ -44,6 +45,10 @@
 #define EYE_MOST         6.0f        /* pixels each eye's picture moves, at the slider's top and the far end */
 #define EDGE             8           /* columns drawn past the screen's sides, for the eyes' pictures to move into */
 #define ROAD_ROWS_LEAST  20          /* rows that do not follow on from the last: a road */
+#define SPEED_LEFT       280         /* the race's speedometer, as the frame has it (WIDE's 416): its sprites start here */
+#define SPEED_TOP        170
+#define SPEED_SCALE      2.0f        /* on the bottom screen */
+#define SPEED_GAP        4           /* from the screen's corner */
 #define FAR              1.0f        /* the depths: into the screen, from the screen's own 0 */
 #define BEHIND_MENU      0.5f        /* a tilemap's where no road is */
 #define VERTICES_QUAD    6
@@ -82,6 +87,7 @@ typedef struct
 	bool made;
 	int page;
 	int bank;
+	int screen;
 	uint16_t palette_base;
 	uint8_t shift;
 	uint32_t used;
@@ -97,7 +103,10 @@ typedef struct
 	bool made;
 } sprite_slot;
 
-static C3D_RenderTarget *target, *target_right;
+static C3D_RenderTarget *target, *target_right, *target_bottom;
+static int view_width = TOP_WIDTH;  /* of the screen being drawn */
+static int view_screen;             /* the monitor it shows */
+static float sprite_scale = 1.0f, sprite_x, sprite_y;    /* where a sprite goes from its place, drawing the speedometer */
 static float eye;                   /* pixels this eye's picture moves at FAR: 0 with the slider down */
 static int road_horizon;            /* the row where the road's rows begin, or -1 where there is no road */
 static DVLB_s *shader_data;
@@ -117,8 +126,10 @@ static uint32_t text_versions[TEXT_CELLS];
 static uint8_t text_characters[TEXT_CHARACTERS * 32];
 static uint32_t character_versions[TEXT_CHARACTERS];
 static uint8_t bitmap_rows[0x20000];
-static uint16_t palette_copy[S32_PALETTE_ENTRIES];
-static uint32_t palette_versions[PALETTE_BLOCKS];
+static uint16_t palette_copies[S32_SCREENS][S32_PALETTE_ENTRIES];
+static uint32_t palette_block_versions[S32_SCREENS][PALETTE_BLOCKS];
+#define palette_copy palette_copies[view_screen]
+#define palette_versions palette_block_versions[view_screen]
 static uint32_t palette_version;
 static sprite_slot sprites[SPRITE_SLOTS];
 static uint32_t sprite_bytes;
@@ -170,14 +181,17 @@ static void make_texture(C3D_Tex *texture, int width, int height, GPU_TEXTURE_WR
 /* Which blocks of 16 colours changed since the last frame drawn */
 static void watch_palette(void)
 {
-	const uint16_t *palette = s32_board.palette[0];
+	for (int screen = 0; screen < S32_SCREENS; screen++)
+	{
+		const uint16_t *palette = s32_board.palette[screen];
 
-	for (int block = 0; block < PALETTE_BLOCKS; block++)
-		if (memcmp(&palette_copy[block * 16], &palette[block * 16], 16 * sizeof(uint16_t)) != 0)
-		{
-			memcpy(&palette_copy[block * 16], &palette[block * 16], 16 * sizeof(uint16_t));
-			palette_versions[block] = ++palette_version;
-		}
+		for (int block = 0; block < PALETTE_BLOCKS; block++)
+			if (memcmp(&palette_copies[screen][block * 16], &palette[block * 16], 16 * sizeof(uint16_t)) != 0)
+			{
+				memcpy(&palette_copies[screen][block * 16], &palette[block * 16], 16 * sizeof(uint16_t));
+				palette_block_versions[screen][block] = ++palette_version;
+			}
+	}
 }
 
 static inline int palette_index(const s32_scene_layer *layer, int pixel)
@@ -214,14 +228,15 @@ static int page_slot_of(int page, int bank, const s32_scene_layer *layer)
 	{
 		const page_slot *slot = &pages[index];
 
-		if (slot->made && slot->page == page && slot->bank == bank && slot->palette_base == layer->palette_base
-			&& slot->shift == layer->shift)
+		if (slot->made && slot->page == page && slot->bank == bank && slot->screen == view_screen
+			&& slot->palette_base == layer->palette_base && slot->shift == layer->shift)
 			return index;
 		if (slot->used < pages[oldest].used)
 			oldest = index;
 	}
 	pages[oldest].page = page;
 	pages[oldest].bank = bank;
+	pages[oldest].screen = view_screen;
 	pages[oldest].palette_base = layer->palette_base;
 	pages[oldest].shift = layer->shift;
 	pages[oldest].made = true;
@@ -390,7 +405,7 @@ static void draw_tilemap(const s32_scene *scene, const s32_scene_layer *layer)
 {
 	const s32_scene_tilemap *map = &scene->tilemaps[layer->index - S32_SCENE_NBG0];
 	const s32_scene_clip *clip = &scene->clips[layer->index];
-	const int left = (scene->width - SCREEN_WIDTH) / 2;
+	const int left = (scene->width - view_width) / 2;
 	bool page_seen[PAGE_SLOTS];
 
 	memset(page_seen, 0, sizeof(page_seen));
@@ -415,7 +430,7 @@ static void draw_tilemap(const s32_scene *scene, const s32_scene_layer *layer)
 		for (int span = 0; span < windows->count; span++)
 		{
 			const int edge = eye != 0.0f ? EDGE : 0;
-			const int reach = SCREEN_WIDTH + edge;
+			const int reach = view_width + edge;
 			int x = windows->spans[span][0] - left;
 			const int end = windows->spans[span][1] - left < reach ? windows->spans[span][1] - left : reach;
 			int column;
@@ -484,7 +499,7 @@ static void draw_text(const s32_scene *scene, const s32_scene_layer *layer)
 	const uint16_t *cells = (const uint16_t *)&s32_board.video_ram[((uint32_t)(scene->text_control >> 4) & 0x1f) << 12];
 	const uint8_t *characters = &s32_board.video_ram[(uint32_t)(scene->text_control & 7) << 14];
 	const uint32_t key = (uint32_t)layer->palette_base << 8 | layer->shift << 4 | (scene->text_control & 7);
-	const int left = (scene->width - SCREEN_WIDTH) / 2, shown = scene->width - 2 * scene->side;
+	const int left = (scene->width - view_width) / 2, shown = scene->width - 2 * scene->side;
 	const int first = vertex_count;
 	bool changed = false;
 
@@ -528,7 +543,7 @@ static void draw_bitmap(const s32_scene *scene, const s32_scene_layer *layer)
 	const s32_scene_clip *clip = &scene->clips[S32_SCENE_BITMAP];
 	const int row_bytes = scene->bitmap_bits8 ? 512 : 256;
 	const int rows = scene->bitmap_bits8 ? PAGE_HEIGHT : BITMAP_HEIGHT;
-	const int left = (scene->width - SCREEN_WIDTH) / 2;
+	const int left = (scene->width - view_width) / 2;
 	const int first = vertex_count;
 	const bool all = key != bitmap_key || bitmap_palette_seen != palette_version;
 	uint16_t *texels = (uint16_t *)bitmap_texture.data;
@@ -576,7 +591,7 @@ static void draw_bitmap(const s32_scene *scene, const s32_scene_layer *layer)
 		for (int span = 0; span < clip->rows[y].count; span++)
 		{
 			const int x = clip->rows[y].spans[span][0] - left < 0 ? 0 : clip->rows[y].spans[span][0] - left;
-			const int end = clip->rows[y].spans[span][1] - left < SCREEN_WIDTH ? clip->rows[y].spans[span][1] - left : SCREEN_WIDTH;
+			const int end = clip->rows[y].spans[span][1] - left < view_width ? clip->rows[y].spans[span][1] - left : view_width;
 			const float column = (float)(x + left - scene->side + scene->bitmap_x);
 
 			if (x < end)
@@ -742,7 +757,7 @@ static float sprite_shift(const s32_scene_sprite *sprite)
 /* The sprite's texture on the screen, inside its clip */
 static void add_sprite(const s32_scene *scene, const s32_scene_sprite *sprite, const sprite_slot *slot)
 {
-	const int left = (scene->width - SCREEN_WIDTH) / 2;
+	const int left = (scene->width - view_width) / 2;
 	const float texture_right = (float)(sprite->words * (sprite->bits8 ? 4 : 8)) / slot->texture.width;
 	const float texture_bottom = (float)sprite->rows / slot->texture.height;
 	const float across = texture_right / sprite->width, down = texture_bottom / sprite->height;
@@ -782,7 +797,8 @@ static void add_sprite(const s32_scene *scene, const s32_scene_sprite *sprite, c
 			v1 = swap;
 		}
 	}
-	add_quad((float)(x0 - left) + sprite_shift(sprite), (float)(y0 + TOP), (float)(x1 + 1 - x0), (float)(y1 + 1 - y0), u0, v0, u1, v1, OPAQUE);
+	add_quad(sprite_x + ((float)(x0 - left) + sprite_shift(sprite)) * sprite_scale, sprite_y + (float)(y0 + TOP) * sprite_scale,
+		(float)(x1 + 1 - x0) * sprite_scale, (float)(y1 + 1 - y0) * sprite_scale, u0, v0, u1, v1, OPAQUE);
 }
 
 /* The depth of the layer 'above' layers from the top: over the backdrop, under nothing; a sprite with that many over
@@ -792,55 +808,95 @@ static float layer_depth(const s32_scene *scene, float above)
 	return ((float)scene->layer_count - above) / ((float)scene->layer_count + 2.0f);
 }
 
-/* The sprites in the list's order */
+/* A sprite and its shadow */
+static void draw_sprite(const s32_scene *scene, const s32_scene_sprite *sprite)
+{
+	static uint16_t colours[256];
+	const int first = vertex_count;
+	const sprite_slot *slot;
+	bool shadowed = false;
+	int group = -1;
+	const uint32_t key = sprite_colours(scene, sprite, colours, &shadowed, &group);
+
+	/* (a group the mixer puts behind the backdrop never shows: the game hides sprites so) */
+	if (group < 0 || scene->sprites_above[group] >= scene->layer_count)
+		return;
+	depth = layer_depth(scene, (float)scene->sprites_above[group] - 0.5f);
+	if ((slot = sprite_texture(sprite, key, colours, false)) != NULL)
+	{
+		if (sprite->ghost)
+		{
+			C3D_BlendingColor(0x7F000000u);
+			C3D_AlphaBlend(GPU_BLEND_ADD, GPU_BLEND_ADD, GPU_CONSTANT_ALPHA, GPU_ONE_MINUS_CONSTANT_ALPHA, GPU_ONE, GPU_ZERO);
+		}
+		add_sprite(scene, sprite, slot);
+		C3D_TexBind(0, &slot->texture);
+		draw_added(first);
+		if (sprite->ghost)
+			C3D_AlphaBlend(GPU_BLEND_ADD, GPU_BLEND_ADD, GPU_ONE, GPU_ZERO, GPU_ONE, GPU_ZERO);
+	}
+	if (shadowed && (slot = sprite_texture(sprite, key ^ SHADOW_KEY, colours, true)) != NULL)
+	{
+		const int shadow_first = vertex_count;
+
+		add_sprite(scene, sprite, slot);
+		C3D_TexBind(0, &slot->texture);
+		C3D_BlendingColor(0x7F000000u);
+		C3D_AlphaBlend(GPU_BLEND_ADD, GPU_BLEND_ADD, GPU_ZERO, GPU_CONSTANT_ALPHA, GPU_ONE, GPU_ZERO);
+		draw_added(shadow_first);
+		C3D_AlphaBlend(GPU_BLEND_ADD, GPU_BLEND_ADD, GPU_ONE, GPU_ZERO, GPU_ONE, GPU_ZERO);
+	}
+}
+
+/* The monitor's sprites in the list's order */
 static void draw_sprites(const s32_scene *scene)
 {
 	for (int index = 0; index < scene->sprite_count; index++)
+		if (scene->sprites[index].screen == scene->screen)
+			draw_sprite(scene, &scene->sprites[index]);
+}
+
+static bool speedometer_sprite(const s32_scene *race, const s32_scene_sprite *sprite)
+{
+	return sprite->screen == race->screen && sprite->x >= SPEED_LEFT && sprite->y >= SPEED_TOP
+		&& sprite->width == sprite->words * (sprite->bits8 ? 4 : 8) && sprite->height == sprite->rows;
+}
+
+/* The race's speedometer, its own sprites at the frame's bottom right, larger in the bottom screen's corner */
+static void draw_speedometer(const s32_scene *race)
+{
+	const int left = (race->width - TOP_WIDTH) / 2;
+	int right = 0, bottom = 0;
+
+	for (int index = 0; index < race->sprite_count; index++)
 	{
-		const s32_scene_sprite *sprite = &scene->sprites[index];
-		const int first = vertex_count;
-		static uint16_t colours[256];
-		const sprite_slot *slot;
-		bool shadowed = false;
-		int group = -1;
-		uint32_t key;
+		const s32_scene_sprite *sprite = &race->sprites[index];
 
-		key = sprite_colours(scene, sprite, colours, &shadowed, &group);
-		/* (a group the mixer puts behind the backdrop never shows: the game hides sprites so) */
-		if (group < 0 || scene->sprites_above[group] >= scene->layer_count)
-			continue;
-		depth = layer_depth(scene, (float)scene->sprites_above[group] - 0.5f);
-		if ((slot = sprite_texture(sprite, key, colours, false)) != NULL)
+		if (speedometer_sprite(race, sprite))
 		{
-			if (sprite->ghost)
-			{
-				C3D_BlendingColor(0x7F000000u);
-				C3D_AlphaBlend(GPU_BLEND_ADD, GPU_BLEND_ADD, GPU_CONSTANT_ALPHA, GPU_ONE_MINUS_CONSTANT_ALPHA, GPU_ONE, GPU_ZERO);
-			}
-			add_sprite(scene, sprite, slot);
-			C3D_TexBind(0, &slot->texture);
-			draw_added(first);
-			if (sprite->ghost)
-				C3D_AlphaBlend(GPU_BLEND_ADD, GPU_BLEND_ADD, GPU_ONE, GPU_ZERO, GPU_ONE, GPU_ZERO);
-		}
-		if (shadowed && (slot = sprite_texture(sprite, key ^ SHADOW_KEY, colours, true)) != NULL)
-		{
-			const int shadow_first = vertex_count;
-
-			add_sprite(scene, sprite, slot);
-			C3D_TexBind(0, &slot->texture);
-			C3D_BlendingColor(0x7F000000u);
-			C3D_AlphaBlend(GPU_BLEND_ADD, GPU_BLEND_ADD, GPU_ZERO, GPU_CONSTANT_ALPHA, GPU_ONE, GPU_ZERO);
-			draw_added(shadow_first);
-			C3D_AlphaBlend(GPU_BLEND_ADD, GPU_BLEND_ADD, GPU_ONE, GPU_ZERO, GPU_ONE, GPU_ZERO);
+			right = sprite->x + sprite->width > right ? sprite->x + sprite->width : right;
+			bottom = sprite->y + sprite->height > bottom ? sprite->y + sprite->height : bottom;
 		}
 	}
+	sprite_scale = SPEED_SCALE;
+	sprite_x = (float)(BOTTOM_WIDTH - SPEED_GAP) - (float)(right - left) * SPEED_SCALE;
+	sprite_y = (float)(SCREEN_HEIGHT - TOP - SPEED_GAP) - (float)(bottom + TOP) * SPEED_SCALE;
+	C3D_DepthTest(false, GPU_ALWAYS, GPU_WRITE_COLOR);
+	for (int index = 0; index < race->sprite_count; index++)
+		if (speedometer_sprite(race, &race->sprites[index]))
+			draw_sprite(race, &race->sprites[index]);
+	C3D_DepthTest(true, GPU_GREATER, GPU_WRITE_ALL);
+	sprite_scale = 1.0f;
+	sprite_x = sprite_y = 0.0f;
 }
 
 /* ---- the frame ---- */
 
 static void draw_layer(const s32_scene *scene, const s32_scene_layer *layer)
 {
+	/* (one texture each, the race's: the other monitor's map has neither) */
+	if (scene->screen != 0 && (layer->index == S32_SCENE_TEXT || layer->index == S32_SCENE_BITMAP))
+		return;
 	set_shading(layer->offsets, true);
 	set_blending(scene, layer->blended);
 	if (layer->index >= S32_SCENE_NBG0 && layer->index < S32_SCENE_BITMAP)
@@ -865,18 +921,28 @@ static void draw_backdrop(const s32_scene *scene)
 
 		while (y + height < S32_VIDEO_HEIGHT && scene->backdrop[y + height] == scene->backdrop[y])
 			height++;
-		add_quad(0.0f, (float)(y + TOP), SCREEN_WIDTH, (float)height, 0.0f, 0.0f, 0.0f, 0.0f, vertex_colour(scene->backdrop[y]));
+		add_quad(0.0f, (float)(y + TOP), view_width, (float)height, 0.0f, 0.0f, 0.0f, 0.0f, vertex_colour(scene->backdrop[y]));
 		y += height;
 	}
 	draw_added(first);
 }
 
-/* The scene for one eye */
-static void draw_eye(const s32_scene *scene, C3D_RenderTarget *on)
+/* The screen drawn on, and the monitor it shows */
+static void set_view(int width, int screen)
+{
+	view_width = width;
+	view_screen = screen;
+	Mtx_OrthoTilt(&projection, 0.0f, (float)width, SCREEN_HEIGHT, 0.0f, 1.0f, -1.0f, true);    /* (citro2d's: nearer, more) */
+	C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, projection_at, &projection);
+	C3D_SetScissor(GPU_SCISSOR_NORMAL, TOP, 0, SCREEN_HEIGHT - TOP, (u32)width);
+}
+
+/* The scene for one eye, or the bottom screen */
+static void draw_view(const s32_scene *scene, C3D_RenderTarget *on)
 {
 	C3D_RenderTargetClear(on, C3D_CLEAR_ALL, 0x000000FF, 0);
 	C3D_FrameDrawOn(on);
-	if (!scene->on)
+	if (!scene || !scene->on)
 		return;
 	draw_backdrop(scene);
 	for (int index = scene->layer_count - 2; index >= 0; index--)
@@ -891,7 +957,7 @@ static void draw_eye(const s32_scene *scene, C3D_RenderTarget *on)
 	C3D_DepthTest(true, GPU_GREATER, GPU_WRITE_ALL);
 }
 
-void gpu_draw(const s32_scene *scene)
+void gpu_draw(const s32_scene *scene, const s32_scene *beside)
 {
 	const float slider = osGet3DSliderState();
 	C3D_BufInfo *buffers;
@@ -905,18 +971,26 @@ void gpu_draw(const s32_scene *scene)
 	BufInfo_Init(buffers);
 	BufInfo_Add(buffers, vertices[vertex_list], sizeof(vertex), 3, 0x210);
 	gfxSet3D(slider > 0.0f);
+	watch_palette();
 	if (scene->on)
-	{
-		watch_palette();
 		find_road(scene);
-	}
+	set_view(TOP_WIDTH, 0);
 	/* (into the screen: what is far moves left for the left eye) */
 	eye = -slider * EYE_MOST;
-	draw_eye(scene, target);
+	draw_view(scene, target);
 	if (slider > 0.0f)
 	{
 		eye = slider * EYE_MOST;
-		draw_eye(scene, target_right);
+		draw_view(scene, target_right);
+	}
+	eye = 0.0f;
+	set_view(BOTTOM_WIDTH, 1);
+	draw_view(beside, target_bottom);
+	if (beside && scene->on)
+	{
+		set_shading(scene->sprite_offsets, true);
+		set_blending(scene, false);
+		draw_speedometer(scene);
 	}
 	C3D_FrameEnd(0);
 }
@@ -929,17 +1003,17 @@ void gpu_open(void)
 		for (int x = 0; x < 8; x++)
 			morton[y][x] = (uint8_t)((x & 1) | (y & 1) << 1 | (x & 2) << 1 | (y & 2) << 2 | (x & 4) << 2 | (y & 4) << 3);
 	C3D_Init(CMDBUF_SIZE);
-	target = C3D_RenderTargetCreate(SCREEN_HEIGHT, SCREEN_WIDTH, GPU_RB_RGBA8, GPU_RB_DEPTH24_STENCIL8);
+	target = C3D_RenderTargetCreate(SCREEN_HEIGHT, TOP_WIDTH, GPU_RB_RGBA8, GPU_RB_DEPTH24_STENCIL8);
 	C3D_RenderTargetSetOutput(target, GFX_TOP, GFX_LEFT, TRANSFER_FLAGS);
-	target_right = C3D_RenderTargetCreate(SCREEN_HEIGHT, SCREEN_WIDTH, GPU_RB_RGBA8, GPU_RB_DEPTH24_STENCIL8);
+	target_right = C3D_RenderTargetCreate(SCREEN_HEIGHT, TOP_WIDTH, GPU_RB_RGBA8, GPU_RB_DEPTH24_STENCIL8);
 	C3D_RenderTargetSetOutput(target_right, GFX_TOP, GFX_RIGHT, TRANSFER_FLAGS);
+	target_bottom = C3D_RenderTargetCreate(SCREEN_HEIGHT, BOTTOM_WIDTH, GPU_RB_RGBA8, GPU_RB_DEPTH24_STENCIL8);
+	C3D_RenderTargetSetOutput(target_bottom, GFX_BOTTOM, GFX_LEFT, TRANSFER_FLAGS);
 	shader_data = DVLB_ParseFile((u32 *)outrunners_shader_shbin, outrunners_shader_shbin_size);
 	shaderProgramInit(&shader);
 	shaderProgramSetVsh(&shader, &shader_data->DVLE[0]);
 	C3D_BindProgram(&shader);
 	projection_at = shaderInstanceGetUniformLocation(shader.vertexShader, "projection");
-	Mtx_OrthoTilt(&projection, 0.0f, SCREEN_WIDTH, SCREEN_HEIGHT, 0.0f, 1.0f, -1.0f, true);    /* (citro2d's: nearer, more) */
-	C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, projection_at, &projection);
 	attributes = C3D_GetAttrInfo();
 	AttrInfo_Init(attributes);
 	AttrInfo_AddLoader(attributes, 0, GPU_FLOAT, 3);
@@ -955,7 +1029,6 @@ void gpu_open(void)
 	C3D_DepthTest(true, GPU_GREATER, GPU_WRITE_ALL);
 	C3D_CullFace(GPU_CULL_NONE);
 	C3D_AlphaTest(true, GPU_GREATER, 0);
-	C3D_SetScissor(GPU_SCISSOR_NORMAL, TOP, 0, SCREEN_HEIGHT - TOP, SCREEN_WIDTH);
 }
 
 void gpu_close(void)

@@ -9,6 +9,7 @@
  *    GPU above, board below.
  */
 #include "gpu.h"
+#include "console.h"
 
 #include "s32/machine.h"
 #include "s32/video.h"
@@ -28,7 +29,7 @@
 
 void s32_video_check_pixel(int x, int y);
 
-static s32_scene scene;
+static s32_scene scene, beside;
 static unsigned long total_wrong, total_frames, window_wrong, window_worst;
 static int dumps;
 
@@ -85,6 +86,61 @@ static void dump(int frame, const uint32_t *board, int wrong)
 	fclose(file);
 }
 
+/* The bottom screen beside the other monitor's board frame */
+static void check_bottom_screen(int frame)
+{
+	static int reported;
+	int width;
+	const uint32_t *board = s32_video_frame(1, &width);
+	const char *folder = getenv("CHECK_DIR");
+	int wrong = 0;
+
+	board += (width - 320) / 2;
+	for (int y = 0; y < HEIGHT; y++)
+		for (int x = 0; x < 320; x++)
+		{
+			const uint32_t pixel = board[y * S32_VIDEO_MAX_WIDTH + x];
+			const uint8_t *gpu = check_bottom[y + TOP][x];
+
+			wrong += abs(((int)((pixel >> 16) & 0xff) >> 3) - (gpu[0] >> 3)) > 1 || abs(((int)((pixel >> 8) & 0xff) >> 3) - (gpu[1] >> 3)) > 1
+				|| abs(((int)(pixel & 0xff) >> 3) - (gpu[2] >> 3)) > 1;
+		}
+	if (reported++ % 300 == 0)
+	{
+		printf("bottom frame %d: %d wrong (of 71680)\n", frame, wrong);
+		if (folder)
+		{
+			char path[512];
+			FILE *file;
+
+			snprintf(path, sizeof(path), "%s/bottom_%06d.ppm", folder, frame);
+			if ((file = fopen(path, "wb")) != NULL)
+			{
+				fprintf(file, "P6 640 224 255\n");
+				for (int y = 0; y < HEIGHT; y++)
+				{
+					for (int x = 0; x < 320; x++)
+					{
+						const uint32_t pixel = board[y * S32_VIDEO_MAX_WIDTH + x];
+						const uint8_t bytes[3] = { (uint8_t)(pixel >> 16), (uint8_t)(pixel >> 8), (uint8_t)pixel };
+
+						fwrite(check_bottom[y + TOP][x], 1, 3, file);
+						(void)bytes;
+					}
+					for (int x = 0; x < 320; x++)
+					{
+						const uint32_t pixel = board[y * S32_VIDEO_MAX_WIDTH + x];
+						const uint8_t bytes[3] = { (uint8_t)(pixel >> 16), (uint8_t)(pixel >> 8), (uint8_t)pixel };
+
+						fwrite(bytes, 1, 3, file);
+					}
+				}
+				fclose(file);
+			}
+		}
+	}
+}
+
 void scene_check_frame(void)
 {
 	static bool open;
@@ -97,12 +153,21 @@ void scene_check_frame(void)
 	{
 		open = true;
 		s32_video_use_scene();
+		console_side_map_wanted(true);
 		gpu_open();
 		return;
 	}
-	s32_video_scene(&scene);
-	gpu_draw(&scene);
-	if (getenv("CHECK_AT") && atoi(getenv("CHECK_AT")) == frame)
+	{
+		const bool map = console_side_map_shown();
+
+		s32_video_scene(&scene, 0);
+		if (map)
+			s32_video_scene(&beside, 1);
+		gpu_draw(&scene, map ? &beside : NULL);
+		if (map)
+			check_bottom_screen(frame);
+	}
+	if (0)
 	{
 		int px = atoi(getenv("CHECK_X")), py = atoi(getenv("CHECK_Y"));
 

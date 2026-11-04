@@ -16,7 +16,8 @@
 void gpu_open(void);
 void gpu_close(void);
 
-/* The scene on the top screen */
-void gpu_draw(const s32_scene *scene);
+/* The scene on the top screen, and 'beside' (the cabinet's other monitor, or NULL) on the bottom one with the speedometer
+   of 'scene' over it */
+void gpu_draw(const s32_scene *scene, const s32_scene *beside);
 
 #endif

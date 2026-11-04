@@ -55,12 +55,14 @@ static inline C3D_AttrInfo *C3D_GetAttrInfo(void) { static C3D_AttrInfo it; retu
 static inline void AttrInfo_Init(C3D_AttrInfo *a) { (void)a; }
 static inline void AttrInfo_AddLoader(C3D_AttrInfo *a, int r, GPU_FORMATS f, int n) { (void)a; (void)r; (void)f; (void)n; }
 static inline void C3D_BindProgram(shaderProgram_s *s) { (void)s; }
+#define S32_SCREENS_FAKE
 static inline void Mtx_OrthoTilt(C3D_Mtx *m, float a, float b, float c, float d, float e, float f, bool g) { (void)m; (void)a; (void)b; (void)c; (void)d; (void)e; (void)f; (void)g; }
 static inline void C3D_FVUnifMtx4x4(GPU_SHADER_TYPE t, int at, C3D_Mtx *m) { (void)t; (void)at; (void)m; }
 void C3D_DepthTest(bool e, GPU_TESTFUNC f, GPU_WRITEMASK w);
 static inline void C3D_CullFace(GPU_CULLMODE m) { (void)m; }
 static inline void C3D_AlphaTest(bool e, GPU_TESTFUNC f, int r) { (void)e; (void)f; (void)r; }
-static inline void C3D_SetScissor(GPU_SCISSORMODE m, int a, int b, int c, int d) { (void)m; (void)a; (void)b; (void)c; (void)d; }
+static inline void C3D_SetScissor(GPU_SCISSORMODE m, int a, int b, int c, unsigned d) { (void)m; (void)a; (void)b; (void)c; (void)d; }
 /* the picture: 400 x 240, red, green, blue of 0-255 */
 extern uint8_t check_screen[240][400][3];
+extern uint8_t check_bottom[240][320][3];
 #endif
