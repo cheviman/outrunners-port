@@ -211,27 +211,6 @@ uint16_t s32_video_scene_sprite_color(const s32_scene_sprite *sprite, uint16_t p
 uint32_t s32_video_scene_sprite_word(const s32_scene_sprite *sprite, uint32_t address);
 #endif
 
-#ifdef S32_VIDEO_STATS
-/* What the frames took, for a port tuning its renderer: time in ticks, and what the sprites and the mixer saw */
-typedef struct
-{
-	uint64_t ticks_layers, ticks_mix;
-	uint32_t frames;
-	uint32_t sprites, shadows, indirect, from_ram, bits8, pixels, unique;
-	uint32_t blended_frames, offset_frames, clipped_frames;
-	uint32_t layer_frames[8];
-	uint32_t row_scroll_frames[4];          /* NBG2 and 3's row scroll, then their row select */
-	uint32_t zoom_frames[2];                /* NBG0 and 1 zoomed */
-	uint64_t ticks_layer[6];                /* by LAYER_ */
-	uint32_t pages_changed, palette_changed;
-	uint32_t bitmap_pages_changed;          /* of video RAM's first 0x20000 bytes, in 0x400 */
-	char order[16];                         /* the last frame's mixer, top down: T 0 1 2 3 B S D */
-	uint8_t groups;
-} s32_video_stats_t;
-extern s32_video_stats_t s32_video_stats;
-uint64_t s32_video_stats_now(void);
-#endif
-
 /* For tools that look at what the sprites are drawn with (the asset extractor's census): called for every
    sprite the list draws, before it is drawn, with the screen it goes to, its graphics' place in the sprite
    ROM (32-bit words, bank << 20 | offset), its size in words and rows, whether it is 8 bits a pen, whether it

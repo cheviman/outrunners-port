@@ -30,14 +30,10 @@
 
 #include <3ds.h>
 
-#include <arpa/inet.h>
 #include <malloc.h>
-#include <netinet/in.h>
-#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/socket.h>
 #include <sys/stat.h>
 
 #define FOLDER           "sdmc:/3ds/outrunners/"
@@ -66,11 +62,6 @@
 #define SOUND_SAMPLES    2048        /* stereo samples a buffer, at most */
 #define TICKS_FRAME      (SYSCLOCK_ARM11 / 60)
 #define TICKS_BEHIND     (SYSCLOCK_ARM11 / 4)
-#define STATS_FRAMES     120
-#define LOG_PORT         17777       /* where ORUNNERS_3DS_LOG_HOST hears the game's log, a development aid */
-#define HEARTBEAT_NS     1000000000LL
-#define PICTURE_PORT     17778       /* where it hears the frames Y sends: the GPU's and the board's, row by row */
-#define PICTURE_RASTER_FRAMES 3      /* drawn into the sprites' buffers before the frame compared */
 #define SAVE_FRAMES      3600        /* a minute: the SD card takes seconds */
 #define SAVE_PRIORITY    0x38
 #define SAVE_STACK       0x8000
@@ -89,124 +80,13 @@ static ndspWaveBuf sound_buffers[SOUND_BUFFERS];
 static int16_t *sound_memory;
 static bool sound_on;
 
-static u64 frame_start, ticks_video, ticks_show, ticks_sound, ticks_frame, ticks_most, ticks_board_sound, stats_start;
-static u64 ticks_input, ticks_plain;      /* the controls' share; whole frames that drew nothing */
-static int skipped, frames_drawn, frames_plain;
-static bool frame_drawn;
+static int skipped;
 static void (*board_time_passes)(uint64_t until);
 static void (*board_sound_reset)(bool held);
 static LightSemaphore sound_frames, sound_room;    /* frames waiting for the sound board, and room for more */
 static uint64_t sound_queue[SOUND_QUEUE];
 static int sound_next, sound_last;
 static volatile bool sound_quit;
-
-/* What the game is doing, for the heartbeat: a hung game says where */
-static volatile const char *stage = "starting";
-static volatile bool saving;    /* the file and the socket calls share a table of handles that no lock keeps */
-
-#ifdef ORUNNERS_3DS_LOG_HOST
-static int log_socket = -1;
-static struct sockaddr_in log_address;
-#endif
-
-static void say(bool on_screen, const char *format, ...);
-
-#ifdef ORUNNERS_3DS_LOG_HOST
-static int picture_wait;             /* frames until the picture: Y asks for it */
-
-/* A row of a picture to the computer: which picture, which row, 400 x 3 bytes */
-static void send_row(int which, int row, const uint8_t *bytes)
-{
-	static uint8_t packet[4 + SCREEN_WIDTH * 3];
-	struct sockaddr_in to = log_address;
-
-	to.sin_port = htons(PICTURE_PORT);
-	packet[0] = 'P';
-	packet[1] = (uint8_t)which;
-	packet[2] = (uint8_t)(row >> 8);
-	packet[3] = (uint8_t)row;
-	memcpy(packet + 4, bytes, SCREEN_WIDTH * 3);
-	sendto(log_socket, packet, sizeof(packet), 0, (struct sockaddr *)&to, sizeof(to));
-	svcSleepThread(1500000);
-}
-
-/* What the GPU's frame is on the screen, and what the board's video makes of the same frame, row by row */
-static void send_pictures(const s32_scene *scene)
-{
-	static uint8_t row_bytes[SCREEN_WIDTH * 3];
-	int width;
-	const uint32_t *board;
-	const uint32_t *screen;
-
-	gpu_draw(scene);
-	gpu_wait();
-	gpu_draw(scene);
-	gpu_wait();
-	gspWaitForVBlank();
-	gspWaitForVBlank();
-	screen = (const uint32_t *)gfxGetFramebuffer(GFX_TOP, GFX_LEFT, NULL, NULL);
-	GSPGPU_InvalidateDataCache((void *)screen, SCREEN_WIDTH * SCREEN_HEIGHT * 4);
-	for (int y = 0; y < SCREEN_HEIGHT; y++)
-	{
-		for (int x = 0; x < SCREEN_WIDTH; x++)
-		{
-			const uint32_t pixel = screen[x * SCREEN_HEIGHT + (SCREEN_HEIGHT - 1 - y)];
-
-			row_bytes[x * 3] = (uint8_t)(pixel >> 24);
-			row_bytes[x * 3 + 1] = (uint8_t)(pixel >> 16);
-			row_bytes[x * 3 + 2] = (uint8_t)(pixel >> 8);
-		}
-		send_row(0, y, row_bytes);
-	}
-	board = s32_video_frame(0, &width);
-	board += (width - SCREEN_WIDTH) / 2;
-	for (int y = 0; y < S32_VIDEO_HEIGHT; y++)
-	{
-		for (int x = 0; x < SCREEN_WIDTH; x++)
-		{
-			const uint32_t pixel = board[y * S32_VIDEO_MAX_WIDTH + x];
-
-			row_bytes[x * 3] = (uint8_t)(pixel >> 16);
-			row_bytes[x * 3 + 1] = (uint8_t)(pixel >> 8);
-			row_bytes[x * 3 + 2] = (uint8_t)pixel;
-		}
-		send_row(1, y + (SCREEN_HEIGHT - S32_VIDEO_HEIGHT) / 2, row_bytes);
-	}
-	say(false, "picture sent, frame %llu", (unsigned long long)program_frames());
-}
-#endif
-
-/* A line on the bottom screen and, in a development build, to the computer */
-static void say(bool on_screen, const char *format, ...)
-{
-	char line[160];
-	va_list arguments;
-
-	va_start(arguments, format);
-	vsnprintf(line, sizeof(line), format, arguments);
-	va_end(arguments);
-	if (on_screen)
-	{
-		printf("%s\n", line);
-		gfxFlushBuffers();
-	}
-#ifdef ORUNNERS_3DS_LOG_HOST
-	if (log_socket >= 0 && !saving)
-		sendto(log_socket, line, strlen(line), 0, (struct sockaddr *)&log_address, sizeof(log_address));
-#endif
-}
-
-#ifdef ORUNNERS_3DS_LOG_HOST
-static void heartbeat_thread(void *unused)
-{
-	(void)unused;
-	for (;;)
-	{
-		svcSleepThread(HEARTBEAT_NS);
-		say(false, "beat frame=%llu stage=%s", (unsigned long long)program_frames(), (const char *)stage);
-	}
-}
-#endif
 
 /* ---- files ---- */
 
@@ -272,12 +152,8 @@ static void save_thread(void *unused)
 	for (;;)
 	{
 		FILE *output;
-		u64 start;
 
 		LightEvent_Wait(&save_go);
-		saving = true;
-		svcSleepThread(HEARTBEAT_NS / 50);    /* (a line being sent goes first) */
-		start = svcGetSystemTick();
 		if (eeprom_waiting && (output = fopen(eeprom_path, "wb")) != NULL)
 		{
 			fwrite(eeprom_kept, 1, sizeof(eeprom_kept), output);
@@ -288,8 +164,7 @@ static void save_thread(void *unused)
 			fwrite(backup_ram_kept, 1, sizeof(backup_ram_kept), output);
 			fclose(output);
 		}
-		eeprom_waiting = backup_ram_waiting = saving = false;
-		say(false, "saved in %.0f ms", (svcGetSystemTick() - start) * 1000.0 / SYSCLOCK_ARM11);
+		eeprom_waiting = backup_ram_waiting = false;
 	}
 }
 
@@ -319,38 +194,17 @@ static void save_in_the_background(void)
 
 static void on_frame_shown(void)
 {
-	const u64 start = svcGetSystemTick();
 	static s32_scene scene;
-	u64 drawn;
 
 	/* (the game's time comes first: behind it, frames go undrawn) */
-	if (start > next_frame + TICKS_FRAME && skipped < SKIPPED_MOST)
+	if (svcGetSystemTick() > next_frame + TICKS_FRAME && skipped < SKIPPED_MOST)
 	{
 		skipped++;
 		return;
 	}
 	skipped = 0;
-	frames_drawn++;
-	frame_drawn = true;
-	stage = "scene";
-#ifdef ORUNNERS_3DS_LOG_HOST
-	if (picture_wait > 0 && --picture_wait == 0)
-	{
-		s32_video_draw_frame();
-		s32_video_scene(&scene);
-		send_pictures(&scene);
-		s32_video_scene_raster = false;
-		next_frame = svcGetSystemTick();
-		return;
-	}
-#endif
 	s32_video_scene(&scene);
-	drawn = svcGetSystemTick();
-	stage = "gpu";
 	gpu_draw(&scene);
-	stage = "game";
-	ticks_video += drawn - start;
-	ticks_show += svcGetSystemTick() - drawn;
 }
 
 /* ---- the controls ---- */
@@ -375,17 +229,7 @@ static int press(int position, bool held)
 	return position < 0 ? 0 : (position > 0xff ? 0xff : position);
 }
 
-static void read_controls(void);
-
 static void on_controls_update(void)
-{
-	const u64 start = svcGetSystemTick();
-
-	read_controls();
-	ticks_input += svcGetSystemTick() - start;
-}
-
-static void read_controls(void)
 {
 	s32_inputs *input = &s32_board.input;
 	circlePosition circle;
@@ -407,13 +251,6 @@ static void read_controls(void)
 		program_stop();
 		return;
 	}
-#ifdef ORUNNERS_3DS_LOG_HOST
-	if ((hidKeysDown() & KEY_Y) && picture_wait == 0)
-	{
-		s32_video_scene_raster = true;
-		picture_wait = PICTURE_RASTER_FRAMES;
-	}
-#endif
 	if ((keys & KEY_DUP) || circle.dy > CIRCLE_ACTION)
 		held |= ACTION_BIT(ACTION_UP);
 	if ((keys & KEY_DDOWN) || circle.dy < -CIRCLE_ACTION)
@@ -470,7 +307,7 @@ static void open_sound(void)
 
 	if (R_FAILED(ndspInit()))
 	{
-		say(true, "no sound: sdmc:/3ds/dspfirm.cdc?");
+		printf("no sound: sdmc:/3ds/dspfirm.cdc?\n");
 		return;
 	}
 	sound_memory = linearAlloc(SOUND_BUFFERS * SOUND_SAMPLES * 2 * sizeof(int16_t));
@@ -513,34 +350,6 @@ static void queue_sound(const int16_t *mix, size_t count)
 
 /* ---- the frame ---- */
 
-static void log_pace(void)
-{
-	static const double ms = 1000.0 / SYSCLOCK_ARM11;
-	const u64 now = svcGetSystemTick();
-	const u64 frames = program_frames();
-
-	if (frames % STATS_FRAMES != 0)
-		return;
-	if (stats_start)
-		say(true, "%.1f game, %.1f drawn: video %.1f show %.1f snd %.1f wait %.1f all %.1f in %.1f plain %.1f",
-			STATS_FRAMES * (double)SYSCLOCK_ARM11 / (double)(now - stats_start),
-			frames_drawn * (double)SYSCLOCK_ARM11 / (double)(now - stats_start),
-			frames_drawn ? ticks_video * ms / frames_drawn : 0.0, frames_drawn ? ticks_show * ms / frames_drawn : 0.0,
-			ticks_board_sound * ms / STATS_FRAMES, ticks_sound * ms / STATS_FRAMES, ticks_frame * ms / STATS_FRAMES,
-			ticks_input * ms / STATS_FRAMES, frames_plain ? ticks_plain * ms / frames_plain : 0.0);
-	{
-		gpu_stats stats;
-
-		gpu_take_stats(&stats);
-		say(false, "  pages %u tiles %u sprites %u decoded %u quads %u texKB %u skipped %u", stats.pages, stats.tiles,
-			stats.sprites, stats.decoded, stats.quads, stats.sprite_kb, stats.frames_missed);
-	}
-	stats_start = now;
-	ticks_video = ticks_show = ticks_sound = ticks_frame = ticks_most = ticks_board_sound = 0;
-	ticks_input = ticks_plain = 0;
-	frames_drawn = frames_plain = 0;
-}
-
 /* The board's time passing asks nothing of the sound board: sound_thread has it run at the frame's end */
 static void on_time_passes(uint64_t until)
 {
@@ -563,12 +372,10 @@ static void sound_thread(void *unused)
 			break;
 		until = sound_queue[sound_next];
 		sound_next = (sound_next + 1) % SOUND_QUEUE;
-		start = svcGetSystemTick();
 		board_time_passes(until);
 		sound_chips_end_frame(until);
 		mix = sound_chips_frame_mix(&count);
 		queue_sound(mix, count);
-		ticks_board_sound += svcGetSystemTick() - start;
 		LightSemaphore_Release(&sound_room, 1);
 	}
 }
@@ -584,36 +391,16 @@ static void on_sound_reset(bool held)
 
 static void on_frame_done(void)
 {
-	const u64 start = svcGetSystemTick();
 	u64 now;
 
 	/* (this frame's sound queued for its core, which works on through the frames the video takes long over) */
-	stage = "waiting for sound";
 	LightSemaphore_Acquire(&sound_room, 1);
-	stage = "pacing";
 	sound_queue[sound_last] = s32_board.cycles;
 	sound_last = (sound_last + 1) % SOUND_QUEUE;
 	LightSemaphore_Release(&sound_frames, 1);
-	now = svcGetSystemTick();
-	ticks_sound += now - start;
 	if (program_frames() % SAVE_FRAMES == 0)
 		save_in_the_background();
 	console_network_frame();
-	if (frame_start)
-	{
-		const u64 took = now - frame_start;
-
-		ticks_frame += took;
-		if (took > ticks_most)
-			ticks_most = took;
-		if (!frame_drawn)
-		{
-			ticks_plain += took;
-			frames_plain++;
-		}
-		frame_drawn = false;
-	}
-	log_pace();
 	next_frame += TICKS_FRAME;
 	now = svcGetSystemTick();
 	if (now > next_frame + TICKS_BEHIND)
@@ -623,8 +410,6 @@ static void on_frame_done(void)
 		svcSleepThread((s64)((next_frame - now) * (1000000000.0 / SYSCLOCK_ARM11)));
 		now = svcGetSystemTick();
 	}
-	frame_start = svcGetSystemTick();
-	stage = "game";
 }
 
 static void on_irq_changed(bool asserted)
@@ -662,20 +447,8 @@ int main(int argc, char **argv)
 	consoleInit(GFX_BOTTOM, NULL);
 	gfxSetDoubleBuffering(GFX_BOTTOM, false);
 	gpu_open();
-#ifdef ORUNNERS_3DS_LOG_HOST
-	if (R_SUCCEEDED(socInit((u32 *)memalign(0x1000, 0x40000), 0x40000)))
-	{
-		log_socket = socket(AF_INET, SOCK_DGRAM, 0);
-		log_address.sin_family = AF_INET;
-		log_address.sin_port = htons(LOG_PORT);
-		log_address.sin_addr.s_addr = inet_addr(ORUNNERS_3DS_LOG_HOST);
-		threadCreate(heartbeat_thread, NULL, 0x4000, 0x20, 0, true);
-	}
-#endif
 	mkdir("sdmc:/3ds", 0777);
 	mkdir(FOLDER, 0777);
-	say(true, "OutRunners: linear %u KB free, heap %u KB", (unsigned)(linearSpaceFree() / 1024),
-		(unsigned)(envGetHeapSize() / 1024));
 	console_window_settings.full_screen = true;
 	console_window_settings.wide = WIDE_16_9;
 	console_window_settings.pixels = PIXELS_SHARP;
@@ -687,10 +460,8 @@ int main(int argc, char **argv)
 		problem = assets_load_pack("sdmc:/3ds/outrunners.assets");
 	if (problem)
 		return fail("The game's assets cannot be read:", problem);
-	say(true, "assets loaded");
 	APT_SetAppCpuTimeLimit(CORE1_LIMIT);
 	s32_workers_start(VIDEO_WORKERS);
-	say(true, "video: %d threads beside the game's", s32_workers_count());
 	open_sound();
 
 	s32_board.irq_changed = on_irq_changed;
@@ -725,7 +496,6 @@ int main(int argc, char **argv)
 	program_reset();
 	program_frame_done = on_frame_done;
 	next_frame = svcGetSystemTick();
-	say(true, "running");
 
 	program_run();
 
@@ -737,9 +507,6 @@ int main(int argc, char **argv)
 	save_backup_ram();
 	if (sound_on)
 		ndspExit();
-#ifdef ORUNNERS_3DS_LOG_HOST
-	socExit();
-#endif
 	gpu_close();
 	gfxExit();
 	return 0;

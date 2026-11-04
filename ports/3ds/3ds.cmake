@@ -23,10 +23,6 @@ dkp_add_embedded_binary_library(outrunners_shader_data outrunners_shader)
 
 add_executable(OutRunners ports/3ds/main.c ports/3ds/gpu.c)
 target_link_libraries(OutRunners PRIVATE orunners_game_console orunners_sound outrunners_shader_data citro3d)
-set(ORUNNERS_3DS_LOG_HOST "" CACHE STRING "A computer's IPv4 address that hears the game's log on UDP 17777 (development)")
-if(ORUNNERS_3DS_LOG_HOST)
-	target_compile_definitions(OutRunners PRIVATE ORUNNERS_3DS_LOG_HOST="${ORUNNERS_3DS_LOG_HOST}")
-endif()
 ctr_generate_smdh(OutRunners.smdh NAME "OutRunners" DESCRIPTION "OutRunners" AUTHOR "OutRunners port"
 	ICON ${CMAKE_SOURCE_DIR}/ports/3ds/icon.png)
 ctr_create_3dsx(OutRunners SMDH OutRunners.smdh)

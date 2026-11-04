@@ -37,15 +37,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#ifdef S32_VIDEO_STATS
-s32_video_stats_t s32_video_stats;
-static uint32_t stats_seen[512];
-static uint32_t stats_stamp;
-#define STATS(code) do { code; } while (0)
-#else
-#define STATS(code) do { } while (0)
-#endif
-
 #define WIDTH   S32_VIDEO_MAX_WIDTH
 #define HEIGHT  S32_VIDEO_HEIGHT
 
@@ -531,7 +522,6 @@ static void zoomed_setup(int number, zoomed_layer *zoomed)
 	uint32_t source_y;
 
 	flips_of(number, &flip_x, &flip_y);
-	STATS(s32_video_stats.zoom_frames[number] += x_zoom != 0x200 || y_zoom != 0x200);
 	if (x_zoom < 0x80)
 		x_zoom = 0x80;
 	if (y_zoom < 0x80)
@@ -652,8 +642,6 @@ static void scrolled_setup(int number, scrolled_layer *out)
 	out->y_scroll = video_register(0x16 + 8 * (uint32_t)number) & 0x1ff;
 	out->bank = pages_of(number, out->pages);
 	flips_of(number, &out->flip_x, &out->flip_y);
-	STATS(s32_video_stats.row_scroll_frames[number - 2] += out->row_scroll);
-	STATS(s32_video_stats.row_scroll_frames[number] += out->row_select);
 }
 
 static void draw_scrolled(int number)
@@ -797,13 +785,6 @@ static void observe_tilemap(int number)
 }
 
 /* The layers that are on, of those 'wanted' (LAYER_* bits): the ones the mixers of the screens shown take */
-#ifdef S32_VIDEO_STATS
-#define TIMED(layer, call) do { const uint64_t started = s32_video_stats_now(); call; \
-	s32_video_stats.ticks_layer[layer] += s32_video_stats_now() - started; } while (0)
-#else
-#define TIMED(layer, call) call
-#endif
-
 static int draw_layers(int wanted)
 {
 	const uint16_t control = video_register(0x00);
@@ -813,40 +794,40 @@ static int draw_layers(int wanted)
 
 	if (bit((uint32_t)wanted, LAYER_NBG0) && !bit(off, 0) && !bit(more_off, 1))
 	{
-		TIMED(1, draw_zoomed(0));
+		draw_zoomed(0);
 		if (s32_video_tile_observer != NULL)
 			observe_tilemap(0);
 		drawn |= 1 << LAYER_NBG0;
 	}
 	if (bit((uint32_t)wanted, LAYER_NBG1) && !bit(off, 1) && !bit(more_off, 2))
 	{
-		TIMED(2, draw_zoomed(1));
+		draw_zoomed(1);
 		if (s32_video_tile_observer != NULL)
 			observe_tilemap(1);
 		drawn |= 1 << LAYER_NBG1;
 	}
 	if (bit((uint32_t)wanted, LAYER_NBG2) && !bit(off, 2) && !bit(more_off, 3) && !bit(control, 12))
 	{
-		TIMED(3, draw_scrolled(2));
+		draw_scrolled(2);
 		if (s32_video_tile_observer != NULL)
 			observe_tilemap(2);
 		drawn |= 1 << LAYER_NBG2;
 	}
 	if (bit((uint32_t)wanted, LAYER_NBG3) && !bit(off, 3) && !bit(more_off, 4) && !bit(control, 13))
 	{
-		TIMED(4, draw_scrolled(3));
+		draw_scrolled(3);
 		if (s32_video_tile_observer != NULL)
 			observe_tilemap(3);
 		drawn |= 1 << LAYER_NBG3;
 	}
 	if (bit((uint32_t)wanted, LAYER_TEXT) && !bit(off, 4) && !bit(more_off, 0))
 	{
-		TIMED(0, draw_text());
+		draw_text();
 		drawn |= 1 << LAYER_TEXT;
 	}
 	if (bit((uint32_t)wanted, LAYER_BITMAP) && !bit(off, 5) && !bit(more_off, 5))
 	{
-		TIMED(5, draw_bitmap());
+		draw_bitmap();
 		drawn |= 1 << LAYER_BITMAP;
 	}
 	draw_backdrop();
@@ -1022,24 +1003,6 @@ static int draw_sprite(uint32_t entry, int x_offset, int y_offset, const area *i
 			end_pen == 0, pixels);
 	}
 
-#ifdef S32_VIDEO_STATS
-	if (inside->top == 0 || y_offset == 0x7fffffff)
-	{
-		const uint32_t key = (address ^ (uint32_t)sprite.color * 31u) % 512u;
-
-		s32_video_stats.sprites++;
-		s32_video_stats.shadows += sprite.shadow;
-		s32_video_stats.indirect += sprite.indirect;
-		s32_video_stats.from_ram += from_ram;
-		s32_video_stats.bits8 += sprite.bits8;
-		s32_video_stats.pixels += (uint32_t)width * (uint32_t)height;
-		if (stats_seen[key] != stats_stamp)
-		{
-			stats_seen[key] = stats_stamp;
-			s32_video_stats.unique++;
-		}
-	}
-#endif
 	x_zoom = (((sprite.bits8 ? 4 : 8) * source_width) << 16) / width;
 	y_zoom = (source_height << 16) / height;
 
@@ -1239,7 +1202,6 @@ void s32_video_sprites(bool erase, bool draw)
 	if (draw)
 	{
 		video.shown_sprites ^= 1;
-		STATS(stats_stamp++);
 #ifdef S32_VIDEO_SCENE
 		scene_sprite_counts[video.shown_sprites ^ 1] = 0;
 #endif
@@ -1748,27 +1710,6 @@ static void mix(int screen, int drawn)
 		sprites->offsets = color_offsets(screen, bit(mixer_register(screen, 0x3e), 6), bit(sprite_control, 15));
 	}
 
-#ifdef S32_VIDEO_STATS
-	{
-		static const char names[] = "T0123BSD";
-		bool blended = false, offset = false;
-
-		for (int index = 0; index < 8 && index <= count; index++)
-		{
-			s32_video_stats.order[index] = names[orders[0][index].index];
-			blended |= orders[0][index].blend != 0;
-		}
-		s32_video_stats.order[count + 1] = '\0';
-		for (int channel = 0; channel < 6; channel++)
-			offset |= offsets[channel / 3][channel % 3] != 0;
-		s32_video_stats.blended_frames += blended;
-		s32_video_stats.offset_frames += offset;
-		s32_video_stats.groups = (uint8_t)(grouping.mask + 1);
-		for (int index = 0; index < 8; index++)
-			s32_video_stats.layer_frames[index] += bit((uint32_t)drawn, index);
-		s32_video_stats.clipped_frames += (video_register(0x0a) | video_register(0x0c) | video_register(0x0e)) != 0;
-	}
-#endif
 	setup.screen = screen;
 	setup.blend_factor = blend_factor;
 	setup.grouping = grouping;
@@ -1915,35 +1856,10 @@ void s32_video_check_pixel(int x, int y)
 
 /* ---- the frame ---- */
 
-#ifdef S32_VIDEO_STATS
-/* What changed in the memories since the last frame drawn */
-static void stats_changes(void)
-{
-	#define STATS_PAGE 0x400
-	static uint8_t last_ram[S32_VIDEO_RAM_SIZE];
-	static uint16_t last_palette[S32_PALETTE_ENTRIES];
-
-	for (uint32_t place = 0; place + STATS_PAGE <= S32_VIDEO_RAM_SIZE; place += STATS_PAGE)
-		if (memcmp(last_ram + place, s32_board.video_ram + place, STATS_PAGE) != 0)
-		{
-			if (place < 0x10000)
-				s32_video_stats.bitmap_pages_changed++;
-			else
-				s32_video_stats.pages_changed++;
-		}
-	memcpy(last_ram, s32_board.video_ram, S32_VIDEO_RAM_SIZE);
-	for (uint32_t entry = 0; entry < S32_PALETTE_ENTRIES; entry++)
-		s32_video_stats.palette_changed += last_palette[entry] != s32_board.palette[0][entry];
-	memcpy(last_palette, s32_board.palette[0], sizeof(last_palette));
-}
-#endif
-
 void s32_video_draw_frame(void)
 {
 	const bool board_wide = bit(video_register(0x00), 15);
 	const int width = board_wide ? 416 : 320 + 2 * video.wide_side;
-
-	STATS(stats_changes());
 	video.side = board_wide ? 0 : video.wide_side;
 	video.visible.left = 0;
 	video.visible.right = width - 1;
@@ -1972,24 +1888,8 @@ void s32_video_draw_frame(void)
 			continue;
 		}
 		if (drawn < 0)
-		{
-#ifdef S32_VIDEO_STATS
-			const uint64_t start = s32_video_stats_now();
-#endif
 			drawn = draw_layers(wanted);
-			STATS(s32_video_stats.ticks_layers += s32_video_stats_now() - start);
-		}
-#ifdef S32_VIDEO_STATS
-		{
-			const uint64_t start = s32_video_stats_now();
-
-			mix(screen, drawn);
-			s32_video_stats.ticks_mix += s32_video_stats_now() - start;
-			s32_video_stats.frames++;
-		}
-#else
 		mix(screen, drawn);
-#endif
 	}
 }
 

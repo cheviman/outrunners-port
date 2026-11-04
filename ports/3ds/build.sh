@@ -4,5 +4,5 @@
 set -e
 export DEVKITPRO=/opt/devkitpro DEVKITARM=/opt/devkitpro/devkitARM
 /opt/devkitpro/portlibs/3ds/bin/arm-none-eabi-cmake -S . -B build/3ds -G Ninja -DCMAKE_BUILD_TYPE=Release \
-	-DORUNNERS_REFERENCE_TOOLS=OFF -DORUNNERS_3DS_LOG_HOST="$LOG_HOST"
+	-DORUNNERS_REFERENCE_TOOLS=OFF
 cmake --build build/3ds --target OutRunners_3dsx --parallel 8 2>&1 | tail -20 || cmake --build build/3ds --parallel 8

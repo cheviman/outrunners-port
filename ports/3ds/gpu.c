@@ -124,7 +124,6 @@ static sprite_slot sprites[SPRITE_SLOTS];
 static uint32_t sprite_bytes;
 static uint32_t frame_number;
 static uint32_t text_palette_key, bitmap_key, bitmap_palette_seen;
-static gpu_stats stats;
 
 static inline uint16_t texture_colour(uint16_t colour)
 {
@@ -205,7 +204,6 @@ static void draw_tile(page_slot *slot, const s32_scene_layer *layer, int cell_nu
 	for (int y = 0; y < 16; y++)
 		for (int x = 0; x < 16; x++)
 			texels[texel_at(left + x, top + y, PAGE_WIDTH, PAGE_HEIGHT)] = colours[pens[(flip_y ? 15 - y : y) * 16 + (flip_x ? 15 - x : x)]];
-	stats.tiles++;
 }
 
 static int page_slot_of(int page, int bank, const s32_scene_layer *layer)
@@ -242,7 +240,6 @@ static void update_page(int index, const s32_scene_layer *layer)
 	if (slot->used == frame_number)
 		return;
 	slot->used = frame_number;
-	stats.pages++;
 	for (int cell_number = 0; cell_number < PAGE_CELLS; cell_number++)
 	{
 		const uint16_t cell = cells[cell_number];
@@ -274,7 +271,6 @@ static void add_quad(float x, float y, float width, float height, float u0, floa
 	out[4] = (vertex){ x + width, y, depth, u1, v0, colour };
 	out[5] = out[0];
 	vertex_count += VERTICES_QUAD;
-	stats.quads++;
 }
 
 static void draw_added(int first)
@@ -676,7 +672,6 @@ static void decode_sprite(const s32_scene_sprite *sprite, const uint16_t *colour
 		}
 	}
 	C3D_TexFlush(texture);
-	stats.decoded++;
 }
 
 /* Room for 'bytes' more: the textures unused longest go */
@@ -815,7 +810,6 @@ static void draw_sprites(const s32_scene *scene)
 		if (group < 0 || scene->sprites_above[group] >= scene->layer_count)
 			continue;
 		depth = layer_depth(scene, (float)scene->sprites_above[group] - 0.5f);
-		stats.sprites++;
 		if ((slot = sprite_texture(sprite, key, colours, false)) != NULL)
 		{
 			if (sprite->ghost)
@@ -903,10 +897,7 @@ void gpu_draw(const s32_scene *scene)
 	C3D_BufInfo *buffers;
 
 	if (!C3D_FrameBegin(C3D_FRAME_NONBLOCK))
-	{
-		stats.frames_missed++;
 		return;
-	}
 	frame_number++;
 	vertex_list ^= 1;
 	vertex_count = 0;
@@ -928,19 +919,6 @@ void gpu_draw(const s32_scene *scene)
 		draw_eye(scene, target_right);
 	}
 	C3D_FrameEnd(0);
-}
-
-void gpu_wait(void)
-{
-	C3D_FrameBegin(0);
-	C3D_FrameEnd(0);
-}
-
-void gpu_take_stats(gpu_stats *out)
-{
-	*out = stats;
-	out->sprite_kb = sprite_bytes / 1024;
-	memset(&stats, 0, sizeof(stats));
 }
 
 void gpu_open(void)

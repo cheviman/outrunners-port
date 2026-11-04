@@ -37,9 +37,7 @@ No devkitPro on the computer: Docker's `devkitpro/devkitarm` image does it, from
 docker run --rm -v "$PWD":/src -w /src devkitpro/devkitarm:latest ports/3ds/build.sh
 ```
 
-That makes `build/3ds/OutRunners.3dsx`. `-e LOG_HOST=<a computer's IPv4 address>` makes a development build instead: it
-sends the frames' times to that computer on UDP 17777, and Y sends the frame shown, the GPU's and the board's, on 17778.
-Send a build to the Homebrew Launcher (press Y there) with 3dslink. Only ever send it a .3dsx: Luma's loader takes the
+That makes `build/3ds/OutRunners.3dsx`. Send a build to the Homebrew Launcher (press Y there) with 3dslink. Only ever send it a .3dsx: Luma's loader takes the
 whole console down on anything else.
 
 ```bash
