@@ -39,6 +39,7 @@
 #define RECORD_SIZE         0x80u
 #define ROOMS               8          /* the rooms JOIN lists */
 #define BEACON_FRAMES       30         /* a room's beacon, every half second */
+#define SWEEP_FRAMES        60         /* and once a second, one by one, where broadcasts are refused (net.h) */
 #define ROOM_FORGOTTEN      180        /* a room unheard for 3 seconds is gone from JOIN's list */
 #define JOIN_FRAMES         10         /* JOIN again until the room lists the device */
 #define JOIN_GIVEN_UP       300        /* a room that does not answer in 5 seconds */
@@ -57,7 +58,9 @@
 
 static const uint8_t magic[4] = { 'O', 'R', 'U', 'N' };
 
-enum { PACKET_BEACON = 1, PACKET_JOIN, PACKET_STATE, PACKET_LEAVE };
+/* (PACKET_SEEK: a device that hears no broadcasts asks the rooms' hosts for their beacons; devices that do not
+   know it take it for another room's) */
+enum { PACKET_BEACON = 1, PACKET_JOIN, PACKET_STATE, PACKET_LEAVE, PACKET_SEEK };
 
 /* What a device's STATE says of it (flags) */
 #define BUSY                0x01u      /* a seat of it plays a race */
@@ -481,17 +484,44 @@ static void send_state(void)
 	}
 }
 
+static void put_beacon(writer *out)
+{
+	put_header(out, PACKET_BEACON);
+	put_name(out, net.members[0].name);
+	put8(out, (uint32_t)net.member_count);
+}
+
 static void send_beacon(void)
 {
 	uint8_t bytes[64];
 	writer out = { bytes, 0, sizeof(bytes) };
 	const net_address everyone = { NET_BROADCAST, NET_BEACON_PORT }, here = { NET_LOOPBACK, NET_BEACON_PORT };
 
-	put_header(&out, PACKET_BEACON);
-	put_name(&out, net.members[0].name);
-	put8(&out, (uint32_t)net.member_count);
+	put_beacon(&out);
 	send_to(everyone, &out);
 	send_to(here, &out);    /* (a second game on this computer) */
+	if (net.frame % SWEEP_FRAMES == 0 && !busy() && out.size <= out.room)
+		net_send_sweep(NET_BEACON_PORT, out.bytes, out.size);
+}
+
+/* The room's beacon to a device that asks for it, at the address it asks from */
+static void answer_seek(net_address to)
+{
+	uint8_t bytes[64];
+	writer out = { bytes, 0, sizeof(bytes) };
+
+	put_beacon(&out);
+	send_to(to, &out);
+}
+
+static void send_seek(void)
+{
+	uint8_t bytes[32];
+	writer out = { bytes, 0, sizeof(bytes) };
+
+	put_header(&out, PACKET_SEEK);
+	if (out.size <= out.room)
+		net_send_sweep(NET_SEEK_PORT, out.bytes, out.size);
 }
 
 static void send_join(void)
@@ -681,7 +711,8 @@ static void take_datagrams(void)
 	net_address from;
 	size_t size;
 
-	while ((size = net_receive_beacon(bytes, sizeof(bytes), &from)) > 0 || (size = net_receive(bytes, sizeof(bytes), &from)) > 0)
+	while ((size = net_receive_beacon(bytes, sizeof(bytes), &from)) > 0 || (size = net_receive_seeker(bytes, sizeof(bytes), &from)) > 0
+		|| (size = net_receive(bytes, sizeof(bytes), &from)) > 0)
 	{
 		reader in = { bytes, size, 0, false };
 		uint8_t start[4];
@@ -700,6 +731,12 @@ static void take_datagrams(void)
 		{
 			if (net.role == ROLE_SEARCHING)
 				take_beacon(&in, room, sender, from);
+			continue;
+		}
+		if (kind == PACKET_SEEK)
+		{
+			if (net.role == ROLE_IN_ROOM && hosting())
+				answer_seek(from);
 			continue;
 		}
 		if (room != net.room || net.role == ROLE_OFF || net.role == ROLE_SEARCHING)
@@ -953,6 +990,8 @@ void console_network_frame(void)
 					memmove(&net.rooms[index], &net.rooms[index + 1], sizeof(net.rooms[0]) * (size_t)(net.room_count - index - 1));
 					net.room_count--;
 				}
+			if (net.frame % SWEEP_FRAMES == 0)
+				send_seek();
 			break;
 		case ROLE_JOINING:
 			if (net.frame - net.role_frame > JOIN_GIVEN_UP)
@@ -968,7 +1007,10 @@ void console_network_frame(void)
 				break;
 			}
 			if (hosting() && net.frame % BEACON_FRAMES == 0)
+			{
+				net_listen_seekers();    /* (the room's first host, or the next one: where it takes a device's seek) */
 				send_beacon();
+			}
 			send_state();
 			/* everyone in: the entries closed soon after (machine 1, player 0's record) */
 			if (net.linked && net.machine == 1 && RACE(RACE_1)->entry_frames > ENTRIES_CUT

@@ -63,7 +63,10 @@
 #include "s32/video.h"
 #include "sound/chips.h"
 #include "game/assets.h"
-#ifndef ORUNNERS_HANDHELD    /* (a device makes nothing from the ROM set: its pack comes with the game) */
+/* (a device makes nothing from the ROM set, its pack comes with the game; but iOS, which takes the set from the
+   player, as a computer does: no build of it carries the game's data) */
+#if !defined(ORUNNERS_HANDHELD) || defined(ORUNNERS_IOS)
+#define FIRST_RUN
 #include "first_run.h"
 #include "game/extract.h"
 #endif
@@ -81,6 +84,14 @@
 #endif
 
 #include <SDL.h>
+
+/* The phones: the same picture and the same habits, Android's and iOS's */
+#if defined(__ANDROID__) || defined(ORUNNERS_IOS)
+#define PHONE
+#endif
+#ifdef ORUNNERS_IOS
+#include "ios.h"
+#endif
 
 #ifdef __SWITCH__
 #include <switch.h>        /* romfsInit: the game's own files, its .nro's or .nsp's */
@@ -288,8 +299,8 @@ static void picture_size(int *width, int *height)
 	*height = (screens_stacked() ? 2 : 1) * S32_VIDEO_HEIGHT;
 }
 
-#if defined(ORUNNERS_CONSOLE) && ((defined(ORUNNERS_SCREEN_WIDE) && defined(__ANDROID__)) || defined(ORUNNERS_TOUCH_TEST))
-/* WIDE as the screen's shape asks, the window the whole screen: Android's (OPTIONS has no VIDEO there), and the
+#if defined(ORUNNERS_CONSOLE) && ((defined(ORUNNERS_SCREEN_WIDE) && defined(PHONE)) || defined(ORUNNERS_TOUCH_TEST))
+/* WIDE as the screen's shape asks, the window the whole screen: a phone's (OPTIONS has no VIDEO there), and the
    touch controls' check on a computer, whose window is the phone's screen. The screen can change its shape
    mid-game, a Fold opened or closed (Sebas): WIDE is chosen again then, the picture's new width from the next
    frame (on_controls_update sees it) */
@@ -937,7 +948,7 @@ static void load_window_settings(void)
 static void fix_window_settings(void)
 {
 	console_window_settings.full_screen = true;
-#if defined(ORUNNERS_SCREEN_WIDE) && defined(__ANDROID__)
+#if defined(ORUNNERS_SCREEN_WIDE) && defined(PHONE)
 	{
 		/* (the screen as the renderer has it, once there is one; before it, the display's mode) */
 		SDL_DisplayMode mode;
@@ -1142,9 +1153,9 @@ static void read_events(void)
 				program_stop();    /* (back to main, which saves: the game runs on a task's stack, which a
 				                      longjmp to main's does not leave on Windows) */
 				return;
-#ifdef __ANDROID__
+#ifdef PHONE
 			case SDL_APP_WILLENTERBACKGROUND:
-				/* (Android may end the game there: what it keeps is written; a race waits, paused) */
+				/* (the system may end the game there: what it keeps is written; a race waits, paused) */
 				save_eeprom();
 				save_backup_ram();
 				if (console_can_pause())
@@ -1841,6 +1852,8 @@ static char *saves_folder(void)
 	return SDL_strdup(SWITCH_FOLDER "/");
 #elif defined(__ANDROID__)
 	return SDL_GetPrefPath("", "OutRunners");    /* (the app's own folder, its internal storage) */
+#elif defined(ORUNNERS_IOS)
+	return ios_documents_folder();    /* (the Files app shows it: orunners.zip goes in there too) */
 #elif defined(_WIN32) || defined(ORUNNERS_HANDHELD)
 	return SDL_GetBasePath();    /* (a handheld's: the game's folder on its card) */
 #else
@@ -1870,7 +1883,7 @@ static void read_mappings_file(void)
 
 /* On macOS, the folder the .app is in (the game's base is the .app's Resources folder: where the player sees
    the game is beside the .app); 0 elsewhere */
-#ifndef ORUNNERS_HANDHELD
+#ifdef FIRST_RUN
 /* A folder of assets the first run made for another build of the game (its version.txt; extract_assets.py's
    have none) */
 static bool assets_of_another_version(const char *folder)
@@ -1975,6 +1988,22 @@ int main(int argc, char **argv)
 	}
 	fprintf(stderr, "OutRunners: starting\n");
 	SDL_SetHint(SDL_HINT_ANDROID_TRAP_BACK_BUTTON, "1");    /* (back is the menus' back, never the end) */
+#endif
+#ifdef ORUNNERS_IOS
+	/* (what the game says goes to outrunners.log in its folder, which the Files app shows) */
+	{
+		char *documents = ios_documents_folder();
+		char log_path[1024];
+
+		snprintf(log_path, sizeof(log_path), "%soutrunners.log", documents ? documents : "");
+		SDL_free(documents);
+		freopen(log_path, "w", stderr);
+	}
+	fprintf(stderr, "OutRunners: starting\n");
+	ios_wait_for_scene();
+	SDL_SetHint(SDL_HINT_IOS_HIDE_HOME_INDICATOR, "2");    /* (a thumb at the bottom edge never leaves a race) */
+#endif
+#ifdef PHONE
 	SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");          /* (fingers are the touch controls, not the mouse) */
 	SDL_SetHint(SDL_HINT_ACCELEROMETER_AS_JOYSTICK, "0");
 	SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
@@ -2095,7 +2124,7 @@ int main(int argc, char **argv)
 				pack = true;
 				break;
 			}
-#ifndef ORUNNERS_HANDHELD
+#ifdef FIRST_RUN
 			snprintf(folder, sizeof(folder), "%sassets", places[place]);
 			snprintf(layout, sizeof(layout), "%s/data/layout.json", folder);
 			if ((probe = fopen(layout, "rb")) != NULL)
@@ -2110,7 +2139,7 @@ int main(int argc, char **argv)
 			}
 #endif
 		}
-#ifdef ORUNNERS_HANDHELD
+#ifndef FIRST_RUN
 		(void)layout;
 		(void)stale;
 		if (!found)
@@ -2155,6 +2184,9 @@ int main(int argc, char **argv)
 #ifdef __SWITCH__
 	/* (the Switch's screen, 1280 x 720; docked, the system shows it at the TV's size) */
 	window = SDL_CreateWindow(TITLE, 0, 0, 1280, 720, 0);
+#elif defined(ORUNNERS_IOS)
+	window = SDL_CreateWindow(TITLE, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 640, 480,
+		SDL_WINDOW_FULLSCREEN_DESKTOP | SDL_WINDOW_ALLOW_HIGHDPI);    /* (the screen's own pixels, not its points) */
 #elif defined(ORUNNERS_HANDHELD)
 	window = SDL_CreateWindow(TITLE, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 640, 480, SDL_WINDOW_FULLSCREEN_DESKTOP);
 #else

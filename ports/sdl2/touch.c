@@ -25,6 +25,9 @@
 
 #include "console.h"
 #include "letters.h"
+#ifdef ORUNNERS_IOS
+#include "ios.h"
+#endif
 
 #include <math.h>
 #include <stdlib.h>
@@ -58,7 +61,12 @@ typedef struct
 	bool gear;                /* shown in a race with the manual transmission alone */
 } button;
 
-enum { BUTTON_GAS, BUTTON_BRAKE, BUTTON_SHIFT_UP, BUTTON_SHIFT_DOWN, BUTTON_START, BUTTON_MUSIC, BUTTONS };
+/* (BUTTON_GYRO, iOS's: it holds nothing; a touch turns the phone's tilt into the wheel, or back, tilt_steering) */
+enum { BUTTON_GAS, BUTTON_BRAKE, BUTTON_SHIFT_UP, BUTTON_SHIFT_DOWN, BUTTON_START, BUTTON_MUSIC,
+#ifdef ORUNNERS_IOS
+	BUTTON_GYRO,
+#endif
+	BUTTONS };
 
 /* Where the controls are, in the unit: over the picture on a phone's whole screen (their room at its sides
    and corners), or filling the room under it on a tall screen (the wheel as large as it lets it, over the
@@ -86,6 +94,9 @@ static const layout over_picture = {
 			ACTION_BIT(ACTION_START), "START", false },
 		[BUTTON_MUSIC] = { FROM_BOTTOM_MIDDLE, 0.0, 0.06, 0.20, 0.08, CONTROL_BIT(CONTROL_MUSIC), 0, "MUSIC",
 			false },
+#ifdef ORUNNERS_IOS
+		[BUTTON_GYRO] = { FROM_TOP_RIGHT, 0.43, 0.09, 0.24, 0.09, 0, 0, "GYRO", false },
+#endif
 	},
 };
 
@@ -103,6 +114,9 @@ static const layout under_picture = {
 			ACTION_BIT(ACTION_START), "START", false },
 		[BUTTON_MUSIC] = { FROM_BOTTOM_MIDDLE, 0.0, 0.09, 0.30, 0.12, CONTROL_BIT(CONTROL_MUSIC), 0, "MUSIC",
 			false },
+#ifdef ORUNNERS_IOS
+		[BUTTON_GYRO] = { FROM_TOP_RIGHT, 0.74, 0.10, 0.40, 0.14, 0, 0, "GYRO", false },
+#endif
 	},
 };
 
@@ -139,6 +153,9 @@ static const button *const buttons = over_picture.buttons;    /* (what each butt
 static SDL_Texture *disc, *ring, *pill, *pill_ring;
 static letters font;
 static bool have_font;
+#ifdef ORUNNERS_IOS
+static bool tilt_steering;    /* the phone's tilt turns the first player's wheel */
+#endif
 
 static double clamped(double value, double low, double high)
 {
@@ -306,6 +323,10 @@ static void place(const pad *it, int which, double *x, double *y, double *width,
 
 static bool button_shown(const pad *it, int which)
 {
+#ifdef ORUNNERS_IOS
+	if (which == BUTTON_GYRO)
+		return pad_count == 1 && ios_tilt_available();    /* (one phone, two players: nothing to tilt) */
+#endif
 	return !buttons[which].gear || it->gears;
 }
 
@@ -355,6 +376,16 @@ static bool wheel_held(int player)
 	return false;
 }
 
+/* How far the player's wheel turns across, -1 to 1: the finger on it, or else the phone's tilt */
+static double steering(int player)
+{
+#ifdef ORUNNERS_IOS
+	if (tilt_steering && player == 0 && pad_count == 1 && !wheel_held(player))
+		return ios_tilt();
+#endif
+	return pads[player].turn_x;
+}
+
 /* The pad's wheel toward a finger at (x, y) as its player sees it, turned all the way at its ring and beyond */
 static void turn_to(pad *it, double x, double y)
 {
@@ -379,6 +410,17 @@ static void finger_down(SDL_FingerID id, double x, double y)
 	fingers[slot].id = id;
 	fingers[slot].pad = player;
 	fingers[slot].button = button_at(it, x, y);
+#ifdef ORUNNERS_IOS
+	if (fingers[slot].button == BUTTON_GYRO)
+	{
+		/* (on where a finger lands alone: the wheel centred on the phone as it is held now) */
+		tilt_steering = !tilt_steering;
+		if (tilt_steering)
+			ios_tilt_start();
+		else
+			ios_tilt_stop();
+	}
+#endif
 	if (fingers[slot].button >= 0)
 		fingers[slot].role = FINGER_BUTTON;
 	else if (x < it->canvas.x + it->canvas.w / 2.0 && !wheel_held(player))
@@ -493,7 +535,7 @@ bool touch_holds(int player, int control)
 
 int touch_wheel(int player)
 {
-	return player < pad_count ? (int)lround(pads[player].turn_x * TOUCH_WHEEL_FULL) : 0;
+	return player < pad_count ? (int)lround(steering(player) * TOUCH_WHEEL_FULL) : 0;
 }
 
 /* A shape centred on (x, y) as the pad's player sees it, its colour and how much it shows (the shapes are
@@ -533,11 +575,15 @@ static void draw_pad(SDL_Renderer *renderer, int player)
 
 	draw_shape(renderer, it, disc, centre_x, centre_y, radius * 2, radius * 2, 0, wheel ? 70 : 45);
 	draw_shape(renderer, it, ring, centre_x, centre_y, radius * 2, radius * 2, 255, wheel ? 150 : 90);
-	draw_shape(renderer, it, disc, centre_x + it->turn_x * radius, centre_y + it->turn_y * radius, knob * 2, knob * 2,
+	draw_shape(renderer, it, disc, centre_x + steering(player) * radius, centre_y + it->turn_y * radius, knob * 2, knob * 2,
 		255, wheel ? 170 : 90);
 	for (int which = 0; which < BUTTONS; which++)
 	{
+#ifdef ORUNNERS_IOS
+		const bool pressed = (held & (1u << which)) != 0 || (which == BUTTON_GYRO && tilt_steering);    /* (lit while on) */
+#else
 		const bool pressed = (held & (1u << which)) != 0;
+#endif
 		const bool round = buttons[which].width == buttons[which].height;
 		double x, y, width, height;
 

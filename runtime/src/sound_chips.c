@@ -92,7 +92,11 @@ static void fm_catch_up(uint64_t time)
 
 	while (sound.fm_samples < due)
 	{
+#ifdef S32_FM_SILENT
+		out[0] = out[1] = 0;    /* (it plays no note, and its timers keep their own time: sound_chips_timers_due) */
+#else
 		s32_fm_generate(&sound.fm, out);
+#endif
 		append(&sound.fm_buffer, out[0], out[1]);
 		sound.fm_samples++;
 	}
@@ -230,6 +234,19 @@ static int16_t clamp16(double value)
 	return (int16_t)(value < -32768.0 ? -32768.0 : (value > 32767.0 ? 32767.0 : value));
 }
 
+#ifdef S32_FM_SILENT
+#define PCM_LEVEL_SHIFT 6
+#define PCM_LEVEL       22    /* 0.35, over 1 << PCM_LEVEL_SHIFT */
+
+/* mix() for a machine short of time: the MultiPCM alone, in integers */
+static int16_t silent_fm_mix(int32_t first, int32_t second)
+{
+	const int32_t value = ((sides_together ? first + second : first) * PCM_LEVEL) >> PCM_LEVEL_SHIFT;
+
+	return (int16_t)(value < -32768 ? -32768 : (value > 32767 ? 32767 : value));
+}
+#endif
+
 /* The mix at the YM3438's rate: the MultiPCM's latest sample at each of its samples' start; each chip's
    second output goes to the left speaker, its first to the right one (MAME's routes), or both to both
    (sound_chips_join_sides: the program pans each side to one output only, so the sum is each side whole) */
@@ -253,6 +270,18 @@ static void mix(void)
 			if (at > pcm_frames - 1)
 				at = pcm_frames - 1;
 		}
+#ifdef S32_FM_SILENT
+		if (pcm_frames)
+		{
+			const int32_t *pcm = &sound.frame[1][at * 2];
+
+			sound.mix[index * 2] = silent_fm_mix(pcm[1], pcm[0]);
+			sound.mix[index * 2 + 1] = silent_fm_mix(pcm[0], pcm[1]);
+		}
+		else
+			sound.mix[index * 2] = sound.mix[index * 2 + 1] = 0;
+		continue;
+#endif
 		for (int side = 0; side < 2; side++)
 		{
 			const int output = 1 - side;
