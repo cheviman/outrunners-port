@@ -382,6 +382,17 @@ merged here; this repository adds console/, the ports and their documents.
   under the picture). The headless's --wide-16-10. Checked: the same frames of a FULL race (the start, the
   pre-stage's fork, stage 1) in 16:10 and 16:9 as the window crops them, the sides drawn whole; VIDEO from OFF
   one step right to 16:10; built for Windows, Linux and Android without warnings. Not checked on a Steam Deck.
+- The route map beside the race (Sebas, on the Fold 7 opened: the sea and the landmarks with no land under
+  them, since 1.2.0): the decompilation's merge made PAGE_SELECT a view of halfwords, and side_map.c (and
+  route_select.c, REVERSE's goal) wrote a route map's page select as one word, its upper pages left as they
+  were (route_select's by chance the right ones). console_page_select writes both halves, as route_map_update
+  does. Checked: the headless's --side-map frames of a race show the close-up map whole again, REVERSE's map
+  the same as before; by Sebas on the Fold 7 opened (an APK made with OutRunners APK): "perfecto".
+- CLASSIC with one player has no WAITING FOR CHALLENGERS (Sebas: a wait for no one, the right seat's screen
+  unseen): the entries close once the choices are made, as in ARCADE; a challenger joins while the left seat
+  chooses (the right seat's START), and only then does the game wait, for the challenger's choices.
+  tests/console/classic.txt: the race starts at once (its 45 seconds, CLASSIC's 5 more); with the right
+  seat's START in the car select, a race of two.
 
 ## To do
 

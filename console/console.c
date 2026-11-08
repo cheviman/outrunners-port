@@ -2,7 +2,7 @@
  *    Name:        console.c
  *    Description: the console build's own versions of the game functions console/replaced.txt lists, and
  *                 what it tells the port
- *    Version:     0.1.1
+ *    Version:     0.1.2
  *    Created:     29-10-2026
  *    Modified:    07-11-2026
  *    Author:      Sebastian Toyos
@@ -363,11 +363,13 @@ void console_classic_time(uint8_t passes)
 }
 
 /* The car select's WAITING FOR CHALLENGERS! (then JUST A MOMENT PLEASE) once the player's choices are made,
-   while the race takes entries: with one player (no 2 PLAYERS, no CLASSIC, no network) none, and the entries
-   closed at once (player 0's record's entry_frames), as no one else comes */
+   while the race takes entries: with one player (no 2 PLAYERS, no network, no challenger in CLASSIC) none,
+   and the entries closed at once (player 0's record's entry_frames), as no one else comes. CLASSIC's
+   challenger joins while the left seat chooses: the arcade's 10 seconds after it, the right seat's screen
+   unseen, were a wait for no one (Sebas) */
 void waiting_banner_show(void)
 {
-	if (console.two_players || console.classic || console_network_linked())
+	if (console.two_players || console_network_linked())
 	{
 		original_waiting_banner_show();
 		return;
@@ -538,6 +540,12 @@ void console_side_map_wanted(bool wanted)
 bool console_side_map_shown(void)
 {
 	return console_side_map_running();
+}
+
+void console_page_select(uint32_t address, uint32_t pages)
+{
+	PAGE_SELECT(address)[0] = (uint16_t)pages;
+	PAGE_SELECT(address)[1] = (uint16_t)(pages >> 16u);
 }
 
 bool console_right_seat_joins(void)
