@@ -106,7 +106,7 @@ jobs:
           fi
           cp -R dist/outrunners/licenses dist/kit/
           cp LICENSE dist/kit/LICENSE.txt
-          cp build/bin/font.bmp dist/kit/
+          cp ports/sdl2/font/font.bmp dist/kit/    # (on macOS it is inside the .apps alone)
           ls -la dist/outrunners dist/outrunners/licenses dist/kit
           cd dist
           case "$RUNNER_OS" in
