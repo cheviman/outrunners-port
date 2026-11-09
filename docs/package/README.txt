@@ -18,8 +18,7 @@ OutRunners           the console version: one screen, a menu (ARCADE, 2 PLAYERS,
 OutRunners Arcade    the arcade game as it is, both cabinet screens side by side
 
 The first time either starts it takes the assets out of orunners.zip (a few seconds) and keeps them:
-beside the game on Windows, in your user folder for the game elsewhere. OutRunners also writes
-outrunners.assets there, the assets in one file, which the devices' tools below can take instead.
+beside the game on Windows, in your user folder for the game elsewhere.
 
 Racing wheels
 -------------
@@ -40,21 +39,10 @@ heard is out of the race after 3 seconds, and the race goes on. The game uses UD
 
 The devices
 -----------
-Each device's game comes in this package without assets; a tool beside it makes yours, on this
-computer, with your ROM set. What it makes is yours alone: never share it.
-
-Nintendo Switch       OutRunners NSP (the folder switch beside it): OutRunners.nsp, with your console's
-                      keys (prod.keys). Install it with an installer on a console with Atmosphere.
-Android               OutRunners APK (the folder android beside it): OutRunners.apk, signed with a key of
-                      yours kept in your user folder (keep it: only an APK with the same key installs over
-                      the last one). Copy it to the phone and open it there.
-Anbernic H700         OutRunners Anbernic (the folder anbernic beside it): the folder PORTS, beside the
-handhelds             tool or straight into the Roms folder of your handheld's card (choose it as the
-                      output folder): the other ports there stay as they are.
-
-Start a tool with a double click and drop your files on its window (orunners.zip, prod.keys, a square
-picture of yours for the icon), or run it from a command line: an option it does not know shows the ones
-it takes.
+The Nintendo Switch, Android and Anbernic's H700 handhelds have packages of their own on the same release
+page: outrunners-switch.zip, outrunners-android.zip and outrunners-anbernic.zip. Each has the device's game
+without assets and the tool, for Windows, macOS and Linux, that makes yours on your computer with your ROM
+set.
 
 Licenses
 --------

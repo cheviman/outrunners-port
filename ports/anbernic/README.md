@@ -28,7 +28,8 @@ You need two things of your own, which never leave your computer:
 
 - `orunners.zip`, MAME's ROM set of *OutRunners* (World), or a folder of its files;
 - the tool, `OutRunners Anbernic` (`OutRunners Anbernic.exe` on Windows), with the `anbernic` folder beside
-  it: the game's Anbernic build (below); and `font.bmp`, its window's letters.
+  it: the game's Anbernic build (below); and `font.bmp`, its window's letters. The release's Anbernic
+  package, `outrunners-anbernic.zip`, has them all, the tool for Windows, macOS and Linux.
 
 Start the tool (a double click). Its window shows what `PORTS` will be made of, each with its state:
 

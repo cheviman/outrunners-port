@@ -26,13 +26,15 @@ Download the package for Windows, Linux or macOS from the
 [releases](https://github.com/cheviman/outrunners-port/releases). Keep `orunners.zip` beside the game, or drop it
 on its window when it asks: the first time, it takes the assets out of it.
 
-The package also has the tools that make the game for your devices, with your ROM set:
+Each device has a package of its own: the game without its assets, and the tool (for Windows, macOS and Linux)
+that makes it on your computer with your ROM set:
 
-- **Nintendo Switch**: OutRunners NSP makes `OutRunners.nsp`, for a console with Atmosphere
-  ([ports/switch](ports/switch/README.md)).
-- **Android**: OutRunners APK makes `OutRunners.apk` ([ports/android](ports/android/README.md)).
-- **Anbernic's H700 handhelds** (RG35XX, RG40XX...): OutRunners Anbernic makes the folder for PORTS
-  ([ports/anbernic](ports/anbernic/README.md)).
+- **Nintendo Switch** (`outrunners-switch.zip`): OutRunners NSP makes `OutRunners.nsp`, for a console with
+  Atmosphere ([ports/switch](ports/switch/README.md)).
+- **Android** (`outrunners-android.zip`): OutRunners APK makes `OutRunners.apk`
+  ([ports/android](ports/android/README.md)).
+- **Anbernic's H700 handhelds** (`outrunners-anbernic.zip`, RG35XX, RG40XX...): OutRunners Anbernic makes the
+  folder for PORTS ([ports/anbernic](ports/anbernic/README.md)).
 
 What a tool makes has the game's data in it: it is yours alone, never share it.
 

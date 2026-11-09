@@ -394,6 +394,18 @@ merged here; this repository adds console/, the ports and their documents.
   tests/console/classic.txt: the race starts at once (its 45 seconds, CLASSIC's 5 more); with the right
   seat's START in the car select, a race of two.
 
+## Done (09-11-2026)
+
+- The devices in packages of their own (Sebas: not inside the computers' packages): a release has six,
+  the three computers' with their two games alone, and outrunners-switch.zip, outrunners-android.zip and
+  outrunners-anbernic.zip, each the device's game without assets beside its tool for Windows, macOS and
+  Linux (OutRunners APK.exe, "OutRunners APK (macOS)", "OutRunners APK (Linux)": the three find the device's
+  folder and font.bmp beside them), the licenses and a README of its own (docs/package/README-*.txt). The
+  CI's build job leaves the tools in a kit (outrunners-OS-kit.tar.gz, which keeps their permissions) and the
+  job devices packs the zips (ports/pack_devices.py), the programs as Unix entries with their permissions.
+  Checked: the script on this computer's builds, the Windows tools started from the unpacked packages (the
+  APK and PORTS made, the device's folder found beside them); the CI's run before a release.
+
 ## To do
 
 - The network on a network shared with strangers: a room's code to join it (today a device on the same local
