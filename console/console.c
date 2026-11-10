@@ -148,14 +148,36 @@ void network_check_stand_alone(void)
 
 /* ---- the sound ---- */
 
+#define RADIO_SONGS 11    /* radio_songs' records: the cars' ten and Jingle Bell */
+
+/* True for the sound of one of the radio's songs (radio_songs: those the cars start with and << and >> go
+   through) */
+static bool radio_song(uint8_t sound)
+{
+	for (int song = 0; song < RADIO_SONGS; song++)
+		if ((uint8_t)(radio_songs[song] >> 24) == sound)
+			return true;
+	return false;
+}
+
 /* A screen's sound requests, in the vertical blank: the left seat's always; the right one's only while it
    plays a game (game mode 6), the rest of the time dropped, so that what its screen would play unseen (the
-   entry countdown's DJ, its attract mode) is not heard and takes none of the 24 voices the two seats share */
+   entry countdown's DJ, its attract mode) is not heard and takes none of the 24 voices the two seats share.
+   Nor are the right seat's radio's songs heard (issue 22: two cabinets have a radio and speakers each, one
+   screen's two songs go to the same speakers) unless OPTIONS > 2P MUSIC asks for both: a song's request
+   leaves its ring as the game takes it, one a vertical blank, and is not sent; its other sounds are */
 void send_sound_requests(void)
 {
 	if (screen->index != LEFT_SEAT && screen->game_mode != GAME_MODE_PLAY)
 	{
 		screen->sound_queue_read = screen->sound_queue_write;
+		return;
+	}
+	if (screen->index != LEFT_SEAT && !console_window_settings.both_radios
+		&& screen->sound_queue_read != screen->sound_queue_write
+		&& radio_song(screen->sound_queue[screen->sound_queue_read & 0x1Fu]))
+	{
+		screen->sound_queue_read = (uint8_t)((screen->sound_queue_read + 1u) & 0x1Fu);
 		return;
 	}
 	original_send_sound_requests();

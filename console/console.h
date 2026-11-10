@@ -204,6 +204,7 @@ typedef struct
 	bool vertical;         /* 2 PLAYERS: one screen over the other (false: side by side) */
 	int volume;            /* 0-10: 5 is the game's own */
 	char name[CONSOLE_NAME_LENGTH + 1];    /* the player's, as the network's rooms show it */
+	bool both_radios;      /* OPTIONS > 2P MUSIC: the right seat's radio heard too, as the cabinets' (false: the left one's alone) */
 	bool fps;              /* OPTIONS > FPS: the frames a second at the picture's top right, and in a window's title */
 	int dead_zone;         /* STEERING: DEAD_ZONE_* */
 	int sensitivity;       /* STEERING: the sticks', STEERING_LEVELS */

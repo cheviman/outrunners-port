@@ -921,23 +921,26 @@ static int window_width, window_height;    /* the picture the window was last si
 
 static const char *const pixel_names[PIXELS_KINDS] = { "sharp", "smooth", "bilinear", "crt" };
 
+static bool settings_unsaved;    /* OPTIONS changed them since the file was written */
+
 static void save_window_settings(void)
 {
 	const console_window *settings = &console_window_settings;
 	FILE *output;
 
-	if (script)
+	if (script || !settings_unsaved)
 		return;
+	settings_unsaved = false;
 	output = fopen(settings_path, "w");
 	if (!output)
 		return;
 	fprintf(output, "window_scale=%d\nfull_screen=%d\npixels=%s\nwide=%d\nvsync=%d\ntwo_players=%s\nvolume=%d\n"
 		"name=%s\nfps=%d\ndead_zone=%d\nsensitivity=%d\nwheel_rotation=%d\nsteering_speed=%d\ncentring=%d\n"
-		"vibration=%d\nphone_vibration=%d\n",
+		"vibration=%d\nphone_vibration=%d\nboth_radios=%d\n",
 		settings->window_scale, settings->full_screen, pixel_names[settings->pixels], settings->wide, settings->vsync,
 		settings->vertical ? "vertical" : "horizontal", settings->volume, settings->name, settings->fps,
 		settings->dead_zone, settings->sensitivity, settings->wheel_rotation, settings->steering_speed,
-		settings->centring, settings->vibration, settings->phone_vibration);
+		settings->centring, settings->vibration, settings->phone_vibration, settings->both_radios);
 	fclose(output);
 }
 
@@ -964,6 +967,8 @@ static void load_window_settings(void)
 			settings->volume = number;
 		else if (sscanf(line, "fps=%d", &number) == 1)
 			settings->fps = number != 0;
+		else if (sscanf(line, "both_radios=%d", &number) == 1)
+			settings->both_radios = number != 0;
 		else if (sscanf(line, "dead_zone=%d", &number) == 1 && number >= 0 && number <= DEAD_ZONE_MOST)
 			settings->dead_zone = number / DEAD_ZONE_STEP * DEAD_ZONE_STEP;
 		else if (sscanf(line, "sensitivity=%d", &number) == 1 && number >= 1 && number <= STEERING_LEVELS)
@@ -1223,6 +1228,7 @@ static void read_events(void)
 				/* (Android may end the game there: what it keeps is written; a race waits, paused) */
 				save_eeprom();
 				save_backup_ram();
+				save_window_settings();
 				if (console_can_pause())
 					pause_requested = true;
 				break;
@@ -1461,7 +1467,7 @@ static void on_controls_update(void)
 		if (console_window_settings.changed)
 		{
 			apply_window_settings();
-			save_window_settings();
+			settings_unsaved = true;    /* (written as the game is left: a write to the disk can hold a frame) */
 			console_window_settings.changed = false;
 		}
 		else
@@ -1887,11 +1893,6 @@ static void on_frame_done(void)
 	}
 #endif
 
-	if (program_frames() % 600 == 0)
-	{
-		save_eeprom();
-		save_backup_ram();
-	}
 #ifdef ORUNNERS_CONSOLE
 	console_network_frame();
 	if (console_network_waiting())
@@ -2321,8 +2322,13 @@ int main(int argc, char **argv)
 
 	program_run();
 
+	/* what the game keeps stays in memory while it runs and is written here, as it is left (and where Android
+	   sends it to the background): a write to the disk can take long enough to hold the picture and the sound */
 	save_eeprom();
 	save_backup_ram();
+#ifdef ORUNNERS_CONSOLE
+	save_window_settings();
+#endif
 	if (hashes)
 		fclose(hashes);
 	if (video_hashes)

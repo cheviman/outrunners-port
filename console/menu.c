@@ -74,7 +74,7 @@ enum
 static const char *const menu_items[] = { "ARCADE", "2 PLAYERS", "NETWORK", "& KNUCKLES", "OPTIONS", "EXIT" };
 static const char *const deluxe_items[] = { "CLASSIC", "TIME ATTACK", "FULL", "REVERSE", "BACK" };
 static const char *const options_items[] = { "CONTROLS", "DIFFICULTY", "TIME", "VIDEO", "VOLUME", "SOUND TEST", "STEERING", "FPS",
-	"BACK" };
+	"2P MUSIC", "BACK" };
 static const char *const network_items[] = { "HOST", "JOIN", "NAME", "PLAYERS", "BACK" };
 /* the letters NAME goes through: the font's (a space shown as _ while it is written) */
 static const char name_letters[] = " ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-";
@@ -95,7 +95,7 @@ static const char *const difficulties[DIFFICULTIES] = { "VERY EASY", "EASIER", "
 enum { MENU_ARCADE, MENU_TWO_PLAYERS, MENU_NETWORK, MENU_DELUXE, MENU_OPTIONS, MENU_EXIT };
 enum { DELUXE_CLASSIC, DELUXE_TIME_ATTACK, DELUXE_FULL, DELUXE_REVERSE, DELUXE_BACK };
 enum { OPTIONS_CONTROLS, OPTIONS_DIFFICULTY, OPTIONS_TIME, OPTIONS_VIDEO, OPTIONS_VOLUME, OPTIONS_SOUND_TEST,
-	OPTIONS_STEERING, OPTIONS_FPS, OPTIONS_BACK };
+	OPTIONS_STEERING, OPTIONS_FPS, OPTIONS_MUSIC, OPTIONS_BACK };
 enum { NETWORK_HOST, NETWORK_JOIN, NETWORK_NAME, NETWORK_PLAYERS, NETWORK_BACK };
 
 /* The lines a build shows of the title's menu and of OPTIONS: a computer's, all of them. A game device's
@@ -134,7 +134,11 @@ static const int options_lines[] = {
 #ifndef ORUNNERS_HANDHELD
 	OPTIONS_VIDEO,
 #endif
-	OPTIONS_VOLUME, OPTIONS_SOUND_TEST, OPTIONS_STEERING, OPTIONS_FPS, OPTIONS_BACK
+	OPTIONS_VOLUME, OPTIONS_SOUND_TEST, OPTIONS_STEERING, OPTIONS_FPS,
+#if !defined(ORUNNERS_HANDHELD) || defined(ORUNNERS_TWO_PLAYERS)
+	OPTIONS_MUSIC,    /* (where the build has 2 PLAYERS: the right seat's radio) */
+#endif
+	OPTIONS_BACK
 };
 
 /* NETWORK's lines: PLAYERS where a second player may play (2 PLAYERS offered) */
@@ -391,6 +395,11 @@ static void options_frame(uint32_t pressed)
 		console_window_settings.fps = !console_window_settings.fps;
 		console_window_settings.changed = true;
 	}
+	if (item == OPTIONS_MUSIC && (by || (pressed & ACTION_BIT(ACTION_ACCEPT))))
+	{
+		console_window_settings.both_radios = !console_window_settings.both_radios;
+		console_window_settings.changed = true;
+	}
 	if (pressed & ACTION_BIT(ACTION_ACCEPT))
 		switch (item)
 		{
@@ -438,6 +447,8 @@ static void options_frame(uint32_t pressed)
 		}
 		else if (options_lines[index] == OPTIONS_FPS)
 			shown = console_window_settings.fps ? "< ON >" : "< OFF >";
+		else if (options_lines[index] == OPTIONS_MUSIC)
+			shown = console_window_settings.both_radios ? "< ARCADE >" : "< PLAYER 1 >";
 		line(index, options_items[options_lines[index]], shown);
 	}
 	/* the game's version at the bottom right (of WIDE's wider screen too) */

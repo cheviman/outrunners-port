@@ -527,6 +527,8 @@ int main(int argc, char **argv)
 			console_window_settings.wide = WIDE_16_10;
 		else if (strcmp(argv[index], "--autopilot") == 0)
 			autopilot = true;
+		else if (strcmp(argv[index], "--both-radios") == 0)
+			console_window_settings.both_radios = true;    /* (OPTIONS > 2P MUSIC: ARCADE) */
 		else if (strcmp(argv[index], "--restart") == 0 && index + 1 < argc)
 			restart_frame = strtoull(argv[++index], NULL, 10);
 		else if (strcmp(argv[index], "--side-map") == 0)
