@@ -86,8 +86,10 @@ which the ports of other decompiled arcade games share.
 
 ## Supporting it
 
-If you enjoy the game, you can support it on [GitHub Sponsors](https://github.com/sponsors/cheviman): it buys the
-time for what comes next. Thank you!
+The game is free, and stays free. If you want to support the decompilations and the ports, there is
+[Patreon](https://www.patreon.com/ChevimanPorts), where supporters also have a say in what comes next, and
+[GitHub Sponsors](https://github.com/sponsors/cheviman): entirely optional, nothing is locked behind either. If
+anyone asks you to pay for this game, it is not this project.
 
 ## Building it
 
