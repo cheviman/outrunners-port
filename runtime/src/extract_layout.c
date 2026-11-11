@@ -4,7 +4,7 @@
  *                 (extract.c), without their bytes
  *    Version:     0.1.0
  *    Created:     29-10-2026
- *    Modified:    06-11-2026
+ *    Modified:    11-11-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
@@ -237,7 +237,8 @@ const extract_piece extract_program_pieces[] = {
 	{ 0x0069B0u, 0x8u, "car_select_default_cars" },
 	{ 0x0069B8u, 0x20u, "turntable_car_looks" },
 	{ 0x0069D8u, 0x40u, "turntable_car_frames" },
-	{ 0x006A18u, 0x384u, "turntable_scenery_groups" },
+	{ 0x006A18u, 0x60u, "turntable_scenery_groups" },
+	{ 0x006A78u, 0x324u, "turntable_scenery_items" },
 	{ 0x006D9Cu, 0x8u, "car_select_turn_delays" },
 	{ 0x006DA4u, 0x8u, "car_select_wheel_transmissions" },
 	{ 0x006DACu, 0x20u, "welcome_letter_places" },
@@ -551,7 +552,9 @@ const extract_piece extract_program_pieces[] = {
 	{ 0x014A16u, 0xAu, "goal_actor_place_waits" },
 	{ 0x014A20u, 0x40u, "ending_actor_lists" },
 	{ 0x014A60u, 0x4u, "unfinished_ending_actor_count" },
-	{ 0x014A64u, 0x209Cu, "unfinished_ending_actors" },
+	{ 0x014A64u, 0x18u, "unfinished_ending_actors" },
+	{ 0x014A7Cu, 0x590u, "ending_actors" },
+	{ 0x01500Cu, 0x1AF4u, "goal_actor_scripts" },
 	{ 0x016B0Bu, 0x1u, "data_016B0B" },
 	{ 0x016B0Cu, 0x10u, "road_surface_state_jumps" },
 	{ 0x016BBAu, 0x2u, "data_016BBA" },
@@ -752,7 +755,8 @@ const extract_piece extract_program_pieces[] = {
 	{ 0x01DBF8u, 0xD6u, "game_assignments_page_text" },
 	{ 0x01DCCEu, 0x16u, "game_assignments_cursor_cells" },
 	{ 0x01DCE4u, 0x8u, "steering_wheel_reaction_texts" },
-	{ 0x01DCECu, 0x28u, "advertise_sound_texts" },
+	{ 0x01DCECu, 0x8u, "advertise_sound_texts" },
+	{ 0x01DCF4u, 0x20u, "game_assignments_value_texts" },
 	{ 0x01DD14u, 0xAu, "game_assignments_setting_places" },
 	{ 0x01E0D8u, 0xCu, "test_mode_coin_assignments_item_jumps" },
 	{ 0x01E0E4u, 0x10u, "test_mode_coin_assignments_manual_item_jumps" },

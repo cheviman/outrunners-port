@@ -530,7 +530,7 @@ static int reverse_checkpoint_given(int checkpoint)
 {
 	static const uint8_t level_stages[GOAL_CHECKPOINT] = { 0x0D, 0x07, 0x03, 0x01, 0x00 };
 
-	return (stage_start_times[level_stages[checkpoint]] + game->master_time_difficulty[checkpoint]) * 0x1E;
+	return (stage_start_times[level_stages[checkpoint]] + game->race_copies[0].master_time_difficulty[checkpoint]) * 0x1E;
 }
 
 /* REVERSE's time at a checkpoint: the game's, less what the start gave beyond the game's start
@@ -736,8 +736,8 @@ bool console_routes_frame(uint32_t mode, uint32_t pressed)
 		}
 		routes.goal = routes.given_goal;
 		/* (the race's start: REVERSE_START_EXTRA more in the setting the car adds to its 40 seconds) */
-		routes.start_difficulty = game->master_time_difficulty[0];
-		game->master_time_difficulty[0] = (int8_t)(game->master_time_difficulty[0] + REVERSE_START_EXTRA);
+		routes.start_difficulty = game->race_copies[0].master_time_difficulty[0];
+		game->race_copies[0].master_time_difficulty[0] = (int8_t)(routes.start_difficulty + REVERSE_START_EXTRA);
 		routes.time_given = false;
 	}
 	screen->first_stage = (uint8_t)routes.goal;
@@ -922,7 +922,7 @@ void race_progress_update(uint32_t *p_host_record, uint32_t *p_racer_copy)
 	{
 		/* (the start's time set by the car, player_car_update, with REVERSE_START_EXTRA in the setting: the
 		   setting back) */
-		game->master_time_difficulty[0] = routes.start_difficulty;
+		game->race_copies[0].master_time_difficulty[0] = routes.start_difficulty;
 		routes.time_given = true;
 	}
 	stage = RACE(race_copy)->stage;
@@ -939,9 +939,9 @@ void race_progress_update(uint32_t *p_host_record, uint32_t *p_racer_copy)
 		const uint8_t checkpoint = RACE(race)->pass_checkpoint, branch = RACE(race)->pass_branch;
 		const int next = routes.running == ROUTE_FULL ? stage + 1 : routes.parents[stage][branch & 1u];
 		const int given = (int8_t)(stage_start_times[fork_next_stages[read_stage * 2 + branch]]
-			+ game->master_time_difficulty[checkpoint]) * 0x1E;
+			+ game->race_copies[0].master_time_difficulty[checkpoint]) * 0x1E;
 		const int due = routes.running == ROUTE_REVERSE ? reverse_checkpoint_time(checkpoint)
-			: (int8_t)(stage_start_times[next] + game->master_time_difficulty[checkpoint]) * 0x1E;
+			: (int8_t)(stage_start_times[next] + game->race_copies[0].master_time_difficulty[checkpoint]) * 0x1E;
 
 		RACE(race)->time_left = (uint16_t)(RACE(race)->time_left + due - given);
 	}

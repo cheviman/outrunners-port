@@ -19,7 +19,9 @@
 #include "game.h"
 #include "s32/video.h"
 
-#define COIN_SETTINGS       0x1Au    /* the test mode's COIN/CREDIT SETTING: 26 */
+#include <string.h>
+
+#define COIN_SETTINGS      0x1Au    /* the test mode's COIN/CREDIT SETTING: 26 */
 #define START_BUTTON        0x40u    /* screen buttons_pressed: START */
 #define TIME_ATTACK_TIME_LEFT (99u * 30u)    /* race time_left, in 30ths of a second */
 #define CLASSIC_EXTRA       5u       /* CLASSIC's seconds more, at the start and at each checkpoint */
@@ -97,10 +99,7 @@ void console_settings_to_race(void)
 	const uint32_t race = RACE_1;
 
 	RACE(race)->master_game_difficulty = game->game_difficulty;
-	RACE(race)->master_time_difficulty_0 = game->time_difficulty[0];
-	RACE(race)->master_time_difficulty_1 = (uint8_t)game->time_difficulty[1];
-	RACE(race)->master_time_difficulty_2_5 = (uint8_t)game->time_difficulty[2] | ((uint32_t)(uint8_t)game->time_difficulty[3] << 8u)
-		| ((uint32_t)(uint8_t)game->time_difficulty[4] << 16u) | ((uint32_t)(uint8_t)game->time_difficulty[5] << 24u);
+	memcpy(RACE(race)->master_time_difficulty, game->time_difficulty, sizeof(RACE(race)->master_time_difficulty));
 }
 
 void console_master_settings(void)
@@ -362,7 +361,7 @@ uint32_t check_game_start(uint32_t mode, uint32_t seat_credits)
 void console_classic_time(uint8_t passes)
 {
 	const uint32_t race = screen->race;
-	const uint16_t start_time = (uint16_t)((game->race_copies[0].master_time_difficulty_0 + 0x28u) * 0x1Eu);
+	const uint16_t start_time = (uint16_t)((game->race_copies[0].master_time_difficulty[0] + 0x28u) * 0x1Eu);
 
 	if (!console.classic || screen->is_host == 0u)
 		return;

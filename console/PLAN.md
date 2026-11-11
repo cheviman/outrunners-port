@@ -406,6 +406,21 @@ merged here; this repository adds console/, the ports and their documents.
   Checked: the script on this computer's builds, the Windows tools started from the unpacked packages (the
   APK and PORTS made, the device's folder found beside them); the CI's run before a release.
 
+## Done (11-11-2026)
+
+- Merge outrunners-decomp up to 0a03f7f (the core at arcade-decomp 5714a73, console-original 2c54367): the
+  scenarios that cover the code identical on PowerPC, each value at the width the C reads it (toward a port
+  to a big-endian system). src/ written again with console/replaced.txt, the same as the merge left it. The
+  race's master_time_difficulty is one array of six bytes (its three fields before): console.c and routes.c
+  take it so, from the first race copy as the car does. The first run's layout written again (the decomp
+  split turntable_scenery_items, ending_actors, goal_actor_scripts and game_assignments_value_texts off
+  their neighbours), and with it the assets' version: a computer's first-run folder is taken out again, a
+  device's pack made before is refused. FULL's and REVERSE's control scripts poke the race's time as a byte
+  of its halfword (poke ADDRESS VALUE HALFWORD), as the decomp's routes do. Checked: the 16 scenarios
+  identical, picture and sound; the first run's folder against extract_assets.py's, no difference; the
+  console's headless game before and after the merge on tests/console (menu, controls, classic, reverse,
+  two_players, time_attack, full: 204,204 frames), its state, picture and sound the same in every frame.
+
 ## To do
 
 - The network on a network shared with strangers: a room's code to join it (today a device on the same local
