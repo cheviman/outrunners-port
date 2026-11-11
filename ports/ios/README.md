@@ -78,21 +78,20 @@ around SDL, which stays unpatched: the app's scene delegate waits for the scene,
 made. `-[UIApplication statusBarOrientation]` does nothing on iOS 27, so SDL takes the display to be upright (the log's
 `screen 466x678`); the renderer's size, which the game uses, is the true one.
 
-## NETWORK without broadcasts
+## NETWORK and broadcasts
 
 iOS only sends and receives UDP broadcasts with Apple's multicast entitlement
 (`com.apple.developer.networking.multicast`), which Apple grants on request and a plain development profile does not
-have. The rooms are found without it, by unicast, which asks only for the Local Network permission (iOS asks the first
-time NETWORK is used; refused, no room is found, and Settings > Privacy & Security > Local Network turns it on):
+have. The rooms are [arcade-lan](https://github.com/cheviman/arcade-lan)'s (`lan/`), which finds them by their
+broadcast beacons alone: an app signed with the entitlement hosts and joins as any other device, and one without it
+finds no room and its own is not found (iOS asks for the Local Network permission the first time NETWORK is used;
+refused, the same happens, and Settings > Privacy & Security > Local Network turns it on).
 
-- a room hosted on iOS sends its beacon once a second to every other address of the local network as well, on port 27720
-  (`net_send_sweep`, `console/net_udp.c`). Any device that searches hears it, as a beacon, whatever its version;
-- a device searching on iOS sends a `PACKET_SEEK` the same way, to port 27721, once a second. Every room's host, on any
-  platform, listens there and answers with its beacon, to the address that asked.
-
-So a host on another platform needs a build with `PACKET_SEEK` for an iPhone to find it; older builds ignore the datagram.
-Networks larger than a /24 are swept only around the device, the sweep stops during a race, and the broadcasts still
-go out, so an app signed with the entitlement needs nothing else.
+This port's first version found the rooms without the entitlement, by unicast, in the sockets the game had then
+(`console/net_udp.c`): a room hosted on iOS sent its beacon once a second to every other address of the local
+network, a /24 at most, and a device searching on iOS sent a `PACKET_SEEK` the same way to port 27721, where every
+room's host listened and answered with its beacon. The game's network has since moved to arcade-lan, which does not
+have that search yet: it is what arcade-lan needs for an iPhone without the entitlement to play NETWORK.
 
 ## Where it stands
 
@@ -101,7 +100,8 @@ go out, so an app signed with the entitlement needs nothing else.
 - On an iPhone Duo: the same first run, and 60 frames a second by its log. The controls on the phone itself have
   not been tried.
 - The file picker opens, but choosing a set in it has not been tried.
-- NETWORK's discovery in the simulator (below). Two real devices have not raced yet.
+- NETWORK's discovery was tried in the simulator with this port's first sockets; over arcade-lan it has not been
+  tried. Two real devices have not raced yet.
 - Folding and unfolding mid-game has not been tried on the phone.
 - Gyro steering is new: its direction and strength are worth a check on your phone.
 

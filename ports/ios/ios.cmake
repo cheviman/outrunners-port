@@ -43,8 +43,8 @@ FetchContent_MakeAvailable(SDL2)
 foreach(config IN ITEMS "" _DEBUG _RELEASE _RELWITHDEBINFO _MINSIZEREL)
 	set(CMAKE_RUNTIME_OUTPUT_DIRECTORY${config} ${CMAKE_BINARY_DIR}/bin)
 endforeach()
-add_executable(OutRunners MACOSX_BUNDLE ports/sdl2/main.c ports/sdl2/controls.c ports/sdl2/first_run.c
-	ports/sdl2/letters.c ports/sdl2/touch.c ports/ios/ios.m)
+add_executable(OutRunners MACOSX_BUNDLE ports/sdl2/main.c ports/sdl2/forces.c ports/sdl2/controls.c
+	ports/sdl2/first_run.c ports/sdl2/letters.c ports/sdl2/touch.c ports/ios/ios.m)
 target_include_directories(OutRunners PRIVATE ports/ios ports/sdl2)
 target_link_libraries(OutRunners PRIVATE orunners_game_console orunners_sound orunners_extract SDL2::SDL2-static)
 if(TARGET SDL2::SDL2main)

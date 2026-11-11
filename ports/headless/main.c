@@ -3,9 +3,9 @@
  *    Description: runs the game with no screen or sound, with the controls a script drives, and writes a
  *                 hash of the board state (and of the frames the video draws) after every frame, in the
  *                 format tools/core/system32/reference/s32ref uses
- *    Version:     0.1.0
+ *    Version:     0.1.1
  *    Created:     11-10-2026
- *    Modified:    01-11-2026
+ *    Modified:    07-11-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
@@ -64,8 +64,9 @@
 	" [--video-hashes FILE] [--video-dump N ... --video-dir DIR] [--sound-hashes FILE]" \
 	" [--sprite-census FILE] [--tile-census FILE] [--memory-census FILE] [--assets FOLDER|PACK.assets]" \
 	" [--write-pack PACK.assets] [--workers N] [--screens 1|2] [--sound-wav FILE]" \
-	" (orunners_console_headless: [--actions FILE] [--wide | --wide-20-9] [--autopilot] [--ghost-folder DIR]" \
-	" [--pause-dump N] [--side-map] [--real-time] [--name NAME] [--network-log FRAMES] [--restart N])\n"
+	" (orunners_console_headless: [--actions FILE] [--wide | --wide-20-9 | --wide-16-10] [--autopilot]" \
+	" [--ghost-folder DIR] [--pause-dump N] [--side-map] [--real-time] [--name NAME] [--network-log FRAMES]" \
+	" [--restart N])\n"
 #define MAX_VIDEO_DUMPS 64
 #define CENSUS_SLOTS (1u << 22)     /* open addressing for the censuses' hashes */
 #define TILE_CENSUS_EVERY 30        /* the tilemaps are looked at every this many frames */
@@ -533,8 +534,12 @@ int main(int argc, char **argv)
 			console_window_settings.wide = WIDE_16_9;    /* (OPTIONS > VIDEO > WIDE) */
 		else if (strcmp(argv[index], "--wide-20-9") == 0)
 			console_window_settings.wide = WIDE_20_9;
+		else if (strcmp(argv[index], "--wide-16-10") == 0)
+			console_window_settings.wide = WIDE_16_10;
 		else if (strcmp(argv[index], "--autopilot") == 0)
 			autopilot = true;
+		else if (strcmp(argv[index], "--both-radios") == 0)
+			console_window_settings.both_radios = true;    /* (OPTIONS > 2P MUSIC: ARCADE) */
 		else if (strcmp(argv[index], "--restart") == 0 && index + 1 < argc)
 			restart_frame = strtoull(argv[++index], NULL, 10);
 		else if (strcmp(argv[index], "--side-map") == 0)
@@ -599,9 +604,11 @@ int main(int argc, char **argv)
 			return 0;
 		}
 	}
-	s32_board.program_at = data_at;
+	s32_board.program_at = data_byte_at;
 	if (getenv("ORUNNERS_DUMP_ASSETS") && !assets_dump(getenv("ORUNNERS_DUMP_ASSETS")))
 		fprintf(stderr, "%s cannot be written\n", getenv("ORUNNERS_DUMP_ASSETS"));
+	if (getenv("ORUNNERS_DUMP_UNITS") && !assets_dump_units(getenv("ORUNNERS_DUMP_UNITS")))
+		fprintf(stderr, "%s cannot be written\n", getenv("ORUNNERS_DUMP_UNITS"));
 #endif
 	if (script_path)
 	{
@@ -668,6 +675,7 @@ int main(int argc, char **argv)
 		s32_board.pcm_rom = game_pcm;
 #else
 		s32_board.sound_at = assets_sound_data;
+		s32_board.sound_byte_at = assets_sound_byte;
 		s32_board.pcm_at = assets_pcm_byte;
 #endif
 		sound_chips_attach();

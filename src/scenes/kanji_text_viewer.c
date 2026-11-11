@@ -3,7 +3,7 @@
  *    Description: a viewer of kanji texts nothing starts (unused)
  *    Version:     0.1.0
  *    Created:     12-10-2026
- *    Modified:    30-10-2026
+ *    Modified:    11-11-2026
  *    Author:      Sebastian Toyos
  *
  *    OutRunners (arcade, Sega System Multi 32): the game's V70 program decompiled into C by
@@ -41,7 +41,7 @@ void kanji_text_viewer_update(void)
 		game->video_registers[68] = 0u;
 		game->video_registers[69] = 0u;
 		game->send_video_registers = 0xFFu;
-		screen->kanji_text_number = 0u;
+		screen->route_map_signals &= 0xFFFF0000u;
 		screen->kanji_text_units = 0;
 		screen->kanji_text_tens = 0;
 		screen->kanji_text_hundreds = 0;
@@ -93,7 +93,7 @@ void kanji_text_viewer_update(void)
 		if (screen->index == 0u)
 		{
 			text_number = (uint16_t)(screen->kanji_text_units + screen->kanji_text_tens * 0xAu + screen->kanji_text_hundreds * 0x64u);
-			screen->kanji_text_number = text_number;
+			screen->route_map_signals = (screen->route_map_signals & 0xFFFF0000u) | (text_number & 0xFFFFu);
 			cell = TEXT_CELL(5, 10);
 			kanji_text_viewer_draw_number(cell, text_number);
 			current_object->kanji_text_viewer.blink_count++;
@@ -107,7 +107,7 @@ void kanji_text_viewer_update(void)
 			return;
 		text_ended = 0u;
 		line = 0u;
-		text = kanji_texts[screen->kanji_text_number];
+		text = kanji_texts[(uint16_t)screen->route_map_signals];
 		do
 		{
 			line_place = VIDEO_RAM + 0x1040u + line * 0x1000u;
@@ -120,7 +120,7 @@ void kanji_text_viewer_update(void)
 			return;
 		text_ended = 0u;
 		line = 0u;
-		text = kanji_texts[screen->kanji_text_number];
+		text = kanji_texts[(uint16_t)screen->route_map_signals];
 		do
 		{
 			line_place = VIDEO_RAM + 0x1040u + line * 0x1000u;
@@ -180,16 +180,21 @@ uint32_t kanji_text_viewer_draw_character(uint32_t place, uint32_t rows)
    table at 1A6340 into eight 4-bit pixels of pen 1. */
 void kanji_text_viewer_draw_quarter(uint32_t *p_bitmap_place, uint32_t *p_rows)
 {
+	uint32_t bitmap_place = *p_bitmap_place;
 	uint32_t rows_left = 0;
+	uint32_t bitmap_layer_words_long = 0;
 
 	rows_left = 8u;
 	do
 	{
-		BITMAP_LAYER_WORDS(*p_bitmap_place)[0] = byte_swap32(kanji_row_pixels[KANJI_CHARACTER_ROWS(*p_rows)[0]]);
-		*p_bitmap_place += 0x100u;
+		bitmap_layer_words_long = byte_swap32(kanji_row_pixels[KANJI_CHARACTER_ROWS(*p_rows)[0]]);
+		BITMAP_LAYER_WORDS(bitmap_place)[0] = (uint16_t)bitmap_layer_words_long;
+		BITMAP_LAYER_WORDS(bitmap_place)[1] = (uint16_t)(bitmap_layer_words_long >> 16u);
+		bitmap_place += 0x100u;
 		rows_left--;
 		(*p_rows)++;
 	} while (rows_left != 0u);
+	*p_bitmap_place = bitmap_place;
 }
 
 /* Only unused code reaches it (kanji_text_viewer_draw_line): the address of character R13 of the kanji
@@ -221,5 +226,5 @@ void kanji_text_viewer_draw_number(uint32_t cell, uint16_t number)
 	TEXT_LAYER_CELLS(cell)[0] = hundreds + 0x6030u;
 	cell += 2u;
 	TEXT_LAYER_CELLS(cell)[0] = tens + 0x6030u;
-	TEXT_LAYER_CELLS(cell)[1] = number + 0x6030u;
+	TEXT_LAYER_CELLS(cell + 0x2u)[0] = number + 0x6030u;
 }

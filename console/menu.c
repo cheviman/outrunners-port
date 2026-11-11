@@ -2,9 +2,9 @@
  *    Name:        menu.c
  *    Description: the console's menus on the left seat's screen: PRESS START in the attract mode, the title's
  *                 menu, DELUXE, NETWORK with its rooms, and OPTIONS with its pages
- *    Version:     0.1.0
+ *    Version:     0.1.4
  *    Created:     29-10-2026
- *    Modified:    31-10-2026
+ *    Modified:    07-11-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
@@ -43,6 +43,9 @@
 #define SOUND_STOP          0x1Fu      /* the sound program's command: every sound off */
 #define FIRST_SOUND_SET     0xD0u      /* the sound program's command: sound set 0, its own (init_parts) */
 #define MENU_SONG           0          /* the menu's music, of the radio's songs: Magical Sound Shower */
+#define INPUT_CELLS         16         /* INPUT TEST: a control's bar, as the test mode's input test draws it */
+#define INPUT_BAR_X         96
+#define INPUT_WHEEL_END     0x10       /* the wheel's travel (MAME's 10-F0) is EF-0F as the game sees it: its ends the bar's */
 #define CONTROLS_Y          38         /* CONTROLS' PLAYER line */
 #define CONTROLS_HEADING_Y  14
 #define SIGNATURE           "@cheviman"    /* the port's author, under the title's (C) SEGA 1992 (Sebas) */
@@ -59,6 +62,8 @@ enum
 	PAGE_SOUND_TEST,
 	PAGE_VIDEO,
 	PAGE_STEERING,
+	PAGE_INPUT_TEST,    /* STEERING's: the wheel and the pedals as the game sees them */
+	PAGE_WHEEL_SETUP,   /* STEERING's SET UP WHEEL: a racing wheel's controls, one by one */
 	PAGE_CONTROLS,
 	PAGE_NETWORK,
 	PAGE_NAME,
@@ -69,14 +74,16 @@ enum
 static const char *const menu_items[] = { "ARCADE", "2 PLAYERS", "NETWORK", "& KNUCKLES", "OPTIONS", "EXIT" };
 static const char *const deluxe_items[] = { "CLASSIC", "TIME ATTACK", "FULL", "REVERSE", "BACK" };
 static const char *const options_items[] = { "CONTROLS", "DIFFICULTY", "TIME", "VIDEO", "VOLUME", "SOUND TEST", "STEERING", "FPS",
-	"BACK" };
+	"2P MUSIC", "BACK" };
 static const char *const network_items[] = { "HOST", "JOIN", "NAME", "PLAYERS", "BACK" };
 /* the letters NAME goes through: the font's (a space shown as _ while it is written) */
 static const char name_letters[] = " ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-";
 static const char *const time_stages[TIME_STAGES] = { "PRE-STAGE", "STAGE 1", "STAGE 2", "STAGE 3", "STAGE 4",
 	"FINAL STAGE" };
 static const char *const pixel_kinds[PIXELS_KINDS] = { "SHARP", "SMOOTH", "BILINEAR", "CRT" };
-static const char *const wide_kinds[WIDE_KINDS] = { "OFF", "16:9", "20:9" };
+static const char *const wide_kinds[WIDE_KINDS] = { "OFF", "16:9", "20:9", "16:10" };
+/* WIDE's values as VIDEO goes through them, narrowest first */
+static const int wide_order[WIDE_KINDS] = { WIDE_OFF, WIDE_16_10, WIDE_16_9, WIDE_20_9 };
 static const char *const control_names[CONTROLS] = { "STEER LEFT", "STEER RIGHT", "GAS", "BRAKE", "SHIFT UP",
 	"SHIFT DOWN", "MUSIC", "SONG <<", "SONG >>", "START" };
 /* the test mode's GAME DIFFICULTY, from EASY to HARD on its bar of 8 (the fourth, the game's own) */
@@ -88,7 +95,7 @@ static const char *const difficulties[DIFFICULTIES] = { "VERY EASY", "EASIER", "
 enum { MENU_ARCADE, MENU_TWO_PLAYERS, MENU_NETWORK, MENU_DELUXE, MENU_OPTIONS, MENU_EXIT };
 enum { DELUXE_CLASSIC, DELUXE_TIME_ATTACK, DELUXE_FULL, DELUXE_REVERSE, DELUXE_BACK };
 enum { OPTIONS_CONTROLS, OPTIONS_DIFFICULTY, OPTIONS_TIME, OPTIONS_VIDEO, OPTIONS_VOLUME, OPTIONS_SOUND_TEST,
-	OPTIONS_STEERING, OPTIONS_FPS, OPTIONS_BACK };
+	OPTIONS_STEERING, OPTIONS_FPS, OPTIONS_MUSIC, OPTIONS_BACK };
 enum { NETWORK_HOST, NETWORK_JOIN, NETWORK_NAME, NETWORK_PLAYERS, NETWORK_BACK };
 
 /* The lines a build shows of the title's menu and of OPTIONS: a computer's, all of them. A game device's
@@ -127,7 +134,11 @@ static const int options_lines[] = {
 #ifndef ORUNNERS_HANDHELD
 	OPTIONS_VIDEO,
 #endif
-	OPTIONS_VOLUME, OPTIONS_SOUND_TEST, OPTIONS_STEERING, OPTIONS_FPS, OPTIONS_BACK
+	OPTIONS_VOLUME, OPTIONS_SOUND_TEST, OPTIONS_STEERING, OPTIONS_FPS,
+#if !defined(ORUNNERS_HANDHELD) || defined(ORUNNERS_TWO_PLAYERS)
+	OPTIONS_MUSIC,    /* (where the build has 2 PLAYERS: the right seat's radio) */
+#endif
+	OPTIONS_BACK
 };
 
 /* NETWORK's lines: PLAYERS where a second player may play (2 PLAYERS offered) */
@@ -146,8 +157,23 @@ static void set_network_lines(void)
 	if (!two_players_offered)
 		console_network_set_players(1);
 }
-enum { VIDEO_WINDOW, VIDEO_FULL_SCREEN, VIDEO_PIXELS, VIDEO_WIDE, VIDEO_TWO_PLAYERS, VIDEO_BACK, VIDEO_ITEMS };
-enum { STEERING_DEAD_ZONE, STEERING_SENSITIVITY, STEERING_SPEED, STEERING_BACK, STEERING_ITEMS };
+enum { VIDEO_WINDOW, VIDEO_FULL_SCREEN, VIDEO_PIXELS, VIDEO_WIDE, VIDEO_VSYNC, VIDEO_TWO_PLAYERS, VIDEO_BACK,
+	VIDEO_ITEMS };
+/* STEERING's lines: CENTRING and SET UP WHEEL a computer's (a racing wheel's; a device's controls are its
+   own), PHONE VIBRATION Android's (its touch controls') */
+enum { STEERING_DEAD_ZONE, STEERING_SENSITIVITY, STEERING_ROTATION,
+#ifndef ORUNNERS_HANDHELD
+	STEERING_CENTRING,
+#endif
+	STEERING_SPEED, STEERING_VIBRATION,
+#ifdef ORUNNERS_TOUCH
+	STEERING_PHONE_VIBRATION,
+#endif
+#ifndef ORUNNERS_HANDHELD
+	STEERING_SET_UP,
+#endif
+	STEERING_INPUT_TEST, STEERING_BACK, STEERING_ITEMS };
+enum { INPUT_WHEEL, INPUT_GAS, INPUT_BRAKE, INPUT_BACK = INPUT_BRAKE + 2 };
 /* CONTROLS' lines: PLAYER, the controls, DEFAULTS, BACK */
 enum { CONTROLS_PLAYER, CONTROLS_FIRST, CONTROLS_DEFAULTS = CONTROLS_FIRST + CONTROLS, CONTROLS_BACK,
 	CONTROLS_LINES };
@@ -163,13 +189,18 @@ static struct
 	int controls_player;    /* CONTROLS: whose */
 	int controls_waiting;   /* CONTROLS: the control waiting for its key or button, or -1 */
 	bool controls_defaults; /* CONTROLS: DEFAULTS picked, for the port */
+	int wheel_setup_step;   /* SET UP WHEEL: the control it waits for (WHEEL_SETUP_*) */
 	bool music;             /* the menu's song asked for */
 	char name[CONSOLE_NAME_LENGTH + 1];    /* NAME: the name being written */
 	int name_at;            /* NAME: the letter being changed */
 } menu = { .controls_waiting = -1 };
 
 console_window console_window_settings = { .window_scale = 2, .pixels = PIXELS_SHARP, .volume = 5, .name = "PLAYER",
-	.dead_zone = DEAD_ZONE_NORMAL, .sensitivity = STEERING_NORMAL, .steering_speed = STEERING_NORMAL };
+	.dead_zone = DEAD_ZONE_NORMAL, .sensitivity = STEERING_NORMAL, .wheel_rotation = WHEEL_ROTATION_GAME,
+	.steering_speed = STEERING_NORMAL, .centring = CENTRING_NORMAL, .vibration = VIBRATION_NORMAL, .vsync = true,
+	.phone_vibration = true };
+
+const int console_wheel_rotations[WHEEL_ROTATIONS] = { WHEEL_ROTATION_GAME, 360, 450, 540, 720, 900, 1080 };
 
 /* ---- drawing ---- */
 
@@ -273,6 +304,7 @@ static int lines_of(int page)
 		case PAGE_SOUND_TEST: return 2;
 		case PAGE_VIDEO: return VIDEO_ITEMS;
 		case PAGE_STEERING: return STEERING_ITEMS;
+		case PAGE_INPUT_TEST: return 1;  /* (BACK alone: the wheel turns past the arrows there) */
 		case PAGE_CONTROLS: return 0;    /* (its grid moves its own way: controls_move) */
 		case PAGE_NETWORK: return network_line_count;
 		case PAGE_NAME: return 0;        /* (its letters move their own way: name_frame) */
@@ -363,6 +395,11 @@ static void options_frame(uint32_t pressed)
 		console_window_settings.fps = !console_window_settings.fps;
 		console_window_settings.changed = true;
 	}
+	if (item == OPTIONS_MUSIC && (by || (pressed & ACTION_BIT(ACTION_ACCEPT))))
+	{
+		console_window_settings.both_radios = !console_window_settings.both_radios;
+		console_window_settings.changed = true;
+	}
 	if (pressed & ACTION_BIT(ACTION_ACCEPT))
 		switch (item)
 		{
@@ -410,6 +447,8 @@ static void options_frame(uint32_t pressed)
 		}
 		else if (options_lines[index] == OPTIONS_FPS)
 			shown = console_window_settings.fps ? "< ON >" : "< OFF >";
+		else if (options_lines[index] == OPTIONS_MUSIC)
+			shown = console_window_settings.both_radios ? "< ARCADE >" : "< PLAYER 1 >";
 		line(index, options_items[options_lines[index]], shown);
 	}
 	/* the game's version at the bottom right (of WIDE's wider screen too) */
@@ -493,7 +532,17 @@ static void video_frame(uint32_t pressed)
 				window->changed = true;
 				break;
 			case VIDEO_WIDE:
-				window->wide = step(window->wide, by ? by : 1, 0, WIDE_KINDS - 1);
+			{
+				int at = 0;
+
+				while (at < WIDE_KINDS - 1 && wide_order[at] != window->wide)
+					at++;
+				window->wide = wide_order[step(at, by ? by : 1, 0, WIDE_KINDS - 1)];
+				window->changed = true;
+				break;
+			}
+			case VIDEO_VSYNC:
+				window->vsync = !window->vsync;
 				window->changed = true;
 				break;
 			case VIDEO_TWO_PLAYERS:
@@ -516,18 +565,32 @@ static void video_frame(uint32_t pressed)
 	line(VIDEO_PIXELS, "PIXELS", value);
 	snprintf(value, sizeof(value), "< %s >", wide_kinds[window->wide]);
 	line(VIDEO_WIDE, "WIDE", value);
+	line(VIDEO_VSYNC, "VSYNC", window->vsync ? "< ON >" : "< OFF >");
 	line(VIDEO_TWO_PLAYERS, "2 PLAYERS", window->vertical ? "< VERTICAL >" : "< HORIZONTAL >");
 	line(VIDEO_BACK, "BACK", NULL);
 	darken_page();
 }
 
-/* STEERING: the sticks' dead zone and sensitivity, the keys' and pads' speed (ports/sdl2/main.c) */
+/* A force's value on STEERING: its percent, OFF at 0 */
+static void force_value(char *value, size_t size, int percent)
+{
+	if (percent == 0)
+		snprintf(value, size, "< OFF >");
+	else
+		snprintf(value, size, "< %d%% >", percent);
+}
+
+/* STEERING: the sticks' dead zone and sensitivity, a racing wheel's rotation and centring, the keys' and pads'
+   speed, the wheel motor's vibration (ports/sdl2/main.c, forces.c) */
 static void steering_frame(uint32_t pressed)
 {
 	console_window *window = &console_window_settings;
 	char value[16];
 	const int by = change(pressed);
+	int rotation = 0;
 
+	while (rotation < WHEEL_ROTATIONS - 1 && console_wheel_rotations[rotation] != window->wheel_rotation)
+		rotation++;
 	switch (by ? menu.choice : STEERING_ITEMS)
 	{
 		case STEERING_DEAD_ZONE:
@@ -538,13 +601,46 @@ static void steering_frame(uint32_t pressed)
 			window->sensitivity = step(window->sensitivity, by, 1, STEERING_LEVELS);
 			window->changed = true;
 			break;
+		case STEERING_ROTATION:
+			window->wheel_rotation = console_wheel_rotations[step(rotation, by, 0, WHEEL_ROTATIONS - 1)];
+			window->changed = true;
+			break;
 		case STEERING_SPEED:
 			window->steering_speed = step(window->steering_speed, by, 1, STEERING_LEVELS);
 			window->changed = true;
 			break;
+#ifndef ORUNNERS_HANDHELD
+		case STEERING_CENTRING:
+			window->centring = step(window->centring, by * FORCE_STEP, 0, 100);
+			window->changed = true;
+			break;
+#endif
+		case STEERING_VIBRATION:
+			window->vibration = step(window->vibration, by * FORCE_STEP, 0, 100);
+			window->changed = true;
+			break;
+#ifdef ORUNNERS_TOUCH
+		case STEERING_PHONE_VIBRATION:
+			window->phone_vibration = !window->phone_vibration;
+			window->changed = true;
+			break;
+#endif
 		default:
 			break;
 	}
+	if ((pressed & ACTION_BIT(ACTION_ACCEPT)) && menu.choice == STEERING_INPUT_TEST)
+	{
+		open_page(PAGE_INPUT_TEST, 0);
+		return;
+	}
+#ifndef ORUNNERS_HANDHELD
+	if ((pressed & ACTION_BIT(ACTION_ACCEPT)) && menu.choice == STEERING_SET_UP)
+	{
+		menu.wheel_setup_step = WHEEL_SETUP_TURN;
+		open_page(PAGE_WHEEL_SETUP, 0);
+		return;
+	}
+#endif
 	if ((pressed & ACTION_BIT(ACTION_ACCEPT)) && menu.choice == STEERING_BACK)
 	{
 		open_page(PAGE_OPTIONS, menu.options_choice);
@@ -555,10 +651,111 @@ static void steering_frame(uint32_t pressed)
 	line(STEERING_DEAD_ZONE, "DEAD ZONE", value);
 	snprintf(value, sizeof(value), "< %d >", window->sensitivity);
 	line(STEERING_SENSITIVITY, "SENSITIVITY", value);
+	snprintf(value, sizeof(value), "< %d >", window->wheel_rotation);
+	line(STEERING_ROTATION, "WHEEL ROTATION", value);
+#ifndef ORUNNERS_HANDHELD
+	force_value(value, sizeof(value), window->centring);
+	line(STEERING_CENTRING, "CENTRING", value);
+#endif
 	snprintf(value, sizeof(value), "< %d >", window->steering_speed);
 	line(STEERING_SPEED, "SPEED", value);
+	force_value(value, sizeof(value), window->vibration);
+	line(STEERING_VIBRATION, "VIBRATION", value);
+#ifdef ORUNNERS_TOUCH
+	line(STEERING_PHONE_VIBRATION, "PHONE VIBRATION", window->phone_vibration ? "< ON >" : "< OFF >");
+#endif
+#ifndef ORUNNERS_HANDHELD
+	line(STEERING_SET_UP, "SET UP WHEEL", NULL);
+#endif
+	line(STEERING_INPUT_TEST, "INPUT TEST", NULL);
 	line(STEERING_BACK, "BACK", NULL);
 	darken_page();
+}
+
+/* An INPUT TEST control: its name, the mark on a bar of INPUT_CELLS ('across': 0 at the left) and how far it
+   is, in percent (Sebas: not the test mode's hexadecimal) */
+static void input_bar(int row, const char *name, uint8_t across, int percent)
+{
+	const int y = PAGE_Y + 16 + row * PAGE_STEP;
+	const int cell = across * INPUT_CELLS / 0x100;
+	char bar[INPUT_CELLS + 3], number[8];
+
+	bar[0] = '[';
+	for (int at = 0; at < INPUT_CELLS; at++)
+		bar[1 + at] = at == cell ? ' ' : '-';
+	bar[INPUT_CELLS + 1] = ']';
+	bar[INPUT_CELLS + 2] = '\0';
+	snprintf(number, sizeof(number), "%d%%", percent);
+	console_text(48, y, 1, colours.item, name);
+	console_text(INPUT_BAR_X, y, 1, colours.item, bar);
+	console_text(INPUT_BAR_X + (1 + cell) * 8, y, 1, colours.chosen, "#");
+	console_text(SCREEN_WIDTH - 32 - console_text_width(number, 1), y, 1, colours.item, number);
+}
+
+/* INPUT TEST: player 1's wheel, gas and brake as the game sees them (the screen's, through the calibration),
+   as the test mode's input test draws them, to see where a racing wheel reaches its ends and a pedal its
+   floor (issue 16: WHEEL ROTATION's); but the wheel the way it turns, its left at the bar's left (the game's
+   left is FF) and in percent of its turn, the left's under 0. The arrows do nothing here, the wheel's turn
+   passing them */
+static void input_test_frame(uint32_t pressed)
+{
+	const struct screen *seat = SCREEN(SCREEN_1);
+	int turn = (0xFF - seat->wheel - INPUT_WHEEL_END) * 0x100 / (0x100 - 2 * INPUT_WHEEL_END);
+
+	if (pressed & ACTION_BIT(ACTION_ACCEPT))
+	{
+		open_page(PAGE_STEERING, STEERING_INPUT_TEST);
+		return;
+	}
+	turn = turn < 0 ? 0 : (turn > 0xFF ? 0xFF : turn);
+	page_heading("INPUT TEST");
+	input_bar(INPUT_WHEEL, "WHEEL", (uint8_t)turn, (turn - 0x80) * 100 / 0x7F);
+	input_bar(INPUT_GAS, "GAS", seat->gas, seat->gas * 100 / 0xFF);
+	input_bar(INPUT_BRAKE, "BRAKE", seat->brake, seat->brake * 100 / 0xFF);
+	line_at(INPUT_BACK, true, "BACK", NULL);
+	darken_page();
+}
+
+/* SET UP WHEEL: the controls it asks for, the one it waits for chosen and those taken OK, and under them how
+   to show it; the port watches the devices meanwhile (console_wheel_setup_step), the menus' actions unheard */
+static const char *const wheel_setup_names[WHEEL_SETUP_STEPS] = { "WHEEL", "GAS", "BRAKE", "SHIFT UP",
+	"SHIFT DOWN", "START" };
+static const char *const wheel_setup_hints[WHEEL_SETUP_STEPS] = { "TURN THE WHEEL LEFT",
+	"PRESS THE GAS AND LET GO", "PRESS THE BRAKE AND LET GO", "PRESS SHIFT UP", "PRESS SHIFT DOWN",
+	"PRESS START" };
+
+static void wheel_setup_frame(void)
+{
+	const int hint_y = PAGE_Y + 16 + (WHEEL_SETUP_STEPS + 1) * PAGE_STEP;
+
+	page_heading("SET UP WHEEL");
+	for (int step = 0; step < WHEEL_SETUP_STEPS; step++)
+		line_at(step, step == menu.wheel_setup_step, wheel_setup_names[step],
+			step < menu.wheel_setup_step ? "OK" : NULL);
+	centred(hint_y, 1, colours.chosen, wheel_setup_hints[menu.wheel_setup_step]);
+	centred(hint_y + 2 * PAGE_STEP, 1, colours.item, "ESCAPE CANCELS");
+	darken_page();
+}
+
+int console_wheel_setup_step(void)
+{
+	return menu.page == PAGE_WHEEL_SETUP ? menu.wheel_setup_step : -1;
+}
+
+void console_wheel_setup_took(void)
+{
+	if (menu.page != PAGE_WHEEL_SETUP)
+		return;
+	if (++menu.wheel_setup_step == WHEEL_SETUP_STEPS)
+		open_page(PAGE_INPUT_TEST, 0);    /* (the wheel set up: where it reaches, and the pedals) */
+}
+
+void console_wheel_setup_cancel(void)
+{
+#ifndef ORUNNERS_HANDHELD
+	if (menu.page == PAGE_WHEEL_SETUP)
+		open_page(PAGE_STEERING, STEERING_SET_UP);
+#endif
 }
 
 /* CONTROLS: PLAYER on top, the controls in two columns of five (each its name, and under it the pictures of
@@ -910,7 +1107,7 @@ static void list_frame(const char *const *items, const int *lines, int count)
 static bool options_page(int page)
 {
 	return page == PAGE_OPTIONS || page == PAGE_TIME || page == PAGE_SOUND_TEST || page == PAGE_VIDEO
-		|| page == PAGE_STEERING || page == PAGE_CONTROLS;
+		|| page == PAGE_STEERING || page == PAGE_INPUT_TEST || page == PAGE_WHEEL_SETUP || page == PAGE_CONTROLS;
 }
 
 /* The port's author under the title's (C) SEGA 1992, while the title shows it (not under OPTIONS' pages,
@@ -997,6 +1194,14 @@ int console_menu_frame(uint32_t mode)
 		/* (the port takes the keys and buttons meanwhile) */
 		hold_title(true);
 		controls_frame(0);
+		return MENU_NOTHING;
+	}
+	if (menu.page == PAGE_WHEEL_SETUP)
+	{
+		/* (the port watches the devices meanwhile: their buttons are no actions) */
+		hold_title(true);
+		page_colours(false);
+		wheel_setup_frame();
 		return MENU_NOTHING;
 	}
 	if (lines)
@@ -1106,6 +1311,8 @@ int console_menu_frame(uint32_t mode)
 			save_game_settings();
 			open_page(PAGE_MENU, MENU_LINE(MENU_OPTIONS));
 		}
+		else if (menu.page == PAGE_INPUT_TEST)
+			open_page(PAGE_STEERING, STEERING_INPUT_TEST);
 		else
 		{
 			if (menu.page == PAGE_SOUND_TEST)
@@ -1121,6 +1328,7 @@ int console_menu_frame(uint32_t mode)
 		case PAGE_SOUND_TEST: sound_test_frame(pressed); break;
 		case PAGE_VIDEO: video_frame(pressed); break;
 		case PAGE_STEERING: steering_frame(pressed); break;
+		case PAGE_INPUT_TEST: input_test_frame(pressed); break;
 		case PAGE_CONTROLS: controls_frame(pressed); break;
 		default: break;
 	}

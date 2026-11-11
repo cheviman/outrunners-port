@@ -1,0 +1,8 @@
+# & KNUCKLES > CLASSIC (with time_attack_controls.txt and --autopilot): one player, the race starting once the car
+# select's choices are made, with no WAITING FOR CHALLENGERS
+600 start
+660 down
+680 down
+690 down
+700 accept
+760 accept

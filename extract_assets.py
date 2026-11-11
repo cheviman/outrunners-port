@@ -3,9 +3,9 @@
 Name:        extract_assets.py
 Description: extracts the game's assets from the user's own ROM set, driven by assets.json (as in
              n64decomp/sm64)
-Version:     0.1.0
+Version:     0.1.1
 Created:     25-10-2026
-Modified:    29-10-2026
+Modified:    10-11-2026
 Author:      Sebastian Toyos
 
 Usage:
@@ -19,6 +19,10 @@ assets.json holds positions only: every byte comes from the user's own ROM set w
 extracted, into assets/ (which, like the ROM, stays out of the repository). Each asset is in a format the
 usual tools open (indexed PNG, WAV, text), and --check builds the board's regions back from the files and
 compares them with the set, chip by chip.
+
+Nothing outside assets/ is written or deleted (outrunners-port's issue 24): an asset's path that is not
+inside it stops the tool where assets.json gives it, and is left alone, and said, where the state of the
+last extraction does (assets/.extracted, a file anything may have written).
 """
 import json
 import re
@@ -50,6 +54,16 @@ REGION_BUILDERS = {
 }
 
 
+def inside_assets(relative_path):
+    """Whether an asset's path, as assets.json or the last extraction's state gives it, is inside assets/ as
+    the file system has it (its dots and the links out of it followed); assets/ itself is not. Nothing else
+    is written or deleted."""
+    try:
+        return ASSETS.resolve() in (ROOT / relative_path).resolve().parents
+    except (OSError, RuntimeError, ValueError):    # (a path the system cannot follow: a loop of links, a NUL)
+        return False
+
+
 def load_manifest():
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
     for asset in manifest["assets"]:
@@ -57,6 +71,8 @@ def load_manifest():
         asset["size"] = int(asset["size"], 0)
         if asset["region"] not in REGION_BUILDERS:
             raise SystemExit(f"assets.json: unknown region '{asset['region']}' for {asset['path']}")
+        if not inside_assets(asset["path"]):
+            raise SystemExit(f"assets.json: the path '{asset['path']}' is not inside assets/")
     return manifest
 
 
@@ -288,6 +304,23 @@ def write_names(folder):
     return 1
 
 
+def walked_records(places, data, start, kept):
+    """The records the formats that walk their pieces (tools/formats' program_ formats: the road objects'
+    streams, the stages' background objects...) read in them: (address, structure), for the typed pointers'
+    walk to follow theirs"""
+    from formats import program_walk
+    chosen, _, _ = data_formats.load_formats(ROOT / "data_formats.json")
+    bounds = sorted({address for address, _ in places} | {begin for begin, _ in kept} | {start + len(data)})
+    program_walk.RECORDS.clear()
+    for address, name in places:
+        kind = chosen.get(name)
+        if kind not in data_formats.FORMATS or not kind.startswith("program_"):
+            continue
+        end = next(bound for bound in bounds if bound > address)
+        data_formats.FORMATS[kind][1](data[address - start:end - start])
+    return list(program_walk.RECORDS)
+
+
 def extract(asset, data, region_of):
     path = ROOT / asset["path"]
     kind = asset["type"]
@@ -304,12 +337,15 @@ def extract(asset, data, region_of):
         code = data_formats.v60_code(region_of("program"), ROOT / "symbols.txt", start, end)
         # the chips' mirrors are no data of their own: kept, as the code is
         mirrors = [tuple(int(value, 0) for value in pair) for pair in asset.get("mirrors", [])]
+        # what the typed pointers point at, laid out in its piece as its structure, as the code reads it
+        segments = typed.pointed_segments(places, data, start, sorted(code + mirrors),
+                                          walked_records(places, data, start, sorted(code + mirrors)))
         game_c = sorted(source for source in (ROOT / "src").rglob("*.c")
                         if "sound" not in source.parts and source.name != "table.c")
         files = data_formats.export(data, start, places, ROOT / asset["formats"], path, sorted(code + mirrors),
                                     default_group=subjects_of(places, ROOT / "symbols.txt", game_c, ROOT / "src",
                                                               0x40000),
-                                    choose=typed.format_for)
+                                    choose=typed.format_for, segments=segments)
         # the layout says which names are inside another piece, and where
         layout = json.loads((path / "layout.json").read_text(encoding="ascii"))
         layout["inside"] = [{"address": f"{address:06X}", "name": name} for address, name in sorted(inner)]
@@ -336,6 +372,10 @@ def extract(asset, data, region_of):
 
 
 def remove(relative_path):
+    """An extracted asset, gone: its folder or its file, a picture's or a sound's .json beside it, and the
+    folders it leaves empty. Inside assets/ alone, whoever asks."""
+    if not inside_assets(relative_path):
+        raise SystemExit(f"'{relative_path}' is not inside assets/: nothing removed")
     path = ROOT / relative_path
     if path.is_dir():
         shutil.rmtree(path)
@@ -427,6 +467,12 @@ def main():
     manifest = load_manifest()
     listed = [asset["path"] for asset in manifest["assets"]]
     saved_version, saved_paths = read_state()
+    # the state is a file in assets/ that anything may have written: what it lists outside assets/ is never
+    # touched, and goes from the state as it is written again
+    foreign = [path for path in saved_paths if not inside_assets(path)]
+    for path in foreign:
+        print(f"  assets/.extracted lists '{path}', which is not inside assets/: left alone")
+    saved_paths = [path for path in saved_paths if path not in foreign]
     if "--clean" in arguments:
         for path in dict.fromkeys(listed + saved_paths):
             remove(path)
@@ -465,7 +511,7 @@ def main():
         # the state keeps every type's paths: these types' as the manifest lists them now
         listed = [path for path in saved_paths if path not in listed] + listed
     if not todo:
-        if stale:
+        if stale or foreign:
             write_state(version, listed)
         print("Assets are up to date")
         return 0

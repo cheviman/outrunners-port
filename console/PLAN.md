@@ -260,6 +260,167 @@ merged here; this repository adds console/, the ports and their documents.
   (the V60's float conversions), and a text with nothing to put in it no longer goes to snprintf as its
   format.
 
+## Done (04-11-2026)
+
+- Android's WIDE by the screen (issue 15: a 4:3 handheld got 16:9, the picture at the top and the route map
+  under it): none on a screen narrower than 3:2, the game's 4:3 picture filling it, but a tablet's, whose
+  16:9 keeps the controls and the route map under the picture (an open Fold's, Sebas). A tablet's screen is
+  known before the window too (the first display's), for WIDE's first choice.
+- OPTIONS > STEERING's WHEEL ROTATION (issue 16: a G29 at 900 turned 450 each way to the end): a racing
+  wheel's turn from end to end as its driver has it, 270 (the arcade's: a stick's whole travel, as before)
+  to 1080; the game's wheel all the way at 135 each way, the rest past it, the dead zone a part of those
+  135. Saved in outrunners.ini (wheel_rotation).
+- STEERING's INPUT TEST (Sebas: as the arcade's test mode has it): player 1's wheel, gas and brake as the game
+  sees them (the screen's, through the calibration), each a mark on a bar of 16 cells as the test mode's
+  input test draws them, and how far in percent (Sebas: not its hexadecimal), to see a racing wheel's ends and
+  the pedals' floor; the wheel's mark the way it turns (the game's left is FF), its bar and its -100% to 100%
+  the port's travel (EF-0F as the game sees it). A page of its own: the wheel's axis is the menus' arrows
+  too, which there do nothing.
+- The sprite graphics' lookup between the video's threads (issue 17: a segmentation fault in sprite_word on
+  a build without optimization, the README's on Linux, whose CMake has no build type): the block the last
+  lookup found is a hint the threads share, and a build that read it again after checking it could index
+  another thread's block. Read once now (runtime/src/assets_media.c). It took the first run's assets: they
+  leave the sprite chips' empty runs out (all ones, as the board reads them), five blocks, where
+  extract_assets.py's are one and never change the hint; both draw the same.
+
+## Done (05-11-2026)
+
+- OPTIONS > STEERING's SET UP WHEEL (a T300RS on Windows, reported on Reddit: the game took no input from
+  it): the game reads controllers as SDL's game controllers alone, and SDL has no layout for many wheels
+  (it knows a T300RS for a wheel, not where its pedals are). The page asks for the wheel turned left, the gas
+  and the brake pressed and let go, and the buttons for shift up, shift down and start
+  (ports/sdl2/wheel_setup.c watches every device's axes and buttons meanwhile, each kept open as a
+  joystick); a pedal's rest says its axis (an end: the whole axis, inverted at the positive one; the middle:
+  combined pedals, half each). The layout is SDL's line for the device: added to SDL, the wheel player 1's
+  game controller (the one before it player 2's), INPUT TEST next; written to gamecontrollerdb.txt in the
+  saves folder in place of the device's line before, the file's other lines kept. Both games read that file
+  as SDL starts (SDL_HINT_GAMECONTROLLERCONFIG_FILE), so a layout made elsewhere works too. Escape cancels.
+  A computer's only (ORUNNERS_HANDHELD has none). Checked with SDL's virtual joysticks: a wheel with no
+  layout through the six steps, separate and combined pedals, set up again (one line kept), a new start
+  reading the file, and the window's game with a virtual pad and wheel through the menus (Escape on the way,
+  the wheel player 1's, its turn and pedals on the seat), on Windows and on Linux (SDL 2.30). Built on Windows
+  (MSVC) and Linux (gcc) without warnings; macOS's files compiled with clang (arm64, x86_64), its link
+  left to the CI. Not checked on a real wheel.
+
+## Done (06-11-2026)
+
+- OPTIONS > STEERING's CENTRING and VIBRATION (the T300RS's player on Reddit: with no force the wheel never
+  came back to the centre): the cabinet's wheel had a spring of its own, and the board's one force is the
+  wheel motor, on or off (output port D bit 4 of each seat, written by the VBLANK while the test mode's STEERING
+  WHEEL REACTION is on and the seat is not in the attract mode: a crash, off the road). ports/sdl2/forces.c,
+  each frame for each player's game controller: SDL's spring at CENTRING (the wheel's autocentre where it has
+  no spring), a sine of 40 ms at VIBRATION while the seat's motor runs, a game controller's rumble where the
+  device has no sine; held in the pause and a network wait; nothing opened with both at 0 (SDL opening a
+  haptic turns the device's own autocentre off). Both at 50% at first, kept in outrunners.ini; CENTRING a
+  computer's line, VIBRATION every build's; OutRunners Arcade at 50% each, its test mode deciding the shake.
+  The board's outputs were already kept (s32_board.outputs): nothing in src/ or runtime/ changed. Checked on
+  Linux (SDL 2.30) with a virtual wheel of uinput logging every effect: the arcade game off the road (the
+  spring at 50%, the sine on and off with the motor, all erased at the end), the console's with outrunners.ini
+  at 30/70, 0/0 (no haptic opened) and 0/70, a wheel with an autocentre and no spring, a pad with rumble only,
+  and forces.c alone through changes while it runs (the spring updated, erased at 0 and made again, the sine
+  updated while playing, the pause's hold, the haptic let go at 0/0 and opened again). Not checked on a real
+  wheel nor on Windows' DirectInput.
+- Merge outrunners-decomp up to ba27c10 (the core at arcade-decomp dfc18d9, console-original f9a4594): each
+  value at its own width on a big-endian processor, the board's memories in the host's order, the program's
+  data laid out as the code reads it. src/ written again with console/replaced.txt; console/routes.c reads
+  and writes the background's page word as its two halves (the union gone from struct tilemap_pages). The
+  first run's layout written again (extract_layout.py: the tables the decomp split, background_tile_page_lists
+  and its packed pages, the backgrounds of four scenes...), and with it the assets' version: a computer's
+  first-run folder is taken out again, and a device's pack made before is refused (another version: its
+  package is made again with this version's tools). The pack keeps the data as a little-endian host holds it,
+  with no units (only a big-endian host's chip_byte reads them). Checked: the 16 scenarios identical; the
+  first run's folder against extract_assets.py's, no difference; OutRunners Arcade's window (three video
+  threads) on coin_start and two_players, its state, picture and sound the reference's; a pack written and
+  two_players run from it with three video threads, the same; a pack made before, refused.
+- NETWORK over arcade-lan (lan/, a submodule: github.com/cheviman/arcade-lan, Sebas: one network for the
+  ports), its linked game (LAN_LINK, made for this one from these rooms beside TMNT's lockstep): arcade-lan
+  keeps the rooms (the beacons, JOIN, the list with where the host hears each device), each device's block to
+  every other each frame (the newest kept), a device unheard (heard false) and gone after 3 seconds for the
+  rest of the game, a room taking devices while its game goes on, the next device hosting a room whose host is
+  gone, and what a device says of itself (lan_set_status: BUSY, a seat in a race, which START waits on).
+  console/network.c keeps the game's part: the link's set-up at START (the game's devices in the room's order,
+  the host machine 1), the block (the records a machine carries: its own two and a gone one's), each
+  machine's taken from the one that carries it (publisher) through check_record (now into a whole struct
+  race), a machine gone carried by another, the race hosted on. console/net_udp.c and net.h gone; the
+  datagrams' version 2 (a device of 1.2.0 sees no room of one before). Checked with two headless games
+  (--real-time, tests/console/network_*): a race of both to its end and back to the room; the joiner gone
+  mid-race (160 frames of WAIT, then its car out of sight, the race on to its end alone); the room's host
+  gone (the other hosts the room); the race's host gone (the other hosts the race on from its last record,
+  its time and time left, and the room). arcade-lan's tests (lan_test, lan_link_test: four devices, a tenth
+  of the datagrams lost) on Windows and Linux; built on Windows (MSVC) and Linux (gcc) without warnings.
+- The README for the player (959 lines to 122, Sebas: too specific): what the game is, playing it, the
+  console version, the controls, NETWORK, building it; the decompilation's own README stays
+  outrunners-decomp's, linked (a merge of the decomp keeps the port's README as it is). arcade-lan cited with
+  its license, in the packages' licenses/ too.
+
+## Done (07-11-2026)
+
+- OPTIONS > VIDEO's VSYNC (issue 19: tearing on macOS; the port never waited for the screen, its frames paced
+  by a timer alone): on at first, kept in outrunners.ini; OutRunners Arcade's always on; a device's screen as
+  its SDL shows it (Anbernic's 2.0.12 has no SDL_RenderSetVSync), and off for --fast. The renderer shows each
+  frame at the screen's refresh (SDL_RenderSetVSync) and the game keeps its own pace, 60 a second
+  (wait_for_frame): a faster screen shows each frame twice or so. A frame a whole frame's time behind that pace
+  (a screen a little slower than 60, 59.94 Hz, or the machine busy) is not shown, so as not to wait: the game
+  and its sound keep their pace, a frame left out now and then. The pause and a network race's WAIT pace
+  themselves the same way (wait_for_frame, not SDL_Delay(16)), as the network counts its time in frames. The
+  log says the screen's refresh, the frames left out and the pace. Checked on Windows on a 144 Hz screen:
+  1800 frames of a race, none left out, 59.935 frames a second (the start's first frames); the VIDEO page
+  drawn. Not checked on macOS, nor on a 60 Hz screen. Interpolated frames for 120 Hz (issue 18) wait for the
+  video on the GPU (the Switch's 4 PLAYERS branch).
+- The phone vibrates with the cabinet's wheel motor (Sebas: the phone in a crash), for the players on its touch
+  controls (no game controller of theirs): forces_device opens the device's own vibrator, which SDL lists on
+  Android as a haptic named VIBRATOR_SERVICE (rumble only), and vibrates at VIBRATION's strength while a touch
+  player's seat's motor runs: 250 ms asked at once and again every 10 frames (Android starts a vibration over
+  at each call), stopped with the motor, in the pause and at the end. STEERING > PHONE VIBRATION (Android's,
+  on at first, phone_vibration in outrunners.ini) turns it off; the manifest asks for VIBRATE (SDL's Vibrator
+  throws without it). Built for Android (arm64, the base APK, with VIBRATE in it) and Windows without
+  warnings; checked by Sebas on a Galaxy Z Fold 7 (an APK made with OutRunners APK): "anda perfecto".
+- VIDEO's WIDE 16:10 (Sebas: a Steam Deck's 1280 x 800), as TMNT's: 32 columns more at each side
+  (S32_VIDEO_WIDE_SIDE_16_10, frames of 384), the window showing 358 (16:10 at 224 rows); WIDE_16_10 after the
+  others in the enum (outrunners.ini keeps the number), VIDEO going through them narrowest first (OFF, 16:10,
+  16:9, 20:9). Android's WIDE by the screen: 16:10 from 3:2 up to 16:9 (a tablet's still 16:9, its controls
+  under the picture). The headless's --wide-16-10. Checked: the same frames of a FULL race (the start, the
+  pre-stage's fork, stage 1) in 16:10 and 16:9 as the window crops them, the sides drawn whole; VIDEO from OFF
+  one step right to 16:10; built for Windows, Linux and Android without warnings. Not checked on a Steam Deck.
+- The route map beside the race (Sebas, on the Fold 7 opened: the sea and the landmarks with no land under
+  them, since 1.2.0): the decompilation's merge made PAGE_SELECT a view of halfwords, and side_map.c (and
+  route_select.c, REVERSE's goal) wrote a route map's page select as one word, its upper pages left as they
+  were (route_select's by chance the right ones). console_page_select writes both halves, as route_map_update
+  does. Checked: the headless's --side-map frames of a race show the close-up map whole again, REVERSE's map
+  the same as before; by Sebas on the Fold 7 opened (an APK made with OutRunners APK): "perfecto".
+- CLASSIC with one player has no WAITING FOR CHALLENGERS (Sebas: a wait for no one, the right seat's screen
+  unseen): the entries close once the choices are made, as in ARCADE; a challenger joins while the left seat
+  chooses (the right seat's START), and only then does the game wait, for the challenger's choices.
+  tests/console/classic.txt: the race starts at once (its 45 seconds, CLASSIC's 5 more); with the right
+  seat's START in the car select, a race of two.
+
+## Done (09-11-2026)
+
+- The devices in packages of their own (Sebas: not inside the computers' packages): a release has six,
+  the three computers' with their two games alone, and outrunners-switch.zip, outrunners-android.zip and
+  outrunners-anbernic.zip, each the device's game without assets beside its tool for Windows, macOS and
+  Linux (OutRunners APK.exe, "OutRunners APK (macOS)", "OutRunners APK (Linux)": the three find the device's
+  folder and font.bmp beside them), the licenses and a README of its own (docs/package/README-*.txt). The
+  CI's build job leaves the tools in a kit (outrunners-OS-kit.tar.gz, which keeps their permissions) and the
+  job devices packs the zips (ports/pack_devices.py), the programs as Unix entries with their permissions.
+  Checked: the script on this computer's builds, the Windows tools started from the unpacked packages (the
+  APK and PORTS made, the device's folder found beside them); the CI's run before a release.
+
+## Done (11-11-2026)
+
+- Merge outrunners-decomp up to 0a03f7f (the core at arcade-decomp 5714a73, console-original 2c54367): the
+  scenarios that cover the code identical on PowerPC, each value at the width the C reads it (toward a port
+  to a big-endian system). src/ written again with console/replaced.txt, the same as the merge left it. The
+  race's master_time_difficulty is one array of six bytes (its three fields before): console.c and routes.c
+  take it so, from the first race copy as the car does. The first run's layout written again (the decomp
+  split turntable_scenery_items, ending_actors, goal_actor_scripts and game_assignments_value_texts off
+  their neighbours), and with it the assets' version: a computer's first-run folder is taken out again, a
+  device's pack made before is refused. FULL's and REVERSE's control scripts poke the race's time as a byte
+  of its halfword (poke ADDRESS VALUE HALFWORD), as the decomp's routes do. Checked: the 16 scenarios
+  identical, picture and sound; the first run's folder against extract_assets.py's, no difference; the
+  console's headless game before and after the merge on tests/console (menu, controls, classic, reverse,
+  two_players, time_attack, full: 204,204 frames), its state, picture and sound the same in every frame.
+
 ## To do
 
 - The network on a network shared with strangers: a room's code to join it (today a device on the same local

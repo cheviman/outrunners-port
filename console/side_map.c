@@ -3,9 +3,9 @@
  *    Description: the race's route map beside it (a tall screen's room under the picture): the right seat,
  *                 unseen with one player, shows the game's close-up route map, its car as far along the
  *                 route as the left seat's car is
- *    Version:     0.1.0
+ *    Version:     0.1.1
  *    Created:     30-10-2026
- *    Modified:    30-10-2026
+ *    Modified:    07-11-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
@@ -212,8 +212,8 @@ static void map_set_up(void)
 	set_up_background(0x4868u + (index * 10u + (uint32_t)side.first_branch * 5u) * 4u);
 	queue_palette(route_map_background_palette);
 	io_write16(route_map_sea_colour_addresses[index], SEA_COLOUR);
-	PAGE_SELECT(registers->pages_address)[0] = route_map_close_up_pages[index];
-	PAGE_SELECT(registers->second_pages_address)[0] = 0u;
+	console_page_select(registers->pages_address, route_map_close_up_pages[index]);
+	console_page_select(registers->second_pages_address, 0u);
 	VIDEO_REGISTER_WORDS(registers->zoom_x_address)[0] = 0x200u;
 	VIDEO_REGISTER_WORDS(registers->zoom_y_address)[0] = 0x200u;
 	VIDEO_REGISTER_WORDS(registers->zoom_center_x_address)[0] = 0u;

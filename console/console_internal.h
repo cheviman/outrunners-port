@@ -1,9 +1,9 @@
 /**
  *    Name:        console_internal.h
  *    Description: what the console build's files share among themselves
- *    Version:     0.1.0
+ *    Version:     0.1.1
  *    Created:     29-10-2026
- *    Modified:    01-11-2026
+ *    Modified:    07-11-2026
  *    Author:      Sebastian Toyos
  */
 #ifndef ORUNNERS_CONSOLE_INTERNAL_H
@@ -46,7 +46,7 @@ typedef struct
 	bool two_players;       /* 2 PLAYERS: both screens shown, the right seat in the race */
 	bool join_right;        /* the right seat's START, pressed once it is in the entry (game mode 7) */
 	bool time_attack;       /* DELUXE > TIME ATTACK: the left seat's race has no time limit */
-	bool classic;           /* DELUXE > CLASSIC: the game's entries as the arcade's (WAITING FOR CHALLENGERS) */
+	bool classic;           /* DELUXE > CLASSIC: the right seat free to join while the left one chooses */
 	bool classic_start;     /* CLASSIC: its seconds more given at the start (console_classic_time) */
 	bool side_map_wanted;   /* the port has room for the route map beside the race (console_side_map_wanted) */
 	uint8_t quit_seats;     /* the pause's QUIT GAME: the seats (bit 0 the left) still to go back to the title */
@@ -121,6 +121,10 @@ void console_route_select_start(int model);
 bool console_route_select_running(void);
 int console_route_select_frame(uint32_t pressed);
 int console_route_select_goal(void);
+
+/* A tilemap's page select at 'address' (a route map's registers' pages): its four pages, two halfwords, as
+   route_map_update writes them (console.c) */
+void console_page_select(uint32_t address, uint32_t pages);
 
 /* DIFFICULTY and TIME, as OPTIONS leaves them, into the race records (console.c); and with them the rest of
    machine 1's settings, as network_check_result puts them in its first record for every machine's races */

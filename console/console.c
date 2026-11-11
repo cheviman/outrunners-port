@@ -2,9 +2,9 @@
  *    Name:        console.c
  *    Description: the console build's own versions of the game functions console/replaced.txt lists, and
  *                 what it tells the port
- *    Version:     0.1.0
+ *    Version:     0.1.2
  *    Created:     29-10-2026
- *    Modified:    01-11-2026
+ *    Modified:    07-11-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
@@ -19,7 +19,9 @@
 #include "game.h"
 #include "s32/video.h"
 
-#define COIN_SETTINGS       0x1Au    /* the test mode's COIN/CREDIT SETTING: 26 */
+#include <string.h>
+
+#define COIN_SETTINGS      0x1Au    /* the test mode's COIN/CREDIT SETTING: 26 */
 #define START_BUTTON        0x40u    /* screen buttons_pressed: START */
 #define TIME_ATTACK_TIME_LEFT (99u * 30u)    /* race time_left, in 30ths of a second */
 #define CLASSIC_EXTRA       5u       /* CLASSIC's seconds more, at the start and at each checkpoint */
@@ -97,10 +99,7 @@ void console_settings_to_race(void)
 	const uint32_t race = RACE_1;
 
 	RACE(race)->master_game_difficulty = game->game_difficulty;
-	RACE(race)->master_time_difficulty_0 = game->time_difficulty[0];
-	RACE(race)->master_time_difficulty_1 = (uint8_t)game->time_difficulty[1];
-	RACE(race)->master_time_difficulty_2_5 = (uint8_t)game->time_difficulty[2] | ((uint32_t)(uint8_t)game->time_difficulty[3] << 8u)
-		| ((uint32_t)(uint8_t)game->time_difficulty[4] << 16u) | ((uint32_t)(uint8_t)game->time_difficulty[5] << 24u);
+	memcpy(RACE(race)->master_time_difficulty, game->time_difficulty, sizeof(RACE(race)->master_time_difficulty));
 }
 
 void console_master_settings(void)
@@ -148,14 +147,36 @@ void network_check_stand_alone(void)
 
 /* ---- the sound ---- */
 
+#define RADIO_SONGS 11    /* radio_songs' records: the cars' ten and Jingle Bell */
+
+/* True for the sound of one of the radio's songs (radio_songs: those the cars start with and << and >> go
+   through) */
+static bool radio_song(uint8_t sound)
+{
+	for (int song = 0; song < RADIO_SONGS; song++)
+		if ((uint8_t)(radio_songs[song] >> 24) == sound)
+			return true;
+	return false;
+}
+
 /* A screen's sound requests, in the vertical blank: the left seat's always; the right one's only while it
    plays a game (game mode 6), the rest of the time dropped, so that what its screen would play unseen (the
-   entry countdown's DJ, its attract mode) is not heard and takes none of the 24 voices the two seats share */
+   entry countdown's DJ, its attract mode) is not heard and takes none of the 24 voices the two seats share.
+   Nor are the right seat's radio's songs heard (issue 22: two cabinets have a radio and speakers each, one
+   screen's two songs go to the same speakers) unless OPTIONS > 2P MUSIC asks for both: a song's request
+   leaves its ring as the game takes it, one a vertical blank, and is not sent; its other sounds are */
 void send_sound_requests(void)
 {
 	if (screen->index != LEFT_SEAT && screen->game_mode != GAME_MODE_PLAY)
 	{
 		screen->sound_queue_read = screen->sound_queue_write;
+		return;
+	}
+	if (screen->index != LEFT_SEAT && !console_window_settings.both_radios
+		&& screen->sound_queue_read != screen->sound_queue_write
+		&& radio_song(screen->sound_queue[screen->sound_queue_read & 0x1Fu]))
+	{
+		screen->sound_queue_read = (uint8_t)((screen->sound_queue_read + 1u) & 0x1Fu);
 		return;
 	}
 	original_send_sound_requests();
@@ -340,7 +361,7 @@ uint32_t check_game_start(uint32_t mode, uint32_t seat_credits)
 void console_classic_time(uint8_t passes)
 {
 	const uint32_t race = screen->race;
-	const uint16_t start_time = (uint16_t)((game->race_copies[0].master_time_difficulty_0 + 0x28u) * 0x1Eu);
+	const uint16_t start_time = (uint16_t)((game->race_copies[0].master_time_difficulty[0] + 0x28u) * 0x1Eu);
 
 	if (!console.classic || screen->is_host == 0u)
 		return;
@@ -363,11 +384,13 @@ void console_classic_time(uint8_t passes)
 }
 
 /* The car select's WAITING FOR CHALLENGERS! (then JUST A MOMENT PLEASE) once the player's choices are made,
-   while the race takes entries: with one player (no 2 PLAYERS, no CLASSIC, no network) none, and the entries
-   closed at once (player 0's record's entry_frames), as no one else comes */
+   while the race takes entries: with one player (no 2 PLAYERS, no network, no challenger in CLASSIC) none,
+   and the entries closed at once (player 0's record's entry_frames), as no one else comes. CLASSIC's
+   challenger joins while the left seat chooses: the arcade's 10 seconds after it, the right seat's screen
+   unseen, were a wait for no one (Sebas) */
 void waiting_banner_show(void)
 {
-	if (console.two_players || console.classic || console_network_linked())
+	if (console.two_players || console_network_linked())
 	{
 		original_waiting_banner_show();
 		return;
@@ -426,6 +449,7 @@ int console_wide_side(void)
 		return 0;    /* (2 PLAYERS: both screens alike) */
 	switch (console_window_settings.wide)
 	{
+		case WIDE_16_10: return S32_VIDEO_WIDE_SIDE_16_10;
 		case WIDE_16_9: return S32_VIDEO_WIDE_SIDE_16_9;
 		case WIDE_20_9: return S32_VIDEO_WIDE_SIDE_20_9;
 		default: return 0;
@@ -537,6 +561,12 @@ void console_side_map_wanted(bool wanted)
 bool console_side_map_shown(void)
 {
 	return console_side_map_running();
+}
+
+void console_page_select(uint32_t address, uint32_t pages)
+{
+	PAGE_SELECT(address)[0] = (uint16_t)pages;
+	PAGE_SELECT(address)[1] = (uint16_t)(pages >> 16u);
 }
 
 bool console_right_seat_joins(void)

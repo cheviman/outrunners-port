@@ -1,11 +1,18 @@
 # Name:        CMakeLists.txt
 # Description: build of the OutRunners runtime and its development tools
-# Version:     0.1.0
+# Version:     0.1.2
 # Created:     11-10-2026
-# Modified:    31-10-2026
+# Modified:    06-11-2026
 # Author:      Sebastian Toyos
 cmake_minimum_required(VERSION 3.20)
-project(outrunners VERSION 1.1.1 LANGUAGES C CXX)    # (the release's: OPTIONS shows it, the devices' packages carry it)
+project(outrunners VERSION 1.2.2 LANGUAGES C CXX)    # (the release's: OPTIONS shows it, the devices' packages carry it)
+
+# A generator of one configuration (Makefiles, Ninja: Linux's and macOS's by default) given no build type
+# builds the game optimized, as the packages are: without, it is slower (and issue 17's race showed)
+get_property(ORUNNERS_MULTI_CONFIG GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
+if(NOT ORUNNERS_MULTI_CONFIG AND NOT CMAKE_BUILD_TYPE)
+	set(CMAKE_BUILD_TYPE Release CACHE STRING "The build type: Release unless given" FORCE)
+endif()
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -171,10 +178,9 @@ if(ORUNNERS_DECOMPILED AND ORUNNERS_SOUND_DECOMPILED)
 		${ORUNNERS_DECOMPILED} ${ORUNNERS_CONSOLE_SOURCES})
 	target_include_directories(orunners_game_console PUBLIC runtime/include ${ORUNNERS_DECOMPILED_DIR} console)
 	target_compile_definitions(orunners_game_console PUBLIC ORUNNERS_CONSOLE ORUNNERS_VERSION="${PROJECT_VERSION}")
-	target_link_libraries(orunners_game_console PUBLIC s32runtime)
-	if(WIN32)
-		target_link_libraries(orunners_game_console PUBLIC ws2_32)    # (the network's sockets: console/net_udp.c)
-	endif()
+	# (NETWORK: arcade-lan's linked game, a repository of its own in lan/, its sockets with it)
+	add_subdirectory(lan ${CMAKE_BINARY_DIR}/arcade_lan)
+	target_link_libraries(orunners_game_console PUBLIC s32runtime arcade_lan)
 	if(MSVC)
 		target_compile_options(orunners_game_console PRIVATE /bigobj)
 	else()
@@ -275,15 +281,16 @@ if(ORUNNERS_DECOMPILED AND ORUNNERS_SOUND_DECOMPILED)
 		# executable, .app and window, and the console one beside it, OutRunners. Both make their assets on
 		# their first run from the player's ROM set (ports/sdl2/first_run.c), its window written with Kenney
 		# Mini (CC0), a picture beside them, in the .app's Resources on macOS
-		add_executable(orunners WIN32 MACOSX_BUNDLE ports/sdl2/main.c ports/sdl2/first_run.c ports/sdl2/letters.c
-			ports/sdl2/font/font.bmp)
+		add_executable(orunners WIN32 MACOSX_BUNDLE ports/sdl2/main.c ports/sdl2/forces.c ports/sdl2/first_run.c
+			ports/sdl2/letters.c ports/sdl2/font/font.bmp)
 		target_link_libraries(orunners PRIVATE orunners_game orunners_sound orunners_extract ${ORUNNERS_SDL2})
 		set_target_properties(orunners PROPERTIES OUTPUT_NAME "OutRunners Arcade"
 			MACOSX_BUNDLE_BUNDLE_NAME "OutRunners Arcade" MACOSX_BUNDLE_GUI_IDENTIFIER io.github.cheviman.outrunners-arcade)
 		# (OutRunners draws its CONTROLS page's keys and buttons with Kenney's Input Prompts Pixel, a picture
 		# beside it, in the .app's Resources on macOS)
-		add_executable(outrunners WIN32 MACOSX_BUNDLE ports/sdl2/main.c ports/sdl2/controls.c ports/sdl2/first_run.c
-			ports/sdl2/letters.c ports/sdl2/prompts/input_prompts.bmp ports/sdl2/font/font.bmp)
+		add_executable(outrunners WIN32 MACOSX_BUNDLE ports/sdl2/main.c ports/sdl2/forces.c ports/sdl2/controls.c
+			ports/sdl2/wheel_setup.c ports/sdl2/first_run.c ports/sdl2/letters.c ports/sdl2/prompts/input_prompts.bmp
+			ports/sdl2/font/font.bmp)
 		target_link_libraries(outrunners PRIVATE orunners_game_console orunners_sound orunners_extract ${ORUNNERS_SDL2})
 		# a development aid: OutRunners with Android's touch controls, the mouse a finger, to look at them in a
 		# window of any shape

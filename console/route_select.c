@@ -2,9 +2,9 @@
  *    Name:        route_select.c
  *    Description: & KNUCKLES > REVERSE's goal, picked on the route map: the map of the race's end, whole, its
  *                 ten goals, a car on the one picked
- *    Version:     0.1.0
+ *    Version:     0.1.1
  *    Created:     29-10-2026
- *    Modified:    30-10-2026
+ *    Modified:    07-11-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
@@ -120,8 +120,8 @@ static void map_set_up(int side)
 	set_up_background(0x4868u + (index * 10u + (uint32_t)side * 5u) * 4u);
 	queue_palette(route_map_background_palette);
 	io_write16(route_map_sea_colour_addresses[index], 0u);
-	PAGE_SELECT(registers->pages_address)[0] = route_map_routes_pages[index];
-	PAGE_SELECT(registers->second_pages_address)[0] = route_map_world_pages[index];
+	console_page_select(registers->pages_address, route_map_routes_pages[index]);
+	console_page_select(registers->second_pages_address, route_map_world_pages[index]);
 	VIDEO_REGISTER_WORDS(registers->zoom_x_address)[0] = 0x200u;
 	VIDEO_REGISTER_WORDS(registers->zoom_y_address)[0] = 0x200u;
 	VIDEO_REGISTER_WORDS(registers->zoom_center_x_address)[0] = 0xA0u;

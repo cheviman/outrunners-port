@@ -3,14 +3,15 @@
 #              Windows with MSVC), SDL2 inside the executables, and packs what a player runs: the window
 #              ports, OutRunners Arcade and OutRunners, which take their assets out of the player's ROM set
 #              on their first run; the Nintendo Switch's .nsp pieces with devkitPro's toolchain, Android's game
-#              without a pack with the NDK and Anbernic's handhelds' game with Zig, in every package beside the
-#              tools that make the player's .nsp, APK and PORTS of them; with their licenses. A tag v* makes a
-#              release of those packages (as SegaSonic's). It runs on main, its pull requests and the tags v*
-#              alone (Sebas, 30-10-2026: not on the other branches); by hand on any branch. And on the newest
-#              Ubuntu, as the README builds there (its GCC, Python and SDL2)
-# Version:     0.2.2
+#              without a pack with the NDK and Anbernic's handhelds' game with Zig, each in a package of its own
+#              (Sebas, 09-11-2026: not inside the computers' packages) beside the tool that makes the player's
+#              .nsp, APK or PORTS of it, for the three computers; with their licenses. A tag v* makes a release
+#              of those six packages. It runs on main, its pull requests and the tags v* alone (Sebas,
+#              30-10-2026: not on the other branches); by hand on any branch. And on the newest Ubuntu, as the
+#              README builds there (its GCC, Python and SDL2)
+# Version:     0.3.0
 # Created:     27-10-2026
-# Modified:    01-11-2026
+# Modified:    09-11-2026
 # Author:      Sebastian Toyos
 name: build
 
@@ -36,7 +37,6 @@ jobs:
             os: windows-2022
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
-    needs: [switch, android, anbernic]    # (their games go in the package, beside the tools that make them)
     steps:
       # (tools/core, the shared core, holds the licenses of MAME's and ymfm's code the board follows)
       - uses: actions/checkout@v7
@@ -72,36 +72,21 @@ jobs:
       - name: Build
         run: cmake --build build/cmake --config Release --parallel
 
-      # the devices' games, which OutRunners NSP, OutRunners APK and OutRunners Anbernic make the player's
-      # .nsp, APK and PORTS of: the folders switch, android and anbernic beside them
-      - uses: actions/download-artifact@v8
-        with:
-          name: outrunners-switch
-          path: build/bin/switch
-
-      - uses: actions/download-artifact@v8
-        with:
-          name: outrunners-android
-          path: build/bin/android
-
-      - uses: actions/download-artifact@v8
-        with:
-          name: outrunners-anbernic
-          path: build/bin/anbernic
-
       # what a player runs (no headless runs, no build leftovers), in an archive of our own: the artifacts'
       # zip loses the executables' permissions. With it, the terms the executables come with: the project's,
       # MAME's and ymfm's (BSD-3: the board's libraries follow their behavior and tables), SDL2's (zlib) and
       # Kenney's (CC0: the letters of the windows, the controls' pictures), and the package's README.
       # The .apps are signed ad hoc (no certificate): macOS then offers to open them anyway, where a bundle
-      # signed in part is "damaged"
+      # signed in part is "damaged". The devices' tools (OutRunners NSP, APK, Anbernic) go to the kit, with
+      # font.bmp and the licenses, for the devices' packages (the job devices)
       - name: Pack
         shell: bash
         run: |
-          mkdir -p dist/outrunners/licenses
+          mkdir -p dist/outrunners/licenses dist/kit
           for file in build/bin/*; do
             case "$(basename "$file")" in
-              *headless*|*.pdb|*.ilk|*.exp|*.lib|*.a) ;;
+              *headless*|*.pdb|*.ilk|*.exp|*.lib|*.a|switch|android|anbernic) ;;
+              "OutRunners NSP"*|"OutRunners APK"*|"OutRunners Anbernic"*) cp "$file" dist/kit/ ;;
               *) cp -R "$file" dist/outrunners/ ;;
             esac
           done
@@ -110,6 +95,7 @@ jobs:
           cp tools/core/system32/reference/mame/LICENSE dist/outrunners/licenses/MAME.txt
           cp tools/core/system32/reference/ymfm/LICENSE dist/outrunners/licenses/ymfm.txt
           cp build/cmake/_deps/sdl2-src/LICENSE.txt dist/outrunners/licenses/SDL2.txt
+          cp lan/LICENSE dist/outrunners/licenses/arcade-lan.txt
           cp ports/sdl2/font/License.txt dist/outrunners/licenses/Kenney-Mini.txt
           cp ports/sdl2/prompts/License.txt dist/outrunners/licenses/Kenney-Input-Prompts.txt
           if [ "$RUNNER_OS" = macOS ]; then
@@ -118,13 +104,17 @@ jobs:
               codesign --verify --deep --strict --verbose=2 "$app"
             done
           fi
-          ls -la dist/outrunners dist/outrunners/licenses
+          cp -R dist/outrunners/licenses dist/kit/
+          cp LICENSE dist/kit/LICENSE.txt
+          cp ports/sdl2/font/font.bmp dist/kit/    # (on macOS it is inside the .apps alone)
+          ls -la dist/outrunners dist/outrunners/licenses dist/kit
           cd dist
           case "$RUNNER_OS" in
             Linux) tar czf outrunners-${{ matrix.name }}.tar.gz outrunners ;;
             macOS) ditto -c -k --keepParent outrunners outrunners-${{ matrix.name }}.zip ;;
             Windows) 7z a -tzip outrunners-${{ matrix.name }}.zip outrunners ;;
           esac
+          tar czf outrunners-${{ matrix.name }}-kit.tar.gz kit
           cd ..
           tar czf dist/outrunners-${{ matrix.name }}-all.tar.gz -C build bin
 
@@ -133,6 +123,7 @@ jobs:
           name: outrunners-${{ matrix.name }}
           path: |
             dist/outrunners-${{ matrix.name }}.*
+            dist/outrunners-${{ matrix.name }}-kit.tar.gz
             dist/outrunners-${{ matrix.name }}-all.tar.gz
 
   # The Nintendo Switch: the .nsp's pieces (main, main.npdm, control.nacp, icon.jpg), with devkitPro's
@@ -143,6 +134,8 @@ jobs:
     container: devkitpro/devkita64:latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          submodules: true    # (lan/: arcade-lan, the network's)
 
       - name: Configure
         run: /opt/devkitpro/portlibs/switch/bin/aarch64-none-elf-cmake -S . -B build/switch -DCMAKE_BUILD_TYPE=Release -DORUNNERS_REFERENCE_TOOLS=OFF
@@ -162,6 +155,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
+        with:
+          submodules: true    # (lan/: arcade-lan, the network's)
 
       - name: Tools
         run: |
@@ -193,6 +188,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
+        with:
+          submodules: true    # (lan/: arcade-lan, the network's)
 
       - name: Tools
         run: |
@@ -216,6 +213,60 @@ jobs:
         with:
           name: outrunners-anbernic
           path: build/bin/anbernic/
+
+  # The devices' packages (ports/pack_devices.py): outrunners-switch.zip, outrunners-android.zip and
+  # outrunners-anbernic.zip, each the device's game beside its tool for Windows, macOS and Linux (the
+  # computers' kits), font.bmp, the licenses and its README (docs/package)
+  devices:
+    name: devices
+    runs-on: ubuntu-24.04
+    needs: [build, switch, android, anbernic]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: outrunners-switch
+          path: devices/switch
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: outrunners-android
+          path: devices/android
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: outrunners-anbernic
+          path: devices/anbernic
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: outrunners-windows-x64
+          path: computers/windows-x64
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: outrunners-macos-universal
+          path: computers/macos-universal
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: outrunners-linux-x64
+          path: computers/linux-x64
+
+      - name: Pack
+        run: |
+          for computer in windows-x64 macos-universal linux-x64; do
+            mkdir -p "kits/$computer"
+            tar xzf "computers/$computer/outrunners-$computer-kit.tar.gz" -C "kits/$computer"
+          done
+          python3 ports/pack_devices.py --kits kits --switch devices/switch --android devices/android \
+            --anbernic devices/anbernic --out dist
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: outrunners-devices
+          path: dist/outrunners-*.zip
 
   # The newest Ubuntu (ubuntu:rolling) with its own GCC, Python and SDL2, built as the README says: the
   # games and the reference tools on MAME's code too, which a newer GCC breaks first (issue 6), and the
@@ -251,7 +302,7 @@ jobs:
   # A tag v*: the packages as a GitHub release, its notes from docs/releases/TAG.md
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [build]
+    needs: [build, devices]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -270,4 +321,5 @@ jobs:
         run: |
           gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag \
             --title "OutRunners $GITHUB_REF_NAME" --notes-file "docs/releases/$GITHUB_REF_NAME.md" \
-            dist/outrunners-windows-x64.zip dist/outrunners-linux-x64.tar.gz dist/outrunners-macos-universal.zip
+            dist/outrunners-windows-x64.zip dist/outrunners-linux-x64.tar.gz dist/outrunners-macos-universal.zip \
+            dist/outrunners-switch.zip dist/outrunners-android.zip dist/outrunners-anbernic.zip

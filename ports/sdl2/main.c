@@ -2,9 +2,9 @@
  *    Name:        main.c
  *    Description: the game in a window: SDL2 shows its screens, plays its sound, reads the controls and
  *                 keeps the pace, around the same game and board the headless runs check
- *    Version:     0.1.0
+ *    Version:     0.1.4
  *    Created:     21-10-2026
- *    Modified:    01-11-2026
+ *    Modified:    07-11-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
@@ -53,7 +53,12 @@
  *      F3                             smooth or sharp pixels
  *    Game controllers: the left stick is the wheel, the right trigger the gas, the left trigger the brake,
  *    the right and left shoulders shift up and down, Y the DJ, the pad's left and right << and >>, Start
- *    the start, Back a coin.
+ *    the start, Back a coin. A device is a game controller where SDL has a layout for it: its own, or
+ *    gamecontrollerdb.txt's in the folder of what the game keeps (SDL's format, a line a device: the
+ *    console's SET UP WHEEL writes its layouts there, wheel_setup.c). A racing wheel with force feedback
+ *    comes back to the centre on a spring, as the cabinet's did, and shakes while the cabinet's wheel motor
+ *    runs (in a crash, off the road); a game controller rumbles then (forces.c): the arcade game's at half
+ *    their strength, the console's at OPTIONS > STEERING's CENTRING and VIBRATION.
  */
 #include "s32/machine.h"
 #include "s32/program.h"
@@ -69,12 +74,17 @@
 #include "game/extract.h"
 #endif
 #include "s32/workers.h"
+#include "forces.h"
 #ifdef ORUNNERS_CONSOLE
 #include "console.h"
 #include "controls.h"
 #endif
 #ifdef ORUNNERS_TOUCH
 #include "touch.h"
+#endif
+#if defined(ORUNNERS_CONSOLE) && !defined(ORUNNERS_HANDHELD)
+#define WHEEL_SETUP    /* OPTIONS > STEERING's SET UP WHEEL: a computer's (wheel_setup.c) */
+#include "wheel_setup.h"
 #endif
 
 #include <SDL.h>
@@ -133,6 +143,22 @@
 #ifdef ORUNNERS_HANDHELD_KEYS
 #define HANDHELD_MENU_BUTTON 8         /* the joystick button that leaves the game: the RG40XX H's MENU */
 #endif
+#define WHEEL_MOTOR         0x10       /* output port D: the cabinet's wheel motor (forces.c) */
+#ifdef ORUNNERS_CONSOLE
+#define CENTRING            console_window_settings.centring     /* OPTIONS > STEERING's */
+#define VIBRATION           console_window_settings.vibration
+#else
+#define CENTRING            50         /* a racing wheel's spring, as the cabinet's: half its strongest */
+#define VIBRATION           50
+#endif
+#if defined(ORUNNERS_HANDHELD)
+#define VSYNC               false      /* (a device's screen as its SDL shows it: Anbernic's 2.0.12 has no
+                                          SDL_RenderSetVSync) */
+#elif defined(ORUNNERS_CONSOLE)
+#define VSYNC               console_window_settings.vsync    /* OPTIONS > VIDEO's */
+#else
+#define VSYNC               true
+#endif
 #define BACKUP_RAM_SIZE     0xfa
 
 #define USAGE "Usage: orunners [--script FILE [--fast]] [--hashes FILE] [--video-hashes FILE] [--sound-hashes FILE]" \
@@ -145,6 +171,7 @@ static SDL_AudioDeviceID audio;
 static SDL_GameController *controllers[PLAYERS];
 static bool smooth;
 static uint64_t next_frame;           /* performance counter value the next frame waits for */
+static bool vsync_on;                 /* the renderer shows each frame at the screen's refresh (apply_vsync) */
 static char eeprom_path[1024];
 static char backup_ram_path[1024];
 static uint8_t backup_ram_saved[BACKUP_RAM_SIZE];    /* as the file has it */
@@ -243,9 +270,9 @@ static bool tablet;               /* the screen is a tablet's: 2 PLAYERS there, 
 static bool tablet_screen(int width, int height)
 {
 	float horizontal = 0.0f, vertical = 0.0f;
+	const int display = window ? SDL_GetWindowDisplayIndex(window) : 0;    /* (before the window, the first one's) */
 
-	if (SDL_GetDisplayDPI(SDL_GetWindowDisplayIndex(window), NULL, &horizontal, &vertical) != 0 || horizontal <= 0.0f
-		|| vertical <= 0.0f)
+	if (SDL_GetDisplayDPI(display, NULL, &horizontal, &vertical) != 0 || horizontal <= 0.0f || vertical <= 0.0f)
 		return false;
 	return SDL_min(width / horizontal, height / vertical) >= TABLET_SIDE_INCHES;
 }
@@ -272,13 +299,16 @@ static bool screens_stacked(void)
 }
 
 /* The window's picture, in the game's pixels: its screens side by side, or one over the other */
-/* A screen's picture, in the game's pixels: 320, or with the console's WIDE 16:9 or 20:9 */
+/* A screen's picture, in the game's pixels: 320, or with the console's WIDE 16:10, 16:9 or 20:9 */
+#define WIDE_16_10_WIDTH 358   /* 16:10 at 224 rows (358.4): the video's 384 less 13 at each side */
 #define WIDE_16_9_WIDTH 398    /* 16:9 at 224 rows: the video's 416 less 9 at each side */
 #define WIDE_20_9_WIDTH 496    /* the video's 496, whole (20:9 is 498) */
 
 static int screen_width(void)
 {
 #ifdef ORUNNERS_CONSOLE
+	if (console_window_settings.wide == WIDE_16_10)
+		return WIDE_16_10_WIDTH;
 	if (console_window_settings.wide == WIDE_16_9)
 		return WIDE_16_9_WIDTH;
 	if (console_window_settings.wide == WIDE_20_9)
@@ -302,11 +332,19 @@ static void picture_size(int *width, int *height)
 
 static int shape_width, shape_height;    /* the screen WIDE was last chosen for */
 
-/* WIDE for a screen of 'width' x 'height': 20:9 where it is twice as wide as high or more, else 16:9 (either
-   way up: its long side across) */
+/* WIDE for a screen of 'width' x 'height' (either way up: its long side across): 20:9 where it is twice as wide
+   as high or more, 16:9 from 16:9 on, 16:10 from 3:2 on; a narrower one's none, the game's 4:3 picture filling
+   it (a 4:3 handheld's: issue 15), but a tablet's 16:9, the picture at the top and the controls and the route
+   map under it (an open Fold's: Sebas) */
 static int wide_for_screen(int width, int height)
 {
-	return SDL_max(width, height) >= 2 * SDL_min(width, height) ? WIDE_20_9 : WIDE_16_9;
+	const int long_side = SDL_max(width, height), short_side = SDL_min(width, height);
+
+	if (long_side >= 2 * short_side)
+		return WIDE_20_9;
+	if (9 * long_side >= 16 * short_side || tablet_screen(width, height))
+		return WIDE_16_9;
+	return 2 * long_side >= 3 * short_side ? WIDE_16_10 : WIDE_OFF;
 }
 
 /* The screen's size at a frame, as the renderer has it: WIDE chosen again where it changed (the log says so) */
@@ -317,8 +355,9 @@ static void follow_screen(int width, int height)
 	shape_width = width;
 	shape_height = height;
 	console_window_settings.wide = wide_for_screen(width, height);
-	fprintf(stderr, "screen %dx%d: WIDE %s\n", width, height,
-		console_window_settings.wide == WIDE_20_9 ? "20:9" : "16:9");
+	fprintf(stderr, "screen %dx%d: WIDE %s\n", width, height, console_window_settings.wide == WIDE_20_9 ? "20:9"
+		: console_window_settings.wide == WIDE_16_9 ? "16:9" : console_window_settings.wide == WIDE_16_10 ? "16:10"
+		: "OFF");
 }
 #endif
 
@@ -503,6 +542,40 @@ static void draw_fps(const SDL_Rect *shown)
 }
 #endif
 
+/* VSYNC: the renderer shows each frame at the screen's refresh, unless the frames run as fast as they can
+   (--fast). The game keeps its own pace, 60 frames a second (wait_for_frame): a faster screen (120 Hz) shows
+   each frame twice */
+static void apply_vsync(void)
+{
+#ifndef ORUNNERS_HANDHELD
+	const bool wanted = VSYNC && !fast;
+
+	if (renderer && wanted != vsync_on)
+	{
+		SDL_DisplayMode mode;
+
+		vsync_on = SDL_RenderSetVSync(renderer, wanted ? 1 : 0) == 0 ? wanted : false;
+		if (vsync_on && SDL_GetCurrentDisplayMode(SDL_GetWindowDisplayIndex(window), &mode) == 0)
+			fprintf(stderr, "vsync: on, the screen at %d Hz\n", mode.refresh_rate);
+	}
+#endif
+}
+
+static uint32_t frames_left_out;    /* VSYNC: the frames not shown, behind the game's pace (frame_behind) */
+static uint64_t first_frame_done;   /* the performance counter at the end of the game's first frame */
+
+/* A frame a whole frame's time behind the game's pace (a screen a little slower than 60 a second, 59.94 Hz,
+   or the machine busy) is not shown, so that it does not wait for the screen's refresh: the game, and its
+   sound, keep their 60 a second, a frame left out now and then */
+static bool frame_behind(void)
+{
+	const bool behind = vsync_on
+		&& SDL_GetPerformanceCounter() > next_frame + SDL_GetPerformanceFrequency() / S32_FRAME_RATE;
+
+	frames_left_out += behind ? 1u : 0u;
+	return behind;
+}
+
 /* The picture (its part 'source' of 'texture') in the window, as large as it fits with its proportions; with
    the screens facing each other, each screen on its half, the second turned half round */
 static void present(SDL_Rect source)
@@ -608,7 +681,8 @@ static void present(SDL_Rect source)
 	count_fps();
 	draw_fps(&shown[0]);
 #endif
-	SDL_RenderPresent(renderer);
+	if (!frame_behind())
+		SDL_RenderPresent(renderer);
 }
 
 #ifdef ORUNNERS_CONSOLE
@@ -858,21 +932,26 @@ static int window_width, window_height;    /* the picture the window was last si
 
 static const char *const pixel_names[PIXELS_KINDS] = { "sharp", "smooth", "bilinear", "crt" };
 
+static bool settings_unsaved;    /* OPTIONS changed them since the file was written */
+
 static void save_window_settings(void)
 {
 	const console_window *settings = &console_window_settings;
 	FILE *output;
 
-	if (script)
+	if (script || !settings_unsaved)
 		return;
+	settings_unsaved = false;
 	output = fopen(settings_path, "w");
 	if (!output)
 		return;
-	fprintf(output, "window_scale=%d\nfull_screen=%d\npixels=%s\nwide=%d\ntwo_players=%s\nvolume=%d\nname=%s\n"
-		"fps=%d\ndead_zone=%d\nsensitivity=%d\nsteering_speed=%d\n",
-		settings->window_scale, settings->full_screen, pixel_names[settings->pixels], settings->wide,
+	fprintf(output, "window_scale=%d\nfull_screen=%d\npixels=%s\nwide=%d\nvsync=%d\ntwo_players=%s\nvolume=%d\n"
+		"name=%s\nfps=%d\ndead_zone=%d\nsensitivity=%d\nwheel_rotation=%d\nsteering_speed=%d\ncentring=%d\n"
+		"vibration=%d\nphone_vibration=%d\nboth_radios=%d\n",
+		settings->window_scale, settings->full_screen, pixel_names[settings->pixels], settings->wide, settings->vsync,
 		settings->vertical ? "vertical" : "horizontal", settings->volume, settings->name, settings->fps,
-		settings->dead_zone, settings->sensitivity, settings->steering_speed);
+		settings->dead_zone, settings->sensitivity, settings->wheel_rotation, settings->steering_speed,
+		settings->centring, settings->vibration, settings->phone_vibration, settings->both_radios);
 	fclose(output);
 }
 
@@ -893,16 +972,32 @@ static void load_window_settings(void)
 			settings->full_screen = number != 0;
 		else if (sscanf(line, "wide=%d", &number) == 1 && number >= 0 && number < WIDE_KINDS)
 			settings->wide = number;    /* (0 off, 1 16:9, 2 20:9) */
+		else if (sscanf(line, "vsync=%d", &number) == 1)
+			settings->vsync = number != 0;
 		else if (sscanf(line, "volume=%d", &number) == 1 && number >= 0 && number <= 10)
 			settings->volume = number;
 		else if (sscanf(line, "fps=%d", &number) == 1)
 			settings->fps = number != 0;
+		else if (sscanf(line, "both_radios=%d", &number) == 1)
+			settings->both_radios = number != 0;
 		else if (sscanf(line, "dead_zone=%d", &number) == 1 && number >= 0 && number <= DEAD_ZONE_MOST)
 			settings->dead_zone = number / DEAD_ZONE_STEP * DEAD_ZONE_STEP;
 		else if (sscanf(line, "sensitivity=%d", &number) == 1 && number >= 1 && number <= STEERING_LEVELS)
 			settings->sensitivity = number;
 		else if (sscanf(line, "steering_speed=%d", &number) == 1 && number >= 1 && number <= STEERING_LEVELS)
 			settings->steering_speed = number;
+		else if (sscanf(line, "centring=%d", &number) == 1 && number >= 0 && number <= 100)
+			settings->centring = number / FORCE_STEP * FORCE_STEP;
+		else if (sscanf(line, "phone_vibration=%d", &number) == 1)
+			settings->phone_vibration = number != 0;
+		else if (sscanf(line, "vibration=%d", &number) == 1 && number >= 0 && number <= 100)
+			settings->vibration = number / FORCE_STEP * FORCE_STEP;
+		else if (sscanf(line, "wheel_rotation=%d", &number) == 1)
+		{
+			for (int rotation = 0; rotation < WHEEL_ROTATIONS; rotation++)
+				if (console_wheel_rotations[rotation] == number)
+					settings->wheel_rotation = number;
+		}
 		else if (sscanf(line, "pixels=%31s", text) == 1)
 		{
 			for (int kind = 0; kind < PIXELS_KINDS; kind++)
@@ -988,6 +1083,7 @@ static void apply_window_settings(void)
 #endif
 	window_width = width;
 	window_height = height;
+	apply_vsync();    /* (VIDEO's VSYNC) */
 }
 
 /* The menus' actions: the arrows, Enter (START too), Escape or Backspace; each game controller's pad or
@@ -1073,6 +1169,54 @@ static void bind_button(SDL_JoystickID which, SDL_GameControllerButton button)
 }
 #endif
 
+#ifdef WHEEL_SETUP
+/* The player whose game controller the joystick 'id' is, or -1 */
+static int controller_player(SDL_JoystickID id)
+{
+	for (int player = 0; player < PLAYERS; player++)
+		if (controllers[player] && SDL_JoystickInstanceID(SDL_GameControllerGetJoystick(controllers[player])) == id)
+			return player;
+	return -1;
+}
+
+/* SET UP WHEEL made the joystick 'id' a game controller: player 1's from now on, as INPUT TEST shows it next
+   (the controller that was theirs the next free player's, closed where there is none) */
+static void wheel_set_up(SDL_JoystickID id)
+{
+	const int player = controller_player(id);
+	SDL_GameController *first = controllers[0];
+
+	if (player == 0)
+		return;
+	if (player > 0)
+	{
+		controllers[0] = controllers[player];
+		controllers[player] = first;
+		return;
+	}
+	for (int index = 0; index < SDL_NumJoysticks(); index++)
+		if (SDL_JoystickGetDeviceInstanceID(index) == id)
+		{
+			SDL_GameController *wheel = SDL_GameControllerOpen(index);
+			int free_player = 1;
+
+			if (!wheel)
+				return;
+			while (free_player < PLAYERS && controllers[free_player])
+				free_player++;
+			if (free_player < PLAYERS)
+				controllers[free_player] = first;
+			else if (first)
+			{
+				forces_release(first);
+				SDL_GameControllerClose(first);
+			}
+			controllers[0] = wheel;
+			return;
+		}
+}
+#endif
+
 /* ---- the controls ---- */
 
 static void read_events(void)
@@ -1095,6 +1239,7 @@ static void read_events(void)
 				/* (the system may end the game there: what it keeps is written; a race waits, paused) */
 				save_eeprom();
 				save_backup_ram();
+				save_window_settings();
 				if (console_can_pause())
 					pause_requested = true;
 				break;
@@ -1111,6 +1256,15 @@ static void read_events(void)
 			case SDL_KEYDOWN:
 				if (event.key.repeat)
 					break;
+#ifdef WHEEL_SETUP
+				if (console_wheel_setup_step() >= 0 && event.key.keysym.sym == SDLK_ESCAPE)
+				{
+					/* SET UP WHEEL watches the devices: Escape leaves it, the layout as it was */
+					console_wheel_setup_cancel();
+					actions_taken = true;
+					break;
+				}
+#endif
 #ifdef ORUNNERS_CONSOLE
 				if (console_controls_waiting() >= 0)
 				{
@@ -1161,6 +1315,10 @@ static void read_events(void)
 				break;
 #endif
 			case SDL_CONTROLLERDEVICEADDED:
+#ifdef WHEEL_SETUP
+				if (controller_player(SDL_JoystickGetDeviceInstanceID(event.cdevice.which)) >= 0)
+					break;    /* (a wheel SET UP WHEEL opened already) */
+#endif
 				for (int player = 0; player < PLAYERS; player++)
 					if (!controllers[player])
 					{
@@ -1168,11 +1326,20 @@ static void read_events(void)
 						break;
 					}
 				break;
+#ifdef WHEEL_SETUP
+			case SDL_JOYDEVICEADDED:
+				wheel_setup_device_added(event.jdevice.which);
+				break;
+			case SDL_JOYDEVICEREMOVED:
+				wheel_setup_device_removed(event.jdevice.which);
+				break;
+#endif
 			case SDL_CONTROLLERDEVICEREMOVED:
 				for (int player = 0; player < PLAYERS; player++)
 					if (controllers[player]
 						&& SDL_JoystickInstanceID(SDL_GameControllerGetJoystick(controllers[player])) == event.cdevice.which)
 					{
+						forces_release(controllers[player]);
 						SDL_GameControllerClose(controllers[player]);
 						controllers[player] = NULL;
 					}
@@ -1208,18 +1375,20 @@ static int steer(int position, bool left, bool right)
 
 /* A stick's travel as the wheel's, past its dead zone (false inside it). The console's from the dead zone's
    edge out, as OPTIONS > STEERING's DEAD ZONE and SENSITIVITY have it: under STEERING_NORMAL softer about the
-   centre, over it sharper (issue 1: twitchy on some controllers) */
+   centre, over it sharper (issue 1: twitchy on some controllers); a racing wheel's all the way at the game's
+   rotation of its own, WHEEL ROTATION's (issue 16), its dead zone in that part */
 static bool stick_wheel(int stick, int *position)
 {
 	const int travel = stick < 0 ? -stick : stick;
 #ifdef ORUNNERS_CONSOLE
 	static const double curves[STEERING_LEVELS] = { 2.2, 1.9, 1.6, 1.3, 1.0, 0.85, 0.72, 0.6, 0.5 };
-	const int dead = console_window_settings.dead_zone * 32767 / 100;
+	const double reach = 32767.0 * WHEEL_ROTATION_GAME / console_window_settings.wheel_rotation;
+	const int dead = (int)(console_window_settings.dead_zone * reach / 100);
 	double out;
 
 	if (travel <= dead || travel == 0)
 		return false;
-	out = SDL_min(1.0, pow((double)(travel - dead) / (32767 - dead), curves[console_window_settings.sensitivity - 1]));
+	out = SDL_min(1.0, pow((travel - dead) / (reach - dead), curves[console_window_settings.sensitivity - 1]));
 	*position = WHEEL_CENTRE + (int)lround((stick < 0 ? -out : out) * (WHEEL_RIGHT - WHEEL_CENTRE));
 	return true;
 #else
@@ -1276,6 +1445,15 @@ static void on_controls_update(void)
 		s32_script_apply(script, s32_board.frame);
 		return;
 	}
+#ifdef WHEEL_SETUP
+	{
+		/* SET UP WHEEL: the devices watched for the control it waits for; the wheel set up, player 1's */
+		const SDL_JoystickID set_up = wheel_setup_frame();
+
+		if (set_up >= 0)
+			wheel_set_up(set_up);
+	}
+#endif
 	keys = SDL_GetKeyboardState(NULL);
 #ifdef ORUNNERS_CONSOLE
 	{
@@ -1300,7 +1478,7 @@ static void on_controls_update(void)
 		if (console_window_settings.changed)
 		{
 			apply_window_settings();
-			save_window_settings();
+			settings_unsaved = true;    /* (written as the game is left: a write to the disk can hold a frame) */
 			console_window_settings.changed = false;
 		}
 		else
@@ -1469,13 +1647,17 @@ static void make_pause_picture(const uint32_t frozen[2][S32_VIDEO_MAX_WIDTH * S3
 	make_words_picture(frozen, list, console_pause_sprites(list, sizeof(list), choice));
 }
 
+static void wait_for_frame(void);
+
 /* A network race waiting for a device unheard (console_network_waiting): the game held, its sound too, the
-   picture in grey under WAIT, the network's frames running until it goes on */
+   picture in grey under WAIT, the network's frames running until it goes on, at the game's pace (which the
+   network counts its time in) */
 static void run_network_wait(void)
 {
 	static uint32_t frozen[2][S32_VIDEO_MAX_WIDTH * S32_VIDEO_HEIGHT];
 	static uint8_t list[0x400];
 
+	forces_hold();
 	if (audio)
 		SDL_PauseAudioDevice(audio, 1);
 	for (int screen = 0; screen < 2; screen++)
@@ -1486,7 +1668,7 @@ static void run_network_wait(void)
 	{
 		read_events();    /* (closing the window ends the game there: program_stop) */
 		show_screens();
-		SDL_Delay(16);
+		wait_for_frame();    /* (60 a second, as the game's frames) */
 		console_network_frame();
 	}
 	pause_shown = false;
@@ -1505,6 +1687,7 @@ static void run_pause(void)
 	int choice = CONSOLE_PAUSE_CONTINUE;
 
 	pause_requested = false;
+	forces_hold();
 	if (audio)
 		SDL_PauseAudioDevice(audio, 1);
 	for (int screen = 0; screen < 2; screen++)
@@ -1541,7 +1724,7 @@ static void run_pause(void)
 		if (pressed & (PAUSE_BIT | ACTION_BIT(ACTION_BACK)))
 			break;
 		show_screens();    /* (the line chosen, a window resized or put full screen meanwhile) */
-		SDL_Delay(16);
+		wait_for_frame();    /* (60 a second, as the game's frames) */
 		console_network_frame();    /* (a network race goes on: this device is still heard) */
 	}
 	pause_shown = false;
@@ -1665,6 +1848,9 @@ static void on_frame_done(void)
 	size_t count;
 	const int16_t *mix;
 
+	if (frame == 0)
+		first_frame_done = SDL_GetPerformanceCounter();    /* (the pace VSYNC's log gives) */
+
 	/* (in the headless runs' order: the board's hashes, then the sound) */
 	if (hashes)
 		fprintf(hashes, "%" PRIu64 " %016" PRIx64 "\n", frame, s32_state_hash());
@@ -1701,11 +1887,23 @@ static void on_frame_done(void)
 	if (script && s32_script_frames(script) && program_frames() >= s32_script_frames(script))
 		program_stop();
 
-	if (program_frames() % 600 == 0)
+	/* the controllers' forces: a racing wheel's spring, and the cabinet's wheel motor as each seat's output port
+	   D has it (forces.c) */
+	for (int player = 0; player < PLAYERS; player++)
+		forces_frame(player, controllers[player], CENTRING, VIBRATION,
+			(s32_board.outputs[player][0] & WHEEL_MOTOR) != 0);
+#ifdef ORUNNERS_TOUCH
 	{
-		save_eeprom();
-		save_backup_ram();
+		/* the phone itself, for the players on its touch controls (no game controller of theirs): STEERING's
+		   PHONE VIBRATION */
+		bool motor = false;
+
+		for (int player = 0; player < TOUCH_PLAYERS && player < PLAYERS; player++)
+			motor = motor || (!controllers[player] && (s32_board.outputs[player][0] & WHEEL_MOTOR) != 0);
+		forces_device(console_window_settings.phone_vibration ? VIBRATION : 0, motor);
 	}
+#endif
+
 #ifdef ORUNNERS_CONSOLE
 	console_network_frame();
 	if (console_network_waiting())
@@ -1765,6 +1963,26 @@ static char *saves_folder(void)
 	return SDL_GetPrefPath("", "OutRunners");
 #endif
 }
+
+#ifndef ORUNNERS_HANDHELD
+/* gamecontrollerdb.txt in the folder of what the game keeps: game controller layouts in SDL's format, a line
+   a device, which SDL reads as it starts (where SDL_GAMECONTROLLERCONFIG_FILE names no other): a player's
+   own, SDL's community's, and SET UP WHEEL's, which writes its own there */
+#define MAPPINGS_FILE "gamecontrollerdb.txt"
+
+static void read_mappings_file(void)
+{
+	char *saves = saves_folder();
+	char path[1024];
+
+	snprintf(path, sizeof(path), "%s" MAPPINGS_FILE, saves ? saves : "");
+	SDL_free(saves);
+	SDL_SetHint(SDL_HINT_GAMECONTROLLERCONFIG_FILE, path);
+#ifdef WHEEL_SETUP
+	wheel_setup_open(path);
+#endif
+}
+#endif
 
 /* On macOS, the folder the .app is in (the game's base is the .app's Resources folder: where the player sees
    the game is beside the .app); 0 elsewhere */
@@ -1898,9 +2116,12 @@ int main(int argc, char **argv)
 #endif
 #ifdef ORUNNERS_HANDHELD
 	add_device_mappings();
+#else
+	read_mappings_file();
 #endif
 	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER) != 0)
 		return fail("SDL could not start.", SDL_GetError());
+	forces_start();    /* (a racing wheel's forces, where the system has SDL's haptic part) */
 #ifdef ORUNNERS_HANDHELD
 	log_device();
 #endif
@@ -2089,6 +2310,7 @@ int main(int argc, char **argv)
 		return fail("The window could not be opened.", SDL_GetError());
 	SDL_RenderSetIntegerScale(renderer, SDL_FALSE);
 	SDL_SetTextureScaleMode(texture, SDL_ScaleModeNearest);
+	apply_vsync();
 #ifdef ORUNNERS_TOUCH
 	touch_open(renderer, "");    /* (their letters come with the game: Android's in the APK's assets) */
 #endif
@@ -2108,11 +2330,12 @@ int main(int argc, char **argv)
 	s32_board.controls_update = on_controls_update;
 	s32_board.log = on_log;
 	s32_board.frame_timing = true;
-	s32_board.program_at = data_at;
+	s32_board.program_at = data_byte_at;
 	s32_init(NULL);
 	s32_video_init_graphics(assets_graphics());
 	s32_board.frame_shown = on_frame_shown;
 	s32_board.sound_at = assets_sound_data;
+	s32_board.sound_byte_at = assets_sound_byte;
 	s32_board.pcm_at = assets_pcm_byte;
 	sound_chips_attach();
 	sound_cpu_attach();
@@ -2131,8 +2354,13 @@ int main(int argc, char **argv)
 
 	program_run();
 
+	/* what the game keeps stays in memory while it runs and is written here, as it is left (and where Android
+	   sends it to the background): a write to the disk can take long enough to hold the picture and the sound */
 	save_eeprom();
 	save_backup_ram();
+#ifdef ORUNNERS_CONSOLE
+	save_window_settings();
+#endif
 	if (hashes)
 		fclose(hashes);
 	if (video_hashes)
@@ -2141,6 +2369,11 @@ int main(int argc, char **argv)
 		fclose(sound_hashes);
 	if (audio)
 		SDL_CloseAudioDevice(audio);
+	if (vsync_on && program_frames() > 1)
+		fprintf(stderr, "vsync: %u of %" PRIu64 " frames left out, behind the game's pace; %.3f frames a second\n",
+			frames_left_out, program_frames(), (double)(program_frames() - 1) * (double)SDL_GetPerformanceFrequency()
+			/ (double)(SDL_GetPerformanceCounter() - first_frame_done));
+	forces_stop();
 	SDL_Quit();
 #ifdef __SWITCH__
 	romfsExit();

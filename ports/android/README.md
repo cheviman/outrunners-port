@@ -31,7 +31,7 @@ storage.
 
 Android makes nothing from the ROM set: the APK carries the game's assets, taken out of the player's ROM set
 on the player's computer, so each APK is its player's alone: **never share it**. `OutRunners APK`, a tool in
-the computer's package (`apk/`), makes it: drop your `orunners.zip` on its window (and a square PNG or JPEG
+the release's Android package (`outrunners-android.zip`, for Windows, macOS and Linux), makes it: drop your `orunners.zip` on its window (and a square PNG or JPEG
 for your own launcher icon), **Make OutRunners.apk**, copy it to the phone and open it there, or
 `adb install -r OutRunners.apk`. It signs the APK with a key of yours, made the first time and kept in your own
 folder (`%APPDATA%\OutRunners` on Windows): keep it, as only an APK with the same key installs over the last one

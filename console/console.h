@@ -1,9 +1,9 @@
 /**
  *    Name:        console.h
  *    Description: what the console build tells the port
- *    Version:     0.1.0
+ *    Version:     0.1.4
  *    Created:     29-10-2026
- *    Modified:    01-11-2026
+ *    Modified:    07-11-2026
  *    Author:      Sebastian Toyos
  */
 #ifndef ORUNNERS_CONSOLE_H
@@ -127,6 +127,27 @@ void console_controls_bound(void);
 /* DEFAULTS was picked on CONTROLS (true once): the port puts the shown player's keys and buttons back */
 bool console_controls_defaults(void);
 
+/* OPTIONS > STEERING's SET UP WHEEL (a computer's): a racing wheel SDL has no game controller layout for (a
+   Thrustmaster T300RS on Windows: SDL knows it is a wheel, not where its pedals are), or a wrong one, made one
+   from the controls the player shows it in turn. The step the page waits for, or -1: the port watches the
+   devices for it and says when it took it (console_wheel_setup_took: on to the next; after the last, the
+   port has made the layout and the page gives way to INPUT TEST), or Escape leaves the page, the layout as it
+   was (console_wheel_setup_cancel) */
+enum
+{
+	WHEEL_SETUP_TURN,          /* the wheel turned left: its axis, and the device being set up */
+	WHEEL_SETUP_GAS,           /* the pedal pressed and let go: its axis, or its half of the pedals' one */
+	WHEEL_SETUP_BRAKE,
+	WHEEL_SETUP_SHIFT_UP,      /* a button pressed */
+	WHEEL_SETUP_SHIFT_DOWN,
+	WHEEL_SETUP_START,
+	WHEEL_SETUP_STEPS
+};
+
+int console_wheel_setup_step(void);
+void console_wheel_setup_took(void);
+void console_wheel_setup_cancel(void);
+
 /* The window's settings OPTIONS > VIDEO, VOLUME, STEERING and FPS show and change: the port fills them in, and applies and
    saves them when 'changed' is set */
 enum
@@ -143,6 +164,8 @@ enum
 	WIDE_OFF,           /* the board's 320 pixels, 4:3 */
 	WIDE_16_9,          /* 48 more at each side (S32_VIDEO_WIDE_SIDE_16_9) */
 	WIDE_20_9,          /* 88 more at each side (S32_VIDEO_WIDE_SIDE_20_9): a phone's screen */
+	WIDE_16_10,         /* 32 more at each side (S32_VIDEO_WIDE_SIDE_16_10): a Steam Deck's (after the others:
+	                       outrunners.ini keeps the number) */
 	WIDE_KINDS
 };
 
@@ -156,19 +179,40 @@ enum
 #define STEERING_LEVELS     9
 #define STEERING_NORMAL     5
 
+/* OPTIONS > STEERING's WHEEL ROTATION: a racing wheel's turn from end to end, in degrees, as its driver has it;
+   the game's wheel turns all the way at WHEEL_ROTATION_GAME's (the arcade's; a stick's whole travel), the rest
+   of a wider one's turn past it (issue 16: a G29 at 900) */
+#define WHEEL_ROTATION_GAME 270
+#define WHEEL_ROTATIONS     7
+extern const int console_wheel_rotations[WHEEL_ROTATIONS];    /* WHEEL_ROTATION_GAME up to 1080 */
+
+/* OPTIONS > STEERING's CENTRING and VIBRATION (ports/sdl2/forces.c): the spring that brings a racing wheel
+   with force feedback back to the centre, as the cabinet's did (a computer's), and how hard a wheel shakes or
+   a game controller rumbles while the cabinet's wheel motor runs (in a crash, off the road); in percent of
+   the device's strongest, in steps of FORCE_STEP, 0 none */
+#define FORCE_STEP          10
+#define CENTRING_NORMAL     50
+#define VIBRATION_NORMAL    50
+
 typedef struct
 {
 	int window_scale;      /* 1-6: the window, in times the game's picture */
 	bool full_screen;
 	int pixels;            /* PIXELS_* */
 	int wide;              /* WIDE_*: a wider picture */
+	bool vsync;            /* VIDEO's VSYNC: each frame shown at the screen's refresh (a computer's) */
 	bool vertical;         /* 2 PLAYERS: one screen over the other (false: side by side) */
 	int volume;            /* 0-10: 5 is the game's own */
 	char name[CONSOLE_NAME_LENGTH + 1];    /* the player's, as the network's rooms show it */
+	bool both_radios;      /* OPTIONS > 2P MUSIC: the right seat's radio heard too, as the cabinets' (false: the left one's alone) */
 	bool fps;              /* OPTIONS > FPS: the frames a second at the picture's top right, and in a window's title */
 	int dead_zone;         /* STEERING: DEAD_ZONE_* */
 	int sensitivity;       /* STEERING: the sticks', STEERING_LEVELS */
+	int wheel_rotation;    /* STEERING: a racing wheel's, one of console_wheel_rotations */
 	int steering_speed;    /* STEERING: the keys' and pads', STEERING_LEVELS */
+	int centring;          /* STEERING: a racing wheel's spring, percent (FORCE_STEP) */
+	int vibration;         /* STEERING: the wheel motor's shake or rumble, percent (FORCE_STEP) */
+	bool phone_vibration;  /* STEERING (Android's): the phone itself vibrates too, for its touch controls */
 	bool changed;
 } console_window;
 
