@@ -48,6 +48,8 @@ What a tool makes has the game's data in it: it is yours alone, never share it.
 - **OPTIONS**: controls, difficulty, time, video (window, full screen, sharp, smooth or CRT pixels, a wider
   picture: 16:10 for a Steam Deck, 16:9 or 20:9; VSYNC), volume, sound test, steering, FPS.
 - **The pause** in a race: CONTINUE, RESTART, QUIT GAME.
+- **The picture**: the scenery the arcade draws every other frame to make it look faint (the spray of Niagara's
+  falls, the pyramids) is drawn see-through instead, so it does not blink.
 
 ## Controls
 

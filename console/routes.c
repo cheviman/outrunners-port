@@ -2,9 +2,9 @@
  *    Name:        routes.c
  *    Description: & KNUCKLES' routes: REVERSE, from a goal the player picks back to the pre-stage, and FULL,
  *                 the 31 stages one after another from the pre-stage to the last goal
- *    Version:     0.1.1
+ *    Version:     0.1.2
  *    Created:     29-10-2026
- *    Modified:    06-11-2026
+ *    Modified:    11-11-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
@@ -801,12 +801,6 @@ void road_object_stream_read(void)
 	original_road_object_stream_read();
 }
 
-/* WIDE's background through a change: whole. A change's page words are a set of four (background_page_words):
-   the coming background whole, then its left and its right column swapped for the next one's (with a page
-   that joins them), then the next one whole; the game swaps each column while the view's turn keeps it out of
-   its 320 columns, which WIDE's sides show. The sides keep the whole one shown in the middle instead: the
-   first of the set through the left column's swap, the last from the right one's on (the palettes' fades
-   cover the change, as the game's) */
 /* The background's page word, as the game writes it: its two halves, the upper pages the low one */
 static uint32_t page_word(const struct tilemap_pages *pages)
 {
@@ -819,20 +813,61 @@ static void set_page_word(struct tilemap_pages *pages, uint32_t word)
 	pages->lower_pages = (uint16_t)(word >> 16u);
 }
 
-static void wide_background_pages(uint32_t pages_before)
+/* WIDE's background through a change: the game's own, its last two swaps once WIDE's sides are past them too.
+   A change's page words are a set of four (background_page_words), one a step of the view's turn away and
+   back: the background the race leaves, whole (the first four of the new one's nine pages); with the turn
+   past 2A0, the column it has taken out of sight swapped, its upper page for one that joins the two
+   backgrounds (the one the view comes back over: the change itself) and its lower page for the new one's;
+   back at 160, the other column for the new one's; at 60, the joining page for the new one's own, the same
+   in the half still in sight. Those turns are the 320 columns' (the view is 160 at each side of the turn),
+   so WIDE's sides showed the last two swaps half done (the clouds cut): here their page words wait until the
+   turn is back the side's columns more, where the wider view is past the column too. The first cannot wait
+   (the turn reaches about 2A8): the columns a side shows of its column change as the game swaps it, to the
+   joining page's, which goes on from the other column as the old one did. On a route's change that takes the
+   other set (turn_background_pages) the joining page is in the column it was not drawn for and its swap for
+   the new one's shows in the 320 columns whenever it comes: that one does not wait, the middle as 4:3's */
+static struct waiting_page_word
+{
+	uint32_t object;    /* the background whose page word waits (its address), or 0 */
+	uint32_t word;      /* the page word the game wrote */
+	int turn;           /* the turn it waits for: this at most */
+	bool other_set;     /* the change's set is the turn's, not its background's own */
+} wide_page_words[2];   /* by screen */
+
+/* 'starting': the background was being set up (a race's first frame); 'changing': it was in a change, its
+   page word 'pages_before' then; 'other_set': the turn took the change's other set this frame */
+static void wide_background_pages(bool starting, bool changing, bool other_set, uint32_t pages_before)
 {
 	const uint32_t written = current_object->race_background.next_page_words - 4u;
 	struct tilemap_pages *const pages = TILEMAP_PAGES(current_object->race_background.page_word_address);
-	uint32_t entry;
+	struct waiting_page_word *const waiting = &wide_page_words[screen->index & 1u];
+	const int16_t signed_turn = (int16_t)((uint32_t)player_car->view_yaw << 4) >> 4;
+	const int turn = signed_turn < 0 ? -signed_turn : signed_turn;
+	const int side = console_wide_side();
 
-	if (console_wide_side() == 0 || page_word(pages) == pages_before || written < background_page_words_ADDRESS
-		|| written >= background_page_words_ADDRESS + 8u * 4u * 4u)
-		return;
-	entry = (written - background_page_words_ADDRESS) / 4u % 4u;
-	if (entry == 1u)
-		set_page_word(pages, BACKGROUND_PAGE_WORD_STEPS(written - 4u)[0]);
-	else if (entry == 2u)
-		set_page_word(pages, BACKGROUND_PAGE_WORD_STEPS(written + 4u)[0]);
+	if (starting || waiting->object != address_of(current_object))
+		waiting->object = 0u;    /* (a race's that is gone) */
+	if (side != 0 && changing && current_object->state == 2u && page_word(pages) != pages_before
+		&& written >= background_page_words_ADDRESS && written < background_page_words_ADDRESS + 8u * 4u * 4u)
+	{
+		const uint32_t step = (written - background_page_words_ADDRESS) / 4u % 4u;
+
+		if (step < 2u)
+			waiting->other_set = other_set;
+		else if (step == 2u || !waiting->other_set)
+		{
+			waiting->object = address_of(current_object);
+			waiting->word = page_word(pages);
+			waiting->turn = (step == 2u ? 0x160 : 0x60) - side;
+			set_page_word(pages, pages_before);
+		}
+	}
+	/* (at once where the change is over, or WIDE was turned off meanwhile) */
+	if (waiting->object != 0u && (turn <= waiting->turn || current_object->state != 2u || side == 0))
+	{
+		set_page_word(pages, waiting->word);
+		waiting->object = 0u;
+	}
 }
 
 /* A change's columns swapped in the order the view's turn takes them out of sight, on a route's (FULL and
@@ -840,8 +875,8 @@ static void wide_background_pages(uint32_t pages_before)
    the fork's branch, as its road turns the view the branch's way: the branch a route gives for its stage's
    background (fork_background_update) need not be the way the view turns, and the column in sight changed
    at once. The set the turn needs instead (a turn to the right takes the left column first, the branch 0
-   set), from its second step on: the first is the same in both */
-static void turn_background_pages(uint32_t pages_before)
+   set), from its second step on: the first is the same in both. Returns whether that is the other set */
+static bool turn_background_pages(uint32_t pages_before)
 {
 	const uint32_t written = current_object->race_background.next_page_words - 4u;
 	const int16_t turn = (int16_t)((uint32_t)player_car->view_yaw << 4) >> 4;
@@ -850,11 +885,12 @@ static void turn_background_pages(uint32_t pages_before)
 	if (!route_here() || page_word(TILEMAP_PAGES(current_object->race_background.page_word_address)) == pages_before
 		|| written < background_page_words_ADDRESS || written >= background_page_words_ADDRESS + 8u * 4u * 4u
 		|| (written - background_page_words_ADDRESS) / 4u % 4u != 1u)
-		return;
+		return false;
 	set = background_page_words_ADDRESS + (current_object->race_background.page_half * 2u + (turn < 0 ? 1u : 0u)) * 4u * 4u;
 	set_page_word(TILEMAP_PAGES(current_object->race_background.page_word_address),
 		BACKGROUND_PAGE_WORD_STEPS(set + 4u)[0]);
 	current_object->race_background.next_page_words = set + 8u;
+	return set != written - 4u;
 }
 
 /* The background at a fork: the stage's own (stage_backgrounds; the game takes the fork's stage and the
@@ -885,20 +921,21 @@ static void fork_background_update(void)
 	player_car->branch = branch;
 }
 
-/* The background: the route's own at its forks, its columns swapped the way the view turns, whole on WIDE's
-   sides through a change */
+/* The background: the route's own at its forks, its columns swapped the way the view turns, and out of WIDE's
+   sides' sight too */
 void race_background_update(void)
 {
+	const bool starting = current_object->state == 0u;
 	const bool changing = current_object->state == 2u;
 	const uint32_t pages_before = changing
 		? page_word(TILEMAP_PAGES(current_object->race_background.page_word_address)) : 0u;
 
+	bool other_set = false;
+
 	fork_background_update();
 	if (changing && current_object->state == 2u)
-	{
-		turn_background_pages(pages_before);
-		wide_background_pages(pages_before);
-	}
+		other_set = turn_background_pages(pages_before);
+	wide_background_pages(starting, changing, other_set, pages_before);
 }
 
 /* The race's checkpoints: the time a fork adds the route's next stage's (the game's is by the stage its

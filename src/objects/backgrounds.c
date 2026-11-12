@@ -1049,7 +1049,7 @@ void backdrop_translucent_start(void)
 /* Keeps the sprite on the background's panorama at the panorama's own speed (as backdrop_far_update),
    animates it and draws it only on even frames (frame_count), so it looks faint. By state: 0 waits until
    it is off the screen; 1 drawn while on the screen; off it, it ends once leaving. */
-void backdrop_translucent_update(void)
+void CONSOLE_ORIGINAL(backdrop_translucent_update)(void)
 {
 	uint32_t zero = 0;
 	uint32_t scroll_x = 0;

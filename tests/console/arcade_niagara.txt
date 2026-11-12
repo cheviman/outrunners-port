@@ -1,0 +1,3 @@
+# ARCADE (with arcade_niagara_controls.txt): the game as the cabinet runs it, one player
+600 start
+660 accept

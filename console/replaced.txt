@@ -20,3 +20,4 @@ waiting_banner_show         # one player (CLASSIC's too): no WAITING FOR CHALLEN
 car_select_run              # the pause's RESTART: the car and the transmission chosen before, chosen again
 link_receive_records        # the network: the other devices' race records as their datagrams bring them (network.c)
 link_send_records           # the network: none to a link board, the records go with the port's frame
+backdrop_translucent_update  # the spray of the falls and the pyramids: every frame and see-through, in place of every other frame

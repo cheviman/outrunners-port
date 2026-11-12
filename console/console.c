@@ -2,9 +2,9 @@
  *    Name:        console.c
  *    Description: the console build's own versions of the game functions console/replaced.txt lists, and
  *                 what it tells the port
- *    Version:     0.1.2
+ *    Version:     0.1.3
  *    Created:     29-10-2026
- *    Modified:    07-11-2026
+ *    Modified:    11-11-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
@@ -143,6 +143,27 @@ void network_check_stand_alone(void)
 	console_master_settings();
 	move_halfwords(race + 0x30u, BOOKKEEPING_COURSE_RECORDS_ADDRESS, 0x1Eu);
 	clear_text_layer();
+}
+
+/* ---- the picture ---- */
+
+/* The sprites on the background that the game draws every other frame so that they look faint (the spray of
+   Niagara's falls, the pyramids of stages 13 and 20): two of the screen's frames on and two off, which shows
+   as a blink (a player's report). Here they are drawn every frame and see-through: the count kept odd for the
+   game's handler, which draws when its next is even, and the sprites it puts in the list marked as a ghost's
+   (S32_SPRITE_GHOST: half their colour, half the colour under them), what the frames on and off add up to */
+void backdrop_translucent_update(void)
+{
+	const uint32_t first = screen->sprite_list_last + 0x10u;
+
+	current_object->backdrop_translucent.frame_count |= 1u;
+	original_backdrop_translucent_update();
+	for (uint32_t sprite = first; sprite <= screen->sprite_list_last; sprite += 0x10u)
+		if ((SPRITE_WORDS(sprite)[0] >> 14) == 0u)    /* (a sprite, not the group's jump) */
+		{
+			SPRITE_WORDS(sprite)[7] |= S32_SPRITE_GHOST;
+			SPRITE_WORDS(sprite + 0x3000u)[7] |= S32_SPRITE_GHOST;
+		}
 }
 
 /* ---- the sound ---- */

@@ -420,9 +420,51 @@ merged here; this repository adds console/, the ports and their documents.
   identical, picture and sound; the first run's folder against extract_assets.py's, no difference; the
   console's headless game before and after the merge on tests/console (menu, controls, classic, reverse,
   two_players, time_attack, full: 204,204 frames), its state, picture and sound the same in every frame.
+- WIDE's background through a change, the game's own again (a player's video: the canyon stayed behind the
+  road to Niagara, then turned into the falls' forest in a frame). Keeping the background whole (31-10) took
+  the page that joins the two backgrounds out of the change, and that page is the change: the view comes
+  back over it, the old background at one end and the new one at the other. So WIDE showed the old
+  background where the game shows the joining page, in its middle 320 columns too, until the last set
+  replaced it all at once. Now the game's four page words as it writes them, the last two (the other
+  column's swap at a turn of 160, the joining page's at 60) waiting until the turn is back the side's
+  columns more, where WIDE's sides are past their column too (wide_background_pages, routes.c): no half
+  swapped pages at the sides, which is what keeping it whole was for. The first swap (at 2A0, the turn's
+  most about 2A8) cannot wait: the strip a side shows of that column changes to the joining page's as the
+  game swaps it. Where a route's change takes the other set (turn_background_pages) the last swap does not
+  wait: the joining page is then in the column it was not drawn for, and its swap shows in the 320 columns
+  whenever it comes, 4:3 too (FULL's stage 1: San Francisco's skyline gone in a frame; to do). Checked on the
+  console's headless game: ARCADE to Niagara by the canyon (tests/console/arcade_niagara.txt and its controls;
+  before, 9,932 pixels of the middle 320 columns were not 4:3's in a frame of that change), its two changes
+  every 6th frame, and FULL's first 14,000 frames, their seven stretches the same way: the middle 320 columns
+  the same as 4:3's in every one, at 16:10, 16:9 and 20:9 (FULL's at the last two), the sides whole to the
+  eye at 20:9; 4:3 itself the same as before in 12,000 frames, picture and state. Not looked at in the
+  window, nor on a device.
+- The spray of Niagara's falls see-through (the same video: the falls blinked; Sebas). The game draws that
+  sprite on the background every other frame of its 30 a second so that it looks faint
+  (backdrop_translucent_update: the spray, the falls far off in the forest, the pyramids of stages 13 and
+  20), two of the screen's frames on and two off; the reference does the same, and so does a longplay of the
+  arcade. The console draws it every frame, half its colour and half the colour under it, as the ghost's
+  car (S32_SPRITE_GHOST): backdrop_translucent_update in console/replaced.txt (src/ written again: its two
+  lines), the console's keeps the handler's count odd and marks the sprites it puts in the list (console.c).
+  The arcade build blinks as the cabinet does. Checked on the console's headless game, ARCADE to Niagara: 64
+  frames in a row over the falls, the sky's brightness went between 237.7 and 234.6 two frames each (242.1
+  and 237.7 on the spray's other picture) and now stays at 235.2 (239.4) through the 8 frames of each of the
+  spray's pictures; the picture the same as before until the spray is first in sight (frame 11743). The
+  arcade build: the 16 scenarios identical, picture and sound. Not looked at in the window; the pyramids
+  not run.
 
 ## To do
 
+- The northern lights of stage 26 are drawn every other frame too (aurora_update, by the count that also
+  times their animations), and one of the route map's landmarks: see-through as the spray, if they blink as
+  much.
+
+- FULL's and REVERSE's background changes where the view turns the other way than the background's pages
+  were drawn for (the fork's branch road the player takes): the turn's set keeps the swaps out of sight
+  (31-10), but the page that joins the two backgrounds is drawn for the other column, so the view comes back
+  over a cut and the game's last swap changes the picture in sight (FULL's stage 1 at frame 7087 of
+  tests/console/full.txt: San Francisco's skyline gone in a frame, 4:3 and WIDE). Without the joining page
+  there (the column out of sight straight to the new one's) one edge would cross the view instead.
 - The network on a network shared with strangers: a room's code to join it (today a device on the same local
   network can fill a room with JOINs or speak for a member it overhears).
 - The network: checked on two windows and between devices (Android's broadcasts:
