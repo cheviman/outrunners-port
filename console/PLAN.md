@@ -471,12 +471,22 @@ merged here; this repository adds console/, the ports and their documents.
   0-1-3-7 over the same hill; menu, controls, classic, time_attack, two_players and arcade_niagara identical
   to the build before, state and picture in every frame. Not looked at in the window, nor REVERSE from the
   other goals.
+- REVERSE's finish's kangaroos (issue 25: grey figures in the parade, a player's screenshot). The finish is
+  AUSTRALIA's goal at the pre-stage, and its parade's kangaroos take their colours from AUSTRALIA's scene
+  palette (scene_palettes, at 4C00; the pre-stage's is at 4A00, apart): put after the pre-stage's as the
+  route comes to it (fork_background_update). Checked on the console's headless game: the parade's
+  kangaroos as at ARCADE's AUSTRALIA (0-1-3-7-D-15, the sprites' palette there the same); menu, classic,
+  time_attack, two_players and arcade_niagara identical to the build before.
 
 ## To do
 
-- REVERSE's finish at the pre-stage is AUSTRALIA's (finish_stream) in the pre-stage's colours: its
-  kangaroos are red figures (issue 25). Drawing the finish's objects in AUSTRALIA's scene colours
-  (the start line's way, the extra palette) does not reach them: their colours are elsewhere.
+- REVERSE's finish (AUSTRALIA's at the pre-stage): the pair of kangaroos under the riders at each side of
+  the road (scenery_pair 02E1A6) is drawn nearer the middle than at AUSTRALIA, behind the crowd (its
+  pixels at x 79-237 where the game's are at 50-75 and 245-270), its record, place and the road's width
+  code (5) the same as there; the riders (020DCF) where the game has them.
+- Issue 25's last report, a split second of something wrong from the results to the title: not seen
+  pressing START on the route map or the ranking after ARCADE's race (the fades smooth, frame by frame);
+  the player to say which screen.
 
 - The northern lights of stage 26 are drawn every other frame too (aurora_update, by the count that also
   times their animations), and one of the route map's landmarks: see-through as the spray, if they blink as
@@ -487,7 +497,11 @@ merged here; this repository adds console/, the ports and their documents.
   (31-10), but the page that joins the two backgrounds is drawn for the other column, so the view comes back
   over a cut and the game's last swap changes the picture in sight (FULL's stage 1 at frame 7087 of
   tests/console/full.txt: San Francisco's skyline gone in a frame, 4:3 and WIDE). Without the joining page
-  there (the column out of sight straight to the new one's) one edge would cross the view instead.
+  there (the column out of sight straight to the new one's) one edge would cross the view instead. The cut
+  at 7087 is also the change's first step: a route's change from a stage to one the game never comes to
+  from it (FULL's 1 to 2) takes the background of the game's way there (0 to 2), whose first pages are
+  another stage's, not the one left. No page in the ROM joins the two; keeping the old pages in sight
+  instead would show them in the new background's colours.
 - The network on a network shared with strangers: a room's code to join it (today a device on the same local
   network can fill a room with JOINs or speak for a member it overhears).
 - The network: checked on two windows and between devices (Android's broadcasts:

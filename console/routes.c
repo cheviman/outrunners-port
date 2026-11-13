@@ -894,7 +894,10 @@ static bool turn_background_pages(uint32_t pages_before)
 }
 
 /* The background at a fork: the stage's own (stage_backgrounds; the game takes the fork's stage and the
-   branch, which lead forward to its own choice), and none new for the pre-stage, which has none */
+   branch, which lead forward to its own choice), and none new for the pre-stage, which has none. There
+   REVERSE finishes with AUSTRALIA's goal (finish_stream), whose kangaroos take their colours from
+   AUSTRALIA's scene palette (at 4C00, the pre-stage's own at 4A00): put after the pre-stage's
+   (queue_stage_load), as the game puts it at AUSTRALIA (they were not there, a player's screenshot) */
 static void fork_background_update(void)
 {
 	const uint8_t built_stage = screen->built_stage;
@@ -909,6 +912,7 @@ static void fork_background_update(void)
 	}
 	if (screen->route_stage == 0u)
 	{
+		queue_palette(scene_palettes[FIRST_GOAL]);
 		player_car->new_branch = 0u;
 		original_race_background_update();
 		return;
