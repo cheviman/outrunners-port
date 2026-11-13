@@ -2,9 +2,9 @@
  *    Name:        route_select.c
  *    Description: & KNUCKLES > REVERSE's goal, picked on the route map: the map of the race's end, whole, its
  *                 ten goals, a car on the one picked
- *    Version:     0.1.1
+ *    Version:     0.1.2
  *    Created:     29-10-2026
- *    Modified:    07-11-2026
+ *    Modified:    13-11-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
@@ -197,7 +197,14 @@ int console_route_select_frame(uint32_t pressed)
 	}
 	if (pick.leaving != ROUTE_SELECT_NOTHING && (screen->flags & 1u) == 0u)
 	{
-		/* (the fade out over: the map's objects go, the game goes on) */
+		/* (the fade out over: the map's objects go, the game goes on; the zoom's center back at 0, as the
+		   game's route map leaves it (route_map_update) and the race's background reads it: at A0, 70 the
+		   race's background was 112 lines lower, the sky over a hill black, a player's screenshot) */
+		const struct route_map_registers *registers = map_registers();
+
+		VIDEO_REGISTER_WORDS(registers->zoom_center_x_address)[0] = 0u;
+		VIDEO_REGISTER_WORDS(registers->zoom_center_y_address)[0] = 0u;
+		game->send_video_registers = 0xFFu;
 		pick.running = false;
 		clear_objects();
 		return pick.leaving;

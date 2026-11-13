@@ -2,9 +2,9 @@
  *    Name:        routes.c
  *    Description: & KNUCKLES' routes: REVERSE, from a goal the player picks back to the pre-stage, and FULL,
  *                 the 31 stages one after another from the pre-stage to the last goal
- *    Version:     0.1.2
+ *    Version:     0.1.3
  *    Created:     29-10-2026
- *    Modified:    11-11-2026
+ *    Modified:    13-11-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
@@ -921,18 +921,133 @@ static void fork_background_update(void)
 	player_car->branch = branch;
 }
 
-/* The background: the route's own at its forks, its columns swapped the way the view turns, and out of WIDE's
-   sides' sight too */
+/* Whether 'stage''s course changes its background within the stage (a run's road event 4 or 5: the
+   background 2A + stage, road_surface_update) */
+static bool background_change_within(int stage)
+{
+	uint32_t course = stage_courses[stage], size;
+
+	for (;;)
+	{
+		if (s16_at(course) == -COURSE_JUMP)
+		{
+			course = u32_at(course + 2u);
+			continue;
+		}
+		if ((size = record_size(course)) == 0)
+			return false;
+		if (size == 6 && s16_at(course) > 0 && (byte_at(course + 5u) == 4u || byte_at(course + 5u) == 5u))
+			return true;
+		course += size;
+	}
+}
+
+/* 16 colours (at 'colours') into the screen's palette at once, 'blocks' times from 'place' on, as
+   upload_palette_list puts each entry */
+static void palette_blocks_now(uint32_t colours, uint32_t place, uint32_t blocks)
+{
+	const uint32_t index = screen->index;
+	uint32_t address = LINKED((index << 19) | (index >> 13) | 0x600000u, place);
+	const uint16_t *source = rom_pointer(colours);
+
+	for (; blocks != 0u; blocks--)
+		for (int colour = 0; colour < 16; colour += 2, address += 4u)
+			io_write32(address, source[colour] | (uint32_t)source[colour + 1] << 16);
+}
+
+/* A list of colour blocks (queue_palette_list's) at once */
+static void palette_list_now(uint32_t list)
+{
+	const uint32_t entries = list != 0u ? (PALETTE_BLOCK_LIST(list)->length
+		| (uint32_t)PALETTE_BLOCK_LIST(list)->length_high << 16) >> 3 : 0u;
+
+	for (uint32_t entry = 0; entry < entries; entry++)
+	{
+		const struct palette_block_entry *block = PALETTE_BLOCK_ENTRY(list + 4u + entry * 8u);
+
+		palette_blocks_now(block->colours, block->place, block->blocks);
+	}
+}
+
+/* A list of palette fades (start_palette_fades') at its end at once: each one's second palette */
+static void palette_fades_ended(uint32_t fade_list)
+{
+	const uint32_t fades = fade_list != 0u ? PALETTE_FADE_LIST(fade_list)->length / 0xCu : 0u;
+
+	for (uint32_t fade = 0; fade < fades; fade++)
+	{
+		const struct palette_fade_entry *entry = PALETTE_FADE_ENTRY(fade_list + 4u + fade * 0xCu);
+
+		palette_blocks_now(entry->to, entry->palette_offset, entry->blocks);
+	}
+}
+
+/* The palettes a route's background stands on (FULL's and REVERSE's: the sky black over a hill, the road's
+   colours another stage's, a player's report and screenshots). A change of the game's puts only the
+   colours that are not already the stage before's, the one its fork comes from: those of the way there
+   stay from the changes before it (the sky of stage 7, Spain, is the first change's, the pre-stage's to
+   stage 1). A route comes from another stage, or starts at a goal, so the palette is put as the game's
+   own way to 'stage' leaves it: from the race's start at the pre-stage, each change to the next stage of
+   the way (stage_backgrounds; its stage before is the background's built_stage, background >> 1) and
+   each change within a stage of it (2A + stage, where its course has one): their colours, and their fades
+   at their end (the backgrounds', the road's and those of the backgrounds leaving), until the change to
+   'stage' itself, which the game puts as ever ('stage' not the pre-stage, which has no change). Returns the road's palette fades the way leaves
+   (screen road_palette_fades: the last change with road colours') */
+static uint32_t forward_palettes(int stage)
+{
+	uint8_t way[2 * STAGES];
+	int steps = 0, at = stage_backgrounds[stage] >> 1;
+	const uint32_t *start_road = rom_pointer(stage_road_palettes[0]);
+	uint32_t road_fades = start_road[0];
+
+	for (;;)
+	{
+		if (background_change_within(at))
+			way[steps++] = (uint8_t)(0x2A + at);
+		if (at == 0)
+			break;
+		way[steps++] = stage_backgrounds[at];
+		at = stage_backgrounds[at] >> 1;
+	}
+	palette_list_now(no_background_palettes_ADDRESS);    /* (the pre-stage's start: race_background_update) */
+	palette_list_now(stage_road_palettes[0] + 4u);       /* (and road_surface_start) */
+	while (steps-- > 0)
+	{
+		const uint8_t background = way[steps];
+		const uint32_t road = background_road_palettes[background];
+
+		palette_list_now(background_palettes[background]);
+		palette_fades_ended(background_leaving_fades[background]);
+		if (road != 0u)
+		{
+			road_fades = ROAD_PALETTE_RECORD(road)->road_fades;
+			palette_fades_ended(road + 4u);
+		}
+		palette_fades_ended(background_palette_fades[background]);
+	}
+	return road_fades;
+}
+
+/* The background: the route's own at its forks on the palettes the game's way there leaves, its columns
+   swapped the way the view turns, and out of WIDE's sides' sight too */
 void race_background_update(void)
 {
 	const bool starting = current_object->state == 0u;
 	const bool changing = current_object->state == 2u;
+	const bool first_step = changing && current_object->race_background.change_step == 0u;
 	const uint32_t pages_before = changing
 		? page_word(TILEMAP_PAGES(current_object->race_background.page_word_address)) : 0u;
 
 	bool other_set = false;
 
 	fork_background_update();
+	/* (the palettes under the game's own, which it queues for the vertical blank: the race's first frame,
+	   and the first step of a fork's change, as it puts the new background's) */
+	if (route_here() && starting && screen->first_stage != 0u)
+		forward_palettes(screen->first_stage);    /* (REVERSE's goal; FULL starts at the pre-stage, as the game) */
+	else if (route_here() && first_step && current_object->race_background.change_step != 0u
+		&& screen->stage_background_change == 0u && screen->route_stage != 0u)
+		screen->road_palette_fades = forward_palettes(screen->route_stage);
 	if (changing && current_object->state == 2u)
 		other_set = turn_background_pages(pages_before);
 	wide_background_pages(starting, changing, other_set, pages_before);

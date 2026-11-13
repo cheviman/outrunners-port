@@ -452,8 +452,31 @@ merged here; this repository adds console/, the ports and their documents.
   spray's pictures; the picture the same as before until the spray is first in sight (frame 11743). The
   arcade build: the 16 scenarios identical, picture and sound. Not looked at in the window; the pyramids
   not run.
+- REVERSE's backgrounds where the game shows them (issue 25: the sky black over a hill, a player's
+  screenshots; only the top of each stage's background in sight). The route map where its goal is picked
+  (route_select.c) left the background's tilemap zoomed about A0, 70, so the race drew its background 112
+  lines lower, its upper pages' empty rows in the sky: the center back at 0 as the map is left, as the game's
+  route map leaves it.
+- FULL's and REVERSE's palettes as the game's own way to a stage leaves them (issue 25: the lanes eaten by
+  orange zigzags, the road red, black blocks in the sky through a change, a hill another colour). A change of
+  the game's puts only the colours that are not already the stage before's: the rest stay from the changes on
+  the way there (Spain's sky is the pre-stage's to stage 1's). A route comes to a stage from another, or
+  starts at a goal: at a fork's change's first step, and at REVERSE's start, the palette is put as the way
+  there leaves it (forward_palettes, routes.c: from the pre-stage's start, each change to the next stage of
+  the way by stage_backgrounds and each change within a stage of it, their colours and their fades' ends,
+  the backgrounds', the road's and the leaving ones'), with the road's fades that way's (road_palette_fades),
+  under the new background's own. Checked on the console's headless game: REVERSE from AUSTRALIA (17 frames
+  through the race) and FULL (46, one every 2,500) against the same with the old palettes, the frames that
+  differed better each; at stage 7 the palette's background half (1000-17FF) the same as ARCADE's on the way
+  0-1-3-7 over the same hill; menu, controls, classic, time_attack, two_players and arcade_niagara identical
+  to the build before, state and picture in every frame. Not looked at in the window, nor REVERSE from the
+  other goals.
 
 ## To do
+
+- REVERSE's finish at the pre-stage is AUSTRALIA's (finish_stream) in the pre-stage's colours: its
+  kangaroos are red figures (issue 25). Drawing the finish's objects in AUSTRALIA's scene colours
+  (the start line's way, the extra palette) does not reach them: their colours are elsewhere.
 
 - The northern lights of stage 26 are drawn every other frame too (aurora_update, by the count that also
   times their animations), and one of the route map's landmarks: see-through as the spray, if they blink as
