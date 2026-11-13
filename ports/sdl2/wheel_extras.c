@@ -2,7 +2,7 @@
  *    Name:        wheel_extras.c
  *    Description: OPTIONS > STEERING's SET UP WHEEL on more than one device: a racing wheel's pedals and buttons
  *                 on devices of their own (pedals, a shifter), read beside the wheel's game controller
- *    Version:     0.1.0
+ *    Version:     0.1.1
  *    Created:     13-11-2026
  *    Modified:    13-11-2026
  *    Author:      Sebastian Toyos
@@ -16,7 +16,8 @@
  *    with every control its own writes no line: the game controller alone, as before.
  *
  *    The file: "wheel GUID", then "gas GUID axis half inverted", "brake ...", "shift_up GUID button",
- *    "shift_down ...", "start ..." for those on another device.
+ *    "shift_down ...", "start ..." for those on another device; a button on an axis (a handbrake),
+ *    "start GUID aaxis half inverted".
  */
 #include "wheel_extras.h"
 
@@ -79,9 +80,11 @@ void wheel_extras_open(const char *path)
 		return;
 	while (fgets(line, sizeof(line), file))
 	{
-		char name[16], guid[64];
-		int index = 0, half = 0, inverted = 0;
-		const int fields = sscanf(line, "%15s %63s %d %d %d", name, guid, &index, &half, &inverted);
+		char name[16], guid[64], control[16];
+		int half = 0, inverted = 0;
+		const int fields = sscanf(line, "%15s %63s %15s %d %d", name, guid, control, &half, &inverted);
+		const bool axis = fields >= 3 && control[0] == 'a';
+		const int index = fields >= 3 ? atoi(control + (axis ? 1 : 0)) : 0;
 
 		if (fields < 2 || name[0] == '#')
 			continue;
@@ -97,6 +100,7 @@ void wheel_extras_open(const char *path)
 				kept.extras[which].used = true;
 				kept.extras[which].device = SDL_JoystickGetGUIDFromString(guid);
 				kept.extras[which].index = index;
+				kept.extras[which].axis = axis && which > WHEEL_EXTRA_BRAKE;
 				kept.extras[which].half = half;
 				kept.extras[which].inverted = inverted != 0;
 			}
@@ -136,6 +140,9 @@ void wheel_extras_save(SDL_JoystickGUID wheel, const wheel_extra extras[WHEEL_EX
 		SDL_JoystickGetGUIDString(extras[which].device, guid, sizeof(guid));
 		if (which <= WHEEL_EXTRA_BRAKE)
 			fprintf(file, "%s %s %d %d %d\n", names[which], guid, extras[which].index, extras[which].half,
+				extras[which].inverted ? 1 : 0);
+		else if (extras[which].axis)
+			fprintf(file, "%s %s a%d %d %d\n", names[which], guid, extras[which].index, extras[which].half,
 				extras[which].inverted ? 1 : 0);
 		else
 			fprintf(file, "%s %s %d\n", names[which], guid, extras[which].index);
@@ -193,15 +200,12 @@ static SDL_Joystick *part_of(int which)
 	return NULL;
 }
 
-int wheel_extras_pedal(int which)
+/* An axis' travel, 0 to 32767 */
+static int travel_of(SDL_Joystick *part, const wheel_extra *extra)
 {
-	SDL_Joystick *part = which <= WHEEL_EXTRA_BRAKE ? part_of(which) : NULL;
-	const wheel_extra *extra = &kept.extras[which];
-	int value, travel;
+	const int value = SDL_JoystickGetAxis(part, extra->index);
+	int travel;
 
-	if (!part)
-		return 0;
-	value = SDL_JoystickGetAxis(part, extra->index);
 	if (extra->half != 0)
 		travel = extra->half > 0 ? value : -value;    /* (the half that way, as SDL's +a / -a) */
 	else
@@ -209,9 +213,20 @@ int wheel_extras_pedal(int which)
 	return travel < 0 ? 0 : (travel > 32767 ? 32767 : travel);
 }
 
+int wheel_extras_pedal(int which)
+{
+	SDL_Joystick *part = which <= WHEEL_EXTRA_BRAKE ? part_of(which) : NULL;
+
+	return part ? travel_of(part, &kept.extras[which]) : 0;
+}
+
 bool wheel_extras_button(int which)
 {
 	SDL_Joystick *part = which > WHEEL_EXTRA_BRAKE ? part_of(which) : NULL;
 
-	return part && SDL_JoystickGetButton(part, kept.extras[which].index) != 0;
+	if (!part)
+		return false;
+	if (kept.extras[which].axis)
+		return travel_of(part, &kept.extras[which]) >= 16384;    /* (past its middle, as SDL's button on an axis) */
+	return SDL_JoystickGetButton(part, kept.extras[which].index) != 0;
 }

@@ -2,7 +2,7 @@
  *    Name:        wheel_setup.c
  *    Description: OPTIONS > STEERING's SET UP WHEEL: a racing wheel's axes and buttons, as the player shows
  *                 them, made a game controller layout for SDL, kept in gamecontrollerdb.txt
- *    Version:     0.2.0
+ *    Version:     0.2.1
  *    Created:     05-11-2026
  *    Modified:    13-11-2026
  *    Author:      Sebastian Toyos
@@ -21,7 +21,8 @@
  *      its positive end); near its middle, it is the wheel's combined pedals, the gas one half and the brake
  *      the other.
  *    - shift up, shift down and start: the first button pressed of any device, of those not taken: the game
- *      controller's right and left shoulders and START, CONTROLS' own for them.
+ *      controller's right and left shoulders and START, CONTROLS' own for them. Or an axis no step took,
+ *      pulled and let go as a pedal is (a handbrake, a lever): the button held past the middle of its travel.
  *    The device's other buttons are the game controller's others in turn (A, B, X, Y...: CONTROLS binds them),
  *    its first hat the pad. The layout, SDL's line for the device, is added to SDL (SDL_GameControllerAddMapping:
  *    the device a game controller from then on) and to the file, in place of the device's line before; the
@@ -67,7 +68,10 @@ static struct
 	int pedal_half[2];              /* 0: the whole axis; 1 or -1: its half that way (the combined pedals) */
 	bool pedal_inverted[2];
 	int button_device[3];           /* shift up's, shift down's, start's devices */
-	int buttons[3];                 /* shift up's, shift down's, start's */
+	int buttons[3];                 /* shift up's, shift down's, start's: a button, or an axis (button_axis) */
+	bool button_axis[3];            /* an axis pulled (a handbrake), held past the middle of its travel */
+	int button_half[3];             /* its half, as a pedal's (0: the whole axis) */
+	bool button_inverted[3];
 } setup = { .step = -1, .device = -1 };
 
 /* the game controller's buttons the device's others are, in turn: those CONTROLS binds first, the pad's
@@ -219,7 +223,61 @@ static bool take_pedal(int pedal)
 	return true;
 }
 
-/* SHIFT UP, SHIFT DOWN, START ('which' 0-2): the first button pressed of any device, of those not taken */
+/* (an axis the steps before 'which' took: the wheel's, a pedal's, a button's) */
+static bool axis_taken(int slot, int axis, int which)
+{
+	if (slot == setup.device && axis == setup.wheel_axis)
+		return true;
+	for (int pedal = 0; pedal < 2; pedal++)
+		if (setup.pedal_device[pedal] == slot && setup.pedal_axis[pedal] == axis)
+			return true;
+	for (int other = 0; other < which; other++)
+		if (setup.button_axis[other] && setup.button_device[other] == slot && setup.buttons[other] == axis)
+			return true;
+	return false;
+}
+
+/* An axis as SHIFT UP, SHIFT DOWN or START (a handbrake, a lever: issue 28): of every device's axes not taken,
+   the one pulled furthest, once it is let go, as a pedal is; held, it is the button held past the middle of
+   its travel (SDL's button on an axis) */
+static bool take_axis_button(int which)
+{
+	int best_slot = -1, best = -1, rest;
+
+	for (int slot = 0; slot < DEVICES; slot++)
+		for (int axis = 0; devices[slot] && axis < axes_of(devices[slot]); axis++)
+		{
+			int moved;
+
+			if (axis_taken(slot, axis, which))
+				continue;
+			rest = setup.rest[slot][axis];
+			moved = SDL_JoystickGetAxis(devices[slot], axis) - rest;
+			if (abs(rest) >= CENTRED && (moved > 0) == (rest > 0))
+				moved = 0;    /* (resting at an end: pulled toward the other) */
+			if (abs(moved) > abs(setup.pressed[slot][axis]))
+				setup.pressed[slot][axis] = moved;
+			if (best < 0 || abs(setup.pressed[slot][axis]) > abs(setup.pressed[best_slot][best]))
+			{
+				best_slot = slot;
+				best = axis;
+			}
+		}
+	if (best < 0 || abs(setup.pressed[best_slot][best]) < PRESSED)
+		return false;
+	rest = setup.rest[best_slot][best];
+	if (abs(SDL_JoystickGetAxis(devices[best_slot], best) - rest) > abs(setup.pressed[best_slot][best]) / 4)
+		return false;    /* (still pulled) */
+	setup.button_device[which] = best_slot;
+	setup.buttons[which] = best;
+	setup.button_axis[which] = true;
+	setup.button_half[which] = abs(rest) < CENTRED ? (setup.pressed[best_slot][best] > 0 ? 1 : -1) : 0;
+	setup.button_inverted[which] = setup.button_half[which] == 0 && rest > 0;
+	return true;
+}
+
+/* SHIFT UP, SHIFT DOWN, START ('which' 0-2): the first button pressed of any device, of those not taken; or an
+   axis pulled and let go */
 static bool take_button(int which)
 {
 	for (int slot = 0; slot < DEVICES; slot++)
@@ -231,22 +289,24 @@ static bool take_button(int which)
 
 			setup.held[slot][button] = down;
 			for (int other = 0; other < which; other++)
-				taken = taken || (setup.button_device[other] == slot && setup.buttons[other] == button);
+				taken = taken || (!setup.button_axis[other] && setup.button_device[other] == slot
+					&& setup.buttons[other] == button);
 			if (fresh && !taken)
 			{
 				setup.button_device[which] = slot;
 				setup.buttons[which] = button;
+				setup.button_axis[which] = false;
 				return true;
 			}
 		}
-	return false;
+	return take_axis_button(which);
 }
 
 /* (a button the steps took on the wheel's device) */
 static bool chosen(int button)
 {
 	for (int which = 0; which < 3; which++)
-		if (setup.button_device[which] == setup.device && setup.buttons[which] == button)
+		if (!setup.button_axis[which] && setup.button_device[which] == setup.device && setup.buttons[which] == button)
 			return true;
 	return false;
 }
@@ -289,8 +349,18 @@ static void make_mapping(SDL_Joystick *device, char *mapping, char *guid, size_t
 	append_pedal(mapping, SDL_CONTROLLER_AXIS_TRIGGERRIGHT, 0);
 	append_pedal(mapping, SDL_CONTROLLER_AXIS_TRIGGERLEFT, 1);
 	for (int which = 0; which < 3; which++)
-		if (setup.button_device[which] == setup.device)
-			append(mapping, "%s:b%d,", SDL_GameControllerGetStringForButton(chosen_buttons[which]), setup.buttons[which]);
+	{
+		const char *button = SDL_GameControllerGetStringForButton(chosen_buttons[which]);
+
+		if (setup.button_device[which] != setup.device)
+			continue;    /* (on its own device: wheel_extras') */
+		if (!setup.button_axis[which])
+			append(mapping, "%s:b%d,", button, setup.buttons[which]);
+		else if (setup.button_half[which] != 0)
+			append(mapping, "%s:%ca%d,", button, setup.button_half[which] > 0 ? '+' : '-', setup.buttons[which]);
+		else
+			append(mapping, "%s:a%d%s,", button, setup.buttons[which], setup.button_inverted[which] ? "~" : "");
+	}
 	for (int button = 0; button < buttons_of(device); button++)
 	{
 		if (chosen(button))
@@ -391,6 +461,9 @@ static void make_extras(wheel_extra extras[WHEEL_EXTRAS])
 			extras[WHEEL_EXTRA_SHIFT_UP + which].used = true;
 			extras[WHEEL_EXTRA_SHIFT_UP + which].device = SDL_JoystickGetGUID(devices[setup.button_device[which]]);
 			extras[WHEEL_EXTRA_SHIFT_UP + which].index = setup.buttons[which];
+			extras[WHEEL_EXTRA_SHIFT_UP + which].axis = setup.button_axis[which];
+			extras[WHEEL_EXTRA_SHIFT_UP + which].half = setup.button_half[which];
+			extras[WHEEL_EXTRA_SHIFT_UP + which].inverted = setup.button_inverted[which];
 		}
 }
 

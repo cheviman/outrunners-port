@@ -512,6 +512,13 @@ merged here; this repository adds console/, the ports and their documents.
   the old build's too). Checked on Windows with the pack's tables' version changed: the pack made again and
   the game on; with the folder's version.txt changed too and the ROM set beside, the assets taken out again;
   a good pack loaded once. Not checked on a Mac.
+- SET UP WHEEL takes an axis for SHIFT UP, SHIFT DOWN or START (issue 28: a handbrake): of the axes no step
+  took (the wheel's, the pedals'), the one pulled and let go, as a pedal is taken; held past the middle of
+  its travel, it is the button held. On the wheel's device, SDL's button on an axis in its layout
+  ("leftshoulder:a3"); on another, wheel_devices.txt's "start GUID a3 half inverted", the buttons' lines as
+  before. Checked with SDL's virtual joysticks: pedals with a handbrake as START (the gas pressed meanwhile
+  never taken), a wheel's own handbrake as SHIFT DOWN, held at a third and past the middle; the two cases
+  before, the same files.
 ## To do
 
 - REVERSE's finish (AUSTRALIA's at the pre-stage): the pair of kangaroos under the riders at each side of
