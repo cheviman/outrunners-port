@@ -101,6 +101,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if defined(__ANDROID__) && defined(ORUNNERS_CONSOLE)
+static void android_multicast_lock(bool wanted);
+#endif
+
 /* The console version (console/, OutRunners) shows the left seat's screen alone, both in 2 PLAYERS, and
    plays both sides' sound on both speakers; the arcade one (OutRunners Arcade) both screens, each side's
    sound on its own speaker. Each keeps its own files */
@@ -1895,6 +1899,9 @@ static void on_frame_done(void)
 
 #ifdef ORUNNERS_CONSOLE
 	console_network_frame();
+#ifdef __ANDROID__
+	android_multicast_lock(console_network_open());
+#endif
 	if (console_network_waiting())
 		run_network_wait();
 	if (pause_requested)
@@ -2013,6 +2020,88 @@ static int app_folder(const char *base, char *folder, size_t size)
 	return 0;
 #endif
 }
+
+#if defined(__ANDROID__) && defined(ORUNNERS_CONSOLE)
+#include <jni.h>
+
+/* NETWORK on Android: Wi-Fi's multicast lock while the network is open (rooms looked for, a room, its races).
+   Without it some phones drop the datagrams sent to every device (the rooms' beacons), so no room is found
+   but by its address (issue 34). WifiManager.createMulticastLock through SDL's activity, not counted, taken
+   once and let go once; CHANGE_WIFI_MULTICAST_STATE in the manifest. A phone that refuses it plays on as
+   before */
+static jobject multicast_lock;
+
+static bool java_failed(JNIEnv *env)
+{
+	if (!(*env)->ExceptionCheck(env))
+		return false;
+	(*env)->ExceptionClear(env);
+	return true;
+}
+
+static void android_multicast_lock(bool wanted)
+{
+	JNIEnv *env;
+	jobject activity, context = NULL, wifi = NULL, lock = NULL, tag = NULL, service = NULL;
+	jclass kind;
+
+	if (wanted == (multicast_lock != NULL) || (env = (JNIEnv *)SDL_AndroidGetJNIEnv()) == NULL)
+		return;
+	if (!wanted)
+	{
+		kind = (*env)->GetObjectClass(env, multicast_lock);
+		(*env)->CallVoidMethod(env, multicast_lock, (*env)->GetMethodID(env, kind, "release", "()V"));
+		java_failed(env);
+		(*env)->DeleteLocalRef(env, kind);
+		(*env)->DeleteGlobalRef(env, multicast_lock);
+		multicast_lock = NULL;
+		return;
+	}
+	if ((activity = (jobject)SDL_AndroidGetActivity()) == NULL)
+		return;
+	kind = (*env)->GetObjectClass(env, activity);
+	context = (*env)->CallObjectMethod(env, activity,
+		(*env)->GetMethodID(env, kind, "getApplicationContext", "()Landroid/content/Context;"));
+	(*env)->DeleteLocalRef(env, kind);
+	if (!java_failed(env) && context)
+	{
+		kind = (*env)->GetObjectClass(env, context);
+		service = (*env)->NewStringUTF(env, "wifi");
+		wifi = (*env)->CallObjectMethod(env, context,
+			(*env)->GetMethodID(env, kind, "getSystemService", "(Ljava/lang/String;)Ljava/lang/Object;"), service);
+		(*env)->DeleteLocalRef(env, kind);
+	}
+	if (!java_failed(env) && wifi)
+	{
+		kind = (*env)->GetObjectClass(env, wifi);
+		tag = (*env)->NewStringUTF(env, "OutRunners NETWORK");
+		lock = (*env)->CallObjectMethod(env, wifi, (*env)->GetMethodID(env, kind, "createMulticastLock",
+			"(Ljava/lang/String;)Landroid/net/wifi/WifiManager$MulticastLock;"), tag);
+		(*env)->DeleteLocalRef(env, kind);
+	}
+	if (!java_failed(env) && lock)
+	{
+		kind = (*env)->GetObjectClass(env, lock);
+		(*env)->CallVoidMethod(env, lock, (*env)->GetMethodID(env, kind, "setReferenceCounted", "(Z)V"), JNI_FALSE);
+		if (!java_failed(env))
+			(*env)->CallVoidMethod(env, lock, (*env)->GetMethodID(env, kind, "acquire", "()V"));
+		if (!java_failed(env))
+			multicast_lock = (*env)->NewGlobalRef(env, lock);
+		(*env)->DeleteLocalRef(env, kind);
+	}
+	if (lock)
+		(*env)->DeleteLocalRef(env, lock);
+	if (tag)
+		(*env)->DeleteLocalRef(env, tag);
+	if (wifi)
+		(*env)->DeleteLocalRef(env, wifi);
+	if (service)
+		(*env)->DeleteLocalRef(env, service);
+	if (context)
+		(*env)->DeleteLocalRef(env, context);
+	(*env)->DeleteLocalRef(env, activity);
+}
+#endif
 
 #ifdef __ANDROID__
 static const char android_pack_missing[] = "missing";

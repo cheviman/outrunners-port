@@ -3,9 +3,9 @@
 	Name:        AndroidManifest.xml
 	Description: the Android app: SDL's activity (org.libsdl.app.SDLActivity, its Java from SDL's source)
 	             starting the game in libmain.so, on its side of the screen, full screen
-	Version:     0.1.2
+	Version:     0.1.3
 	Created:     30-10-2026
-	Modified:    07-11-2026
+	Modified:    13-11-2026
 	Author:      Sebastian Toyos
 
 	The version and the SDKs come from android.cmake (aapt2 link). A touch screen and a game controller are
@@ -24,6 +24,9 @@
 
 	<!-- NETWORK: the rooms' datagrams on the local network (arcade-lan, lan/) -->
 	<uses-permission android:name="android.permission.INTERNET" />
+	<!-- and Wi-Fi's multicast lock while it is open, without which some phones drop the rooms' beacons
+	     (ports/sdl2/main.c, android_multicast_lock) -->
+	<uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
 	<!-- STEERING's PHONE VIBRATION: the phone vibrates with the cabinet's wheel motor (ports/sdl2/forces.c,
 	     SDL's Vibrator; without it vibrating throws) -->
 	<uses-permission android:name="android.permission.VIBRATE" />

@@ -2,9 +2,9 @@
  *    Name:        network.c
  *    Description: the network game: rooms (HOST, JOIN) of up to four devices, each one of the arcade's linked
  *                 cabinets in the room's races, over arcade-lan's linked game (lan/)
- *    Version:     0.2.0
+ *    Version:     0.2.1
  *    Created:     30-10-2026
- *    Modified:    06-11-2026
+ *    Modified:    13-11-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
@@ -68,6 +68,7 @@ static struct
 	int players;               /* the players of the race's devices, all of them */
 	uint32_t link_ids[MACHINES];
 	bool link_lost[MACHINES];
+	bool entries_taken[SLOTS];  /* player 0's entries taken on for machine 1 gone: the players accepted */
 	uint8_t slots[SLOTS][RECORD_BYTES];
 	int start_pending;         /* the room's START, for the left seat's frame: 0, 1 or 2 seats */
 	bool waiting;              /* a race waits for a device unheard */
@@ -129,6 +130,7 @@ static void link_set_up(int machine, int machines)
 	memset(RACE(RACE_COPY_1), 0, SLOTS * RECORD_SIZE);
 	memset(net.slots, 0, sizeof(net.slots));
 	memset(net.link_lost, 0, sizeof(net.link_lost));
+	memset(net.entries_taken, 0, sizeof(net.entries_taken));
 	net.linked = true;
 	net.machine = machine;
 	net.machines = machines;
@@ -419,9 +421,43 @@ static bool follow_host(uint32_t screen_block)
 	return false;
 }
 
+/* Player 0's entries, taken on in its record for machine 1 gone, as race_entries_update takes them there: once
+   every player still heard has seen the last entry (entry_serial_seen), one request not yet accepted is (entrant,
+   entry_serial + 1), the first one opening the entries (entry_frames_by_machines), cut to ENTRIES_CUT once
+   every player still heard is in; the countdown closes them (entrant FF, entry_serial + 1). Machine 1 gone
+   before it took a request left the others' requests waiting for good (issue 34) */
+static void take_lost_entries(struct race *record)
+{
+	const int players = net.machines * 2;
+	int heard = 0, in = 0;
+
+	for (int player = 0; player < players; player++)
+	{
+		if (player_lost(player))
+			continue;
+		heard++;
+		if (game->race_copies[player].entry_serial_seen != record->entry_serial)
+			return;    /* (the last entry not yet seen everywhere) */
+		in += net.entries_taken[player];
+	}
+	for (int player = 0; player < players; player++)
+		if (!player_lost(player) && !net.entries_taken[player] && game->race_copies[player].entry_request != 0u)
+		{
+			net.entries_taken[player] = true;
+			record->entrant = (uint8_t)player;
+			record->entry_serial++;
+			if (record->entry_frames == 0u)
+				record->entry_frames = entry_frames_by_machines[game->stand_alone == 0u ? game->machine_count : 0u];
+			in++;
+			break;
+		}
+	if (heard > 0 && in >= heard && record->entry_frames > ENTRIES_CUT)
+		record->entry_frames = ENTRIES_CUT;
+}
+
 /* The records of a machine gone this one sends on: from their last, the car out of sight, ready, the
-   entries seen (as race_entries_update waits for every record's), and player 0's entries closed as its
-   countdown would close them */
+   entries seen (as race_entries_update waits for every record's), and player 0's entries taken on
+   (take_lost_entries) and closed as its countdown would close them */
 static void carry_lost_records(void)
 {
 	const uint8_t entry_serial = RACE(RACE_COPY_1)->entry_serial;
@@ -436,10 +472,14 @@ static void carry_lost_records(void)
 		record->ready = 0xFFu;
 		record->entry_request = 0u;
 		record->entry_serial_seen = entry_serial;
-		if (slot == 0 && record->entry_frames != 0u && (net.frame & 1u) == 0u && --record->entry_frames == 0u)
+		if (slot != 0)
+			continue;
+		take_lost_entries(record);
+		if (record->entry_frames != 0u && (net.frame & 1u) == 0u && --record->entry_frames == 0u)
 		{
 			record->entry_serial++;
 			record->entrant = 0xFFu;
+			memset(net.entries_taken, 0, sizeof(net.entries_taken));
 		}
 	}
 }
@@ -534,6 +574,11 @@ void console_network_frame(void)
 bool console_network_waiting(void)
 {
 	return net.waiting;
+}
+
+bool console_network_open(void)
+{
+	return net.lan != NULL || net.linked;
 }
 
 /* ---- the menu's ---- */

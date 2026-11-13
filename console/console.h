@@ -1,9 +1,9 @@
 /**
  *    Name:        console.h
  *    Description: what the console build tells the port
- *    Version:     0.1.4
+ *    Version:     0.1.5
  *    Created:     29-10-2026
- *    Modified:    07-11-2026
+ *    Modified:    13-11-2026
  *    Author:      Sebastian Toyos
  */
 #ifndef ORUNNERS_CONSOLE_H
@@ -45,9 +45,9 @@ int console_test_autopilot(void);
 /* True once the menu's EXIT was picked: the port closes the game */
 bool console_quit_requested(void);
 
-/* The pause: true while a race of the left seat's runs, when the port may stop the game (its START or BACK;
-   the seats' START is then no cabinet's: the radio's >> has its own control); QUIT GAME ends the games
-   being played, back to the title */
+/* The pause: true while a race of the left seat's runs, but the network's (the others race on), when the port
+   may stop the game (its START or BACK; the seats' START is then no cabinet's: the radio's >> has its own
+   control); QUIT GAME ends the games being played, back to the title */
 bool console_can_pause(void);
 void console_quit_game(void);
 
@@ -232,6 +232,9 @@ void console_ghost_folder(const char *folder);
 void console_network_frame(void);
 bool console_network_waiting(void);
 size_t console_network_wait_sprites(uint8_t *list, size_t room);
+
+/* True while the network is open: rooms looked for, a room's, its races (Android's Wi-Fi multicast lock) */
+bool console_network_open(void);
 
 /* For scripted checks: where the network stands, a line of text */
 void console_network_describe(char *text, size_t size);

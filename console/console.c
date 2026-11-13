@@ -2,9 +2,9 @@
  *    Name:        console.c
  *    Description: the console build's own versions of the game functions console/replaced.txt lists, and
  *                 what it tells the port
- *    Version:     0.1.3
+ *    Version:     0.1.4
  *    Created:     29-10-2026
- *    Modified:    11-11-2026
+ *    Modified:    13-11-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
@@ -498,8 +498,10 @@ void console_actions(uint32_t pressed)
 
 bool console_can_pause(void)
 {
-	/* (not over REVERSE's map, in the race's step 5: its START picks the goal) */
-	return SCREEN(SCREEN_1)->game_mode == GAME_MODE_PLAY && racing(SCREEN_1) && !console_route_select_running();
+	/* (not over REVERSE's map, in the race's step 5: its START picks the goal; nor in a race of the network's,
+	   where the others race on: it held this device's car alone, issue 34) */
+	return SCREEN(SCREEN_1)->game_mode == GAME_MODE_PLAY && racing(SCREEN_1) && !console_route_select_running()
+		&& !console_network_linked();
 }
 
 bool console_manual_gears(int player)
@@ -519,7 +521,7 @@ void console_quit_game(void)
 
 bool console_can_restart(void)
 {
-	return console_can_pause() && restart.started != MENU_NOTHING && !console_network_linked();
+	return console_can_pause() && restart.started != MENU_NOTHING;
 }
 
 void console_restart_game(void)

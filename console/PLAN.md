@@ -477,7 +477,23 @@ merged here; this repository adds console/, the ports and their documents.
   route comes to it (fork_background_update). Checked on the console's headless game: the parade's
   kangaroos as at ARCADE's AUSTRALIA (0-1-3-7-D-15, the sprites' palette there the same); menu, classic,
   time_attack, two_players and arcade_niagara identical to the build before.
-
+- No pause in a race of the network's (issue 34; Sebas: it breaks the race's run): it held this device's car
+  alone while the others raced on. console_can_pause is false while the link is on, so START and Escape go
+  on as the cabinet's (the radio's >>), as in the race; a network race is left as before, at its end.
+  Checked on two console headless games on one computer (--real-time, tests/console/network_*): both
+  racing, the pause never offered; CLASSIC's race offers it as before.
+- A network race whose machine 1 is gone before it took the entries goes on (issue 34): the others' requests
+  waited for good, as machine 1's left seat takes them. The machine that sends its records on takes them on
+  in player 0's record as race_entries_update does (take_lost_entries, network.c): once every player still
+  heard has seen the last entry, a request is accepted, the first one opens the entries
+  (entry_frames_by_machines), all of them in cut them to ENTRIES_CUT, the countdown closes them. Checked on
+  two console headless games (--real-time, tests/console/network_*): the host gone 3 frames after its START,
+  the other device was in car select for good, now it races alone; gone 20 frames after, as before (the
+  entries already taken, counted down); both on, the race as before.
+- NETWORK on Android: Wi-Fi's multicast lock while the network is open (console_network_open), without
+  which some phones drop the rooms' beacons (issue 34): android_multicast_lock (ports/sdl2/main.c, JNI
+  through SDL's activity), CHANGE_WIFI_MULTICAST_STATE in the manifest. The APK built here; not run on a
+  phone.
 ## To do
 
 - REVERSE's finish (AUSTRALIA's at the pre-stage): the pair of kangaroos under the riders at each side of
@@ -504,10 +520,8 @@ merged here; this repository adds console/, the ports and their documents.
   instead would show them in the new background's colours.
 - The network on a network shared with strangers: a room's code to join it (today a device on the same local
   network can fill a room with JOINs or speak for a member it overhears).
-- The network: checked on two windows and between devices (Android's broadcasts:
-  some phones drop them without a multicast lock, then a room's address typed in); the pause in a network
-  race without holding the game (today the pause holds this device's car, the others race on); the entries
-  of a race whose machine 1 is gone mid-entries (counted down only).
+- The network: checked between devices (Android's multicast lock on a phone that dropped the beacons; the
+  Switch, the Steam Deck) (issue 34).
 - (done after 1.0) The decompilation's new version merged (2b4e7a0: the game's state as one structure, C
   pointers into it and into the program ROM's records): the core's console-original at arcade-decomp
   82aadc8 with CONSOLE_ORIGINAL; console/ reads the state through game-> and the pointers screen,
