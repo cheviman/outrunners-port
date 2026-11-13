@@ -3,7 +3,7 @@
  *    Description: the game's variables, tables, board registers and structures
  *    Version:     0.1.0
  *    Created:     12-10-2026
- *    Modified:    11-11-2026
+ *    Modified:    13-11-2026
  *    Author:      Sebastian Toyos
  *
  *    OutRunners (arcade, Sega System Multi 32): the game's V70 program decompiled into C by
@@ -1721,7 +1721,9 @@ extern const void *kanji_font_data;
 #define BOOKKEEPING_CHUTE_A_COINS_ADDRESS 0x701F06u
 #define BOOKKEEPING_CHUTE_A_COINS BOARD16(BOOKKEEPING_CHUTE_A_COINS_ADDRESS)
 #define BOOKKEEPING_TOTAL_TIME_ADDRESS 0x701F10u
-#define BOOKKEEPING_TOTAL_TIME BOARD32(BOOKKEEPING_TOTAL_TIME_ADDRESS)
+#define BOOKKEEPING_TOTAL_TIME BOARD16(BOOKKEEPING_TOTAL_TIME_ADDRESS)
+#define BOOKKEEPING_TOTAL_TIME_HIGH_ADDRESS 0x701F12u
+#define BOOKKEEPING_TOTAL_TIME_HIGH BOARD16(BOOKKEEPING_TOTAL_TIME_HIGH_ADDRESS)
 #define BOOKKEEPING_GAMES_A_ADDRESS 0x701F14u
 #define BOOKKEEPING_GAMES_A BOARD16(BOOKKEEPING_GAMES_A_ADDRESS)
 #define BOOKKEEPING_LONGEST_PLAY_ADDRESS 0x701F20u
@@ -1731,7 +1733,7 @@ extern const void *kanji_font_data;
 #define BOOKKEEPING_HISTOGRAM_ADDRESS 0x701F24u
 #define BOOKKEEPING_HISTOGRAM BOARD16(BOOKKEEPING_HISTOGRAM_ADDRESS)
 #define BOOKKEEPING_COURSE_RECORDS_ADDRESS 0x701F32u
-#define BOOKKEEPING_COURSE_RECORDS BOARD8(BOOKKEEPING_COURSE_RECORDS_ADDRESS)
+#define BOOKKEEPING_COURSE_RECORDS BOARD16(BOOKKEEPING_COURSE_RECORDS_ADDRESS)
 #define BOOKKEEPING_SEAT_1_CREDITS_ADDRESS 0x701F74u
 #define BOOKKEEPING_SEAT_1_CREDITS BOARD16(BOOKKEEPING_SEAT_1_CREDITS_ADDRESS)
 #define BOOKKEEPING_SEAT_1_BYTE_ADDRESS 0x701F76u
@@ -1741,9 +1743,13 @@ extern const void *kanji_font_data;
 #define BOOKKEEPING_SEAT_2_BYTE_ADDRESS 0x701F7Au
 #define BOOKKEEPING_SEAT_2_BYTE BOARD16(BOOKKEEPING_SEAT_2_BYTE_ADDRESS)
 #define BOOKKEEPING_BACKUP_SEAT_1_CREDITS_ADDRESS 0x701FF0u
-#define BOOKKEEPING_BACKUP_SEAT_1_CREDITS BOARD32(BOOKKEEPING_BACKUP_SEAT_1_CREDITS_ADDRESS)
+#define BOOKKEEPING_BACKUP_SEAT_1_CREDITS BOARD16(BOOKKEEPING_BACKUP_SEAT_1_CREDITS_ADDRESS)
+#define BOOKKEEPING_BACKUP_SEAT_1_BYTE_ADDRESS 0x701FF2u
+#define BOOKKEEPING_BACKUP_SEAT_1_BYTE BOARD16(BOOKKEEPING_BACKUP_SEAT_1_BYTE_ADDRESS)
 #define BOOKKEEPING_BACKUP_SEAT_2_CREDITS_ADDRESS 0x701FF4u
-#define BOOKKEEPING_BACKUP_SEAT_2_CREDITS BOARD32(BOOKKEEPING_BACKUP_SEAT_2_CREDITS_ADDRESS)
+#define BOOKKEEPING_BACKUP_SEAT_2_CREDITS BOARD16(BOOKKEEPING_BACKUP_SEAT_2_CREDITS_ADDRESS)
+#define BOOKKEEPING_BACKUP_SEAT_2_BYTE_ADDRESS 0x701FF6u
+#define BOOKKEEPING_BACKUP_SEAT_2_BYTE BOARD16(BOOKKEEPING_BACKUP_SEAT_2_BYTE_ADDRESS)
 #define SOUND_PROGRAM_HOLD_ADDRESS 0x701FFFu
 #define SOUND_PROGRAM_HOLD BOARD8(SOUND_PROGRAM_HOLD_ADDRESS)
 
@@ -5157,8 +5163,8 @@ struct stage_road_palette_record
 
 struct backup_course_record
 {
-	uint8_t model;
-	uint8_t name[0x3];
+	uint16_t model_and_initial;
+	uint16_t name_rest;
 	uint16_t time;
 };
 
@@ -5194,9 +5200,9 @@ struct bookkeeping_count16
 
 struct bookkeeping_count32
 {
-	uint32_t value;
+	uint16_t value[0x2];
 	uint8_t pad_04[0x78];
-	uint32_t backup;
+	uint16_t backup[0x2];
 };
 
 struct bookkeeping_count8
@@ -5230,11 +5236,11 @@ struct bookkeeping_block
 	uint8_t pad_08[0x2];
 	uint16_t chute_b_coins;
 	uint8_t pad_0C[0x4];
-	uint32_t total_time;
+	uint16_t total_time[0x2];
 	uint16_t games_a;
 	uint16_t games_b;
-	uint32_t play_time_a;
-	uint32_t play_time_b;
+	uint16_t play_time_a[0x2];
+	uint16_t play_time_b[0x2];
 	uint16_t longest_play;
 	uint16_t shortest_play;
 	uint8_t pad_24[0x5A];
@@ -5412,9 +5418,9 @@ _Static_assert(sizeof(struct course_record_copy) == 0x6, "struct course_record_c
 #define ROAD_OBJECT_STREAM_ENTRY(address) ((const struct road_object_stream_entry *)data_at(address))
 #define ROAD_OBJECT_STREAM_FORKS(address) ((const uint32_t *)data_at(address))
 #define FLASHING_SCENERY_RECORD(address) ((const struct flashing_scenery_record *)data_at(address))
-#define FLASHING_SCENERY_PALETTES(address) ((const int16_t *)data_at(address))
+#define FLASHING_SCENERY_PALETTES(address) ((const unaligned_int16 *)data_at(address))
 #define AURORA_RECORD(address) ((const struct aurora_record *)data_at(address))
-#define AURORA_ANIMATIONS(address) ((const int16_t *)data_at(address))
+#define AURORA_ANIMATIONS(address) ((const unaligned_int16 *)data_at(address))
 #define ROAD_CROSSER_RECORD(address) ((const struct road_crosser_record *)data_at(address))
 #define MOVING_SCENERY_RECORD(address) ((const struct moving_scenery_record *)data_at(address))
 #define SWOOPING_HELICOPTER_RECORD(address) ((const struct swooping_helicopter_record *)data_at(address))
@@ -5596,7 +5602,6 @@ _Static_assert(sizeof(struct course_record_copy) == 0x6, "struct course_record_c
 #define CHIP_TEST_RESULTS(address) ((uint8_t *)ram(address))
 #define PROGRAM_HALFWORDS(address) ((const uint16_t *)data_at(address))
 #define ANALOG_POSITIONS(address) ((uint8_t *)ram(address))
-#define OUTPUT_BITS(address) ((uint32_t *)ram(address))
 #define STAGE_GAME_COUNTS(address) ((uint16_t *)board(address))
 #define BACKUP_COURSE_RECORD(address) ((struct backup_course_record *)board(address))
 #define TILE_PIXEL_WORDS(address) ((uint16_t *)board(address))

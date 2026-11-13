@@ -519,6 +519,13 @@ merged here; this repository adds console/, the ports and their documents.
   before. Checked with SDL's virtual joysticks: pedals with a handbrake as START (the gas pressed meanwhile
   never taken), a wheel's own handbrake as SHIFT DOWN, held at a third and past the middle; the two cases
   before, the same files.
+- outrunners-decomp merged (13-11-2026): the state in the V70's order on any processor (the bookkeeping by
+  halfwords, two lists of halfwords at odd addresses read as they are, the output test's bits by byte), the
+  EEPROM and the bookkeeping saved low byte first (the same files as before on the PC); the core at
+  arcade-decomp 20996ed, console-original 8cf9d7e, src/ decompiled again with console/replaced.txt. The 16
+  scenarios identical, picture and sound; the console's headless game the same before and after on
+  tests/console (menu, controls, classic, time_attack, two_players, arcade_niagara, full, reverse: state,
+  picture and sound) but OPTIONS' version; the assets pack's version the same.
 ## To do
 
 - REVERSE's finish (AUSTRALIA's at the pre-stage): the pair of kangaroos under the riders at each side of

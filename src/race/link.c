@@ -3,7 +3,7 @@
  *    Description: the link between the cabinets: the ISDN connection, the network check at boot, the race's entries and progress, the course records, the records sent and received
  *    Version:     0.1.0
  *    Created:     12-10-2026
- *    Modified:    11-11-2026
+ *    Modified:    13-11-2026
  *    Author:      Sebastian Toyos
  *
  *    OutRunners (arcade, Sega System Multi 32): the game's V70 program decompiled into C by
@@ -1547,7 +1547,7 @@ uint32_t CONSOLE_ORIGINAL(course_records_update)(uint32_t record_entry)
 	struct race *race = NULL;
 	uint8_t *seen_serials = NULL;
 	uint8_t seen_serial = 0;
-	uint32_t model_long = 0, model_long_2 = 0;
+	uint32_t model_and_initial_long = 0, model_and_initial_long_2 = 0;
 
 	seen_serials = &screen->name_entries_seen;
 	players_left = game->player_count;
@@ -1571,19 +1571,15 @@ uint32_t CONSOLE_ORIGINAL(course_records_update)(uint32_t record_entry)
 				COURSE_RECORD_ENTRY(record_entry)->name = race->record_name;
 				COURSE_RECORD_ENTRY(record_entry)->name_rest = race->record_name_rest;
 				backup_record = BOOKKEEPING_COURSE_RECORDS_ADDRESS + record_offset;
-				model_long = (COURSE_RECORD_ENTRY(record_entry)->model | ((uint32_t)COURSE_RECORD_ENTRY(record_entry)->name << 8u) | ((uint32_t)COURSE_RECORD_ENTRY(record_entry)->name_rest << 16u));
-				BACKUP_COURSE_RECORD(backup_record)->model = (uint8_t)model_long;
-				BACKUP_COURSE_RECORD(backup_record)->name[0] = (uint8_t)(model_long >> 8u);
-				BACKUP_COURSE_RECORD(backup_record)->name[1] = (uint8_t)(model_long >> 16u);
-				BACKUP_COURSE_RECORD(backup_record)->name[2] = (uint8_t)(model_long >> 24u);
+				model_and_initial_long = (COURSE_RECORD_ENTRY(record_entry)->model | ((uint32_t)COURSE_RECORD_ENTRY(record_entry)->name << 8u) | ((uint32_t)COURSE_RECORD_ENTRY(record_entry)->name_rest << 16u));
+				BACKUP_COURSE_RECORD(backup_record)->model_and_initial = (uint16_t)model_and_initial_long;
+				BACKUP_COURSE_RECORD(backup_record)->name_rest = (uint16_t)(model_and_initial_long >> 16u);
 				BACKUP_COURSE_RECORD(backup_record)->time = COURSE_RECORD_ENTRY(record_entry)->time;
 				bookkeeping_update_checksum((uint16_t)ignored);
 				backup_record = SOUND_RAM + 0x1FAEu + record_offset;
-				model_long_2 = (COURSE_RECORD_ENTRY(record_entry)->model | ((uint32_t)COURSE_RECORD_ENTRY(record_entry)->name << 8u) | ((uint32_t)COURSE_RECORD_ENTRY(record_entry)->name_rest << 16u));
-				BACKUP_COURSE_RECORD(backup_record)->model = (uint8_t)model_long_2;
-				BACKUP_COURSE_RECORD(backup_record)->name[0] = (uint8_t)(model_long_2 >> 8u);
-				BACKUP_COURSE_RECORD(backup_record)->name[1] = (uint8_t)(model_long_2 >> 16u);
-				BACKUP_COURSE_RECORD(backup_record)->name[2] = (uint8_t)(model_long_2 >> 24u);
+				model_and_initial_long_2 = (COURSE_RECORD_ENTRY(record_entry)->model | ((uint32_t)COURSE_RECORD_ENTRY(record_entry)->name << 8u) | ((uint32_t)COURSE_RECORD_ENTRY(record_entry)->name_rest << 16u));
+				BACKUP_COURSE_RECORD(backup_record)->model_and_initial = (uint16_t)model_and_initial_long_2;
+				BACKUP_COURSE_RECORD(backup_record)->name_rest = (uint16_t)(model_and_initial_long_2 >> 16u);
 				BACKUP_COURSE_RECORD(backup_record)->time = COURSE_RECORD_ENTRY(record_entry)->time;
 			}
 		}

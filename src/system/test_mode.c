@@ -3,7 +3,7 @@
  *    Description: the test mode: its menu and pages (memory, volume, input, output, sound, CRT, game, coins, network, bookkeeping, backup clear) and their drawing
  *    Version:     0.1.0
  *    Created:     12-10-2026
- *    Modified:    11-11-2026
+ *    Modified:    13-11-2026
  *    Author:      Sebastian Toyos
  *
  *    OutRunners (arcade, Sega System Multi 32): the game's V70 program decompiled into C by
@@ -1542,7 +1542,7 @@ uint32_t test_mode_output_test_draw(void)
 		cell = LINKED(cell, output->cell);
 		output_bits = output->variable;
 		output_bits += 0x20E000u;
-		carry = (OUTPUT_BITS(output_bits)[0] & shl32(1u, (int)(output->bit))) != 0u;
+		carry = ((PORT_OUTPUT_BITS(output_bits)[0] | ((uint32_t)PORT_OUTPUT_BITS(output_bits)[1] << 8u) | ((uint32_t)PORT_OUTPUT_BITS(output_bits)[2] << 16u) | ((uint32_t)PORT_OUTPUT_BITS(output_bits)[3] << 24u)) & shl32(1u, (int)(output->bit))) != 0u;
 		text_layer_cells_long = output_test_on_off_cells[carry];
 		TEXT_LAYER_CELLS(cell)[0] = (uint16_t)text_layer_cells_long;
 		TEXT_LAYER_CELLS(cell)[1] = (uint16_t)(text_layer_cells_long >> 16u);
@@ -1555,12 +1555,17 @@ uint32_t test_mode_output_test_draw(void)
    output bytes (the list at 01D5C0). */
 void test_mode_output_test_toggle(void)
 {
-	uint32_t *output_variable = NULL;
 	const struct output_test_output *output = NULL;
+	uint8_t *output_variable = NULL;
+	uint32_t output_variable_0_long = 0;
 
 	output = rom_pointer(output_test_outputs_ADDRESS + 0x2u + game->test_mode_page_cursor * 4u - 2u);
 	output_variable = pointer_to(output->variable + GAME_VARIABLES);
-	output_variable[0] ^= shl32(1u, (int)(output->bit));
+	output_variable_0_long = (output_variable[0] | ((uint32_t)output_variable[1] << 8u) | ((uint32_t)output_variable[2] << 16u) | ((uint32_t)output_variable[3] << 24u)) ^ shl32(1u, (int)(output->bit));
+	output_variable[0] = (uint8_t)output_variable_0_long;
+	output_variable[1] = (uint8_t)(output_variable_0_long >> 8u);
+	output_variable[2] = (uint8_t)(output_variable_0_long >> 16u);
+	output_variable[3] = (uint8_t)(output_variable_0_long >> 24u);
 }
 
 /* The output test's EXIT: turns the lamps and the wheel motor off (port_d_outputs &= E0E1,
@@ -2982,13 +2987,13 @@ uint16_t test_mode_bookkeeping_draw_totals(void)
 	plural_offset = 0xFFFFFFFDu;
 	test_mode_draw_count(games_b, digit_count, plural_offset, &colours, &cell);
 	time_cell = TEXT_CELL(20, 16);
-	total_time = BOOKKEEPING_BLOCK(address_of(current_object))->total_time;
+	total_time = (BOOKKEEPING_BLOCK(address_of(current_object))->total_time[0] | ((uint32_t)BOOKKEEPING_BLOCK(address_of(current_object))->total_time[1] << 16u));
 	time_cell = test_mode_draw_duration(total_time, time_cell);
 	time_cell = (time_cell & ~0xFFFFu) | 0xF8A8u;
-	play_time_a = BOOKKEEPING_BLOCK(address_of(current_object))->play_time_a;
+	play_time_a = (BOOKKEEPING_BLOCK(address_of(current_object))->play_time_a[0] | ((uint32_t)BOOKKEEPING_BLOCK(address_of(current_object))->play_time_a[1] << 16u));
 	time_cell = test_mode_draw_duration(play_time_a, time_cell);
 	time_cell = (time_cell & ~0xFFFFu) | 0xF928u;
-	play_time_b = BOOKKEEPING_BLOCK(address_of(current_object))->play_time_b;
+	play_time_b = (BOOKKEEPING_BLOCK(address_of(current_object))->play_time_b[0] | ((uint32_t)BOOKKEEPING_BLOCK(address_of(current_object))->play_time_b[1] << 16u));
 	time_cell = test_mode_draw_duration(play_time_b, time_cell);
 	games_a = BOOKKEEPING_BLOCK(address_of(current_object))->games_a;
 	game_count = BOOKKEEPING_BLOCK(address_of(current_object))->games_b + games_a;
@@ -2996,7 +3001,7 @@ uint16_t test_mode_bookkeeping_draw_totals(void)
 	if (game_count == 0u)
 		return games_a;
 	time_cell = (time_cell & ~0xFFFFu) | 0xFA34u;
-	average_time = divide_u32(BOOKKEEPING_BLOCK(address_of(current_object))->play_time_a + BOOKKEEPING_BLOCK(address_of(current_object))->play_time_b, total_games);
+	average_time = divide_u32((BOOKKEEPING_BLOCK(address_of(current_object))->play_time_a[0] | ((uint32_t)BOOKKEEPING_BLOCK(address_of(current_object))->play_time_a[1] << 16u)) + (BOOKKEEPING_BLOCK(address_of(current_object))->play_time_b[0] | ((uint32_t)BOOKKEEPING_BLOCK(address_of(current_object))->play_time_b[1] << 16u)), total_games);
 	test_mode_draw_minutes_seconds(&average_time, &time_cell);
 	time_cell = (time_cell & ~0xFFFFu) | 0xFAB4u;
 	longest_time = BOOKKEEPING_BLOCK(address_of(current_object))->longest_play;
@@ -3068,7 +3073,7 @@ void test_mode_bookkeeping_draw_histogram(uint32_t *p_last_character, uint32_t *
 	records_left = 0xAu;
 	do
 	{
-		car_then_time = BACKUP_COURSE_RECORD(record)->model;
+		car_then_time = (uint8_t)BACKUP_COURSE_RECORD(record)->model_and_initial;
 		record++;
 		if ((int8_t)car_then_time < 0)
 			record += 5u;
@@ -3097,15 +3102,15 @@ void test_mode_bookkeeping_draw_histogram(uint32_t *p_last_character, uint32_t *
 			character = (uint16_t)((character & ~0xFFu) | TEST_MODE_CHARACTERS(colour_name)[1]);
 			cell += 2u;
 			TEXT_LAYER_CELLS(cell)[0] = character;
-			character = (uint16_t)((character & ~0xFFu) | BACKUP_COURSE_RECORD(record - 0x1u)->name[0]);
+			character = (uint16_t)((character & ~0xFFu) | (uint8_t)(BACKUP_COURSE_RECORD(record - 0x1u)->model_and_initial >> 8u));
 			cell += 4u;
 			TEXT_LAYER_CELLS(cell)[0] = character;
 			record++;
-			character = (uint16_t)((character & ~0xFFu) | BACKUP_COURSE_RECORD(record - 0x2u)->name[1]);
+			character = (uint16_t)((character & ~0xFFu) | (uint8_t)BACKUP_COURSE_RECORD(record - 0x2u)->name_rest);
 			cell += 2u;
 			TEXT_LAYER_CELLS(cell)[0] = character;
 			record++;
-			character = (uint16_t)((character & ~0xFFu) | BACKUP_COURSE_RECORD(record - 0x3u)->name[2]);
+			character = (uint16_t)((character & ~0xFFu) | (uint8_t)(BACKUP_COURSE_RECORD(record - 0x3u)->name_rest >> 8u));
 			cell += 2u;
 			TEXT_LAYER_CELLS(cell)[0] = character;
 			record++;
