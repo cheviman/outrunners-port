@@ -2310,6 +2310,36 @@ int main(int argc, char **argv)
 		size_t count = 0;
 		bool stale = false;
 		bool pack = false;
+		bool loaded = false;
+#if defined(ORUNNERS_CONSOLE) && !defined(ORUNNERS_HANDHELD)
+		char own_pack[1100];
+
+		/* the pack the game wrote itself beside the folder of what it keeps (below), first: one of another
+		   build, after an update (issue 37: "of another version of the game" for good), is removed, and written
+		   again from the assets' folder, or from the first run's again where that folder is another build's
+		   too */
+		snprintf(own_pack, sizeof(own_pack), "%s" ASSETS_PACK, saves ? saves : (base ? base : ""));
+		if (!found)
+		{
+			FILE *probe = fopen(own_pack, "rb");
+
+			if (probe)
+			{
+				fclose(probe);
+				if ((problem = assets_load_pack(own_pack)) == NULL)
+				{
+					found = own_pack;
+					pack = true;
+					loaded = true;
+				}
+				else
+				{
+					fprintf(stderr, "%s: %s: made again\n", own_pack, problem);
+					remove(own_pack);
+				}
+			}
+		}
+#endif
 
 		places[count++] = base ? base : "";
 		if (app_folder(base, beside_app, sizeof(beside_app)))
@@ -2366,7 +2396,7 @@ int main(int argc, char **argv)
 			found = folder;
 		}
 #endif
-		if ((problem = pack || (assets_path && strstr(assets_path, ".assets")) ? assets_load_pack(found) : assets_load(found)) != NULL)
+		if (!loaded && (problem = pack || (assets_path && strstr(assets_path, ".assets")) ? assets_load_pack(found) : assets_load(found)) != NULL)
 			return fail("The game's assets cannot be read.", problem);
 #if defined(ORUNNERS_CONSOLE) && !defined(ORUNNERS_HANDHELD)
 		if (!pack)

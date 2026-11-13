@@ -504,6 +504,14 @@ merged here; this repository adds console/, the ports and their documents.
   joysticks (a wheel, pedals, a shifter; and one device with everything): the steps take each control where
   it is, the layouts as before but for what is elsewhere, the pedals' travel and the buttons read back from
   the file. Not tried with a real wheel, pedals and shifter.
+- An update no longer stops at "the assets pack is of another version of the game" (issue 37: macOS, after
+  1.3.0). The computers' console game writes its assets as a pack (outrunners.assets) beside the folder of
+  what it keeps the first time, for the devices' tools, and the search took a pack before the assets'
+  folder: after an update, the old build's pack for good. That pack is now tried first, and one that is not
+  taken is removed and written again from the folder (or from the first run's again, where the folder is
+  the old build's too). Checked on Windows with the pack's tables' version changed: the pack made again and
+  the game on; with the folder's version.txt changed too and the ROM set beside, the assets taken out again;
+  a good pack loaded once. Not checked on a Mac.
 ## To do
 
 - REVERSE's finish (AUSTRALIA's at the pre-stage): the pair of kangaroos under the riders at each side of
