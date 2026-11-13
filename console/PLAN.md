@@ -494,6 +494,16 @@ merged here; this repository adds console/, the ports and their documents.
   which some phones drop the rooms' beacons (issue 34): android_multicast_lock (ports/sdl2/main.c, JNI
   through SDL's activity), CHANGE_WIFI_MULTICAST_STATE in the manifest. The APK built here; not run on a
   phone.
+- SET UP WHEEL with the pedals and a shifter on devices of their own (issue 28: a wheel, pedals and a shifter on
+  USB each; the pedals never taken, no force feedback). The wheel's game controller layout stays as it was,
+  made of what is on the wheel's device; the steps watch every device, and what they take on another one
+  goes to wheel_extras (ports/sdl2/wheel_extras.c, wheel_devices.txt beside gamecontrollerdb.txt), read by
+  the wheel's player beside its game controller as its triggers and buttons are. That wheel is player 1's
+  as it comes, whatever device came first (its forces with it), and those devices are no player's game
+  controller. A wheel with every control its own writes no line: as before. Checked with SDL's virtual
+  joysticks (a wheel, pedals, a shifter; and one device with everything): the steps take each control where
+  it is, the layouts as before but for what is elsewhere, the pedals' travel and the buttons read back from
+  the file. Not tried with a real wheel, pedals and shifter.
 ## To do
 
 - REVERSE's finish (AUSTRALIA's at the pre-stage): the pair of kangaroos under the riders at each side of

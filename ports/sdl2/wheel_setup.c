@@ -2,9 +2,9 @@
  *    Name:        wheel_setup.c
  *    Description: OPTIONS > STEERING's SET UP WHEEL: a racing wheel's axes and buttons, as the player shows
  *                 them, made a game controller layout for SDL, kept in gamecontrollerdb.txt
- *    Version:     0.1.0
+ *    Version:     0.2.0
  *    Created:     05-11-2026
- *    Modified:    05-11-2026
+ *    Modified:    13-11-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
@@ -16,19 +16,23 @@
  *    - the wheel: the axis moved furthest from where it was, of those resting near their middle (a pedal's
  *      rests at an end), turned left: SDL's left stick goes left to its negative end, the axis inverted where
  *      it goes the other way. Its device is the one set up.
- *    - a pedal: of that device's other axes, the one pressed furthest and let go again. Where it rests says
- *      how it goes: at an end, the whole axis is the trigger's travel (inverted where it rests at its positive
- *      end); near its middle, it is the wheel's combined pedals, the gas one half and the brake the other.
- *    - shift up, shift down and start: the first button pressed, of those not taken: the game controller's
- *      right and left shoulders and START, CONTROLS' own for them.
+ *    - a pedal: of every device's axes but the wheel's, the one pressed furthest and let go again. Where it
+ *      rests says how it goes: at an end, the whole axis is the trigger's travel (inverted where it rests at
+ *      its positive end); near its middle, it is the wheel's combined pedals, the gas one half and the brake
+ *      the other.
+ *    - shift up, shift down and start: the first button pressed of any device, of those not taken: the game
+ *      controller's right and left shoulders and START, CONTROLS' own for them.
  *    The device's other buttons are the game controller's others in turn (A, B, X, Y...: CONTROLS binds them),
  *    its first hat the pad. The layout, SDL's line for the device, is added to SDL (SDL_GameControllerAddMapping:
  *    the device a game controller from then on) and to the file, in place of the device's line before; the
- *    file's other lines (a layout made elsewhere, SDL's community's) stay as they were.
+ *    file's other lines (a layout made elsewhere, SDL's community's) stay as they were. A pedal or a button on
+ *    another device (pedals, a shifter of their own: issue 28) is not in the layout: wheel_extras keeps it and
+ *    the wheel's player reads it beside the game controller; with every control the wheel's own, as before.
  */
 #include "wheel_setup.h"
 
 #include "console.h"
+#include "wheel_extras.h"
 
 #include <stdarg.h>
 #include <stdbool.h>
@@ -54,13 +58,15 @@ static struct
 	int step;                       /* -1: none */
 	int device;                     /* the device set up (the wheel turned): its slot of devices, or -1 */
 	Sint16 rest[DEVICES][AXES];     /* each axis where the step found it */
-	int pressed[AXES];              /* a pedal's step: the furthest each axis went from there, signed */
-	Uint8 held[BUTTONS];            /* a button's step: the buttons held the frame before */
+	int pressed[DEVICES][AXES];     /* a pedal's step: the furthest each axis went from there, signed */
+	Uint8 held[DEVICES][BUTTONS];   /* a button's step: the buttons held the frame before */
 	int wheel_axis;
 	bool wheel_inverted;
+	int pedal_device[2];            /* the gas' and the brake's devices (slots of devices) */
 	int pedal_axis[2];              /* the gas', the brake's */
 	int pedal_half[2];              /* 0: the whole axis; 1 or -1: its half that way (the combined pedals) */
 	bool pedal_inverted[2];
+	int button_device[3];           /* shift up's, shift down's, start's devices */
 	int buttons[3];                 /* shift up's, shift down's, start's */
 } setup = { .step = -1, .device = -1 };
 
@@ -132,7 +138,7 @@ void wheel_setup_device_removed(SDL_JoystickID which)
 		}
 }
 
-/* A step starts: every device's axes where they are, and the buttons held of the device set up */
+/* A step starts: every device's axes where they are, and the buttons held */
 static void start_step(int step)
 {
 	setup.step = step;
@@ -143,9 +149,9 @@ static void start_step(int step)
 			setup.rest[slot][axis] = SDL_JoystickGetAxis(devices[slot], axis);
 	memset(setup.pressed, 0, sizeof(setup.pressed));
 	memset(setup.held, 0, sizeof(setup.held));
-	if (setup.device >= 0)
-		for (int button = 0; button < buttons_of(devices[setup.device]); button++)
-			setup.held[button] = SDL_JoystickGetButton(devices[setup.device], button);
+	for (int slot = 0; slot < DEVICES; slot++)
+		for (int button = 0; devices[slot] && button < buttons_of(devices[slot]); button++)
+			setup.held[slot][button] = SDL_JoystickGetButton(devices[slot], button);
 }
 
 /* TURN: the axis turned furthest of any device's, of those resting near their middle */
@@ -174,60 +180,74 @@ static bool take_wheel(void)
 	return true;
 }
 
-/* GAS, BRAKE ('pedal' 0, 1): of the device's axes but the wheel's (and the gas', but its other half where it
-   is the combined pedals'), the one pressed furthest, once it is let go */
+/* GAS, BRAKE ('pedal' 0, 1): of every device's axes but the wheel's (and the gas', but its other half where it
+   is the combined pedals'), the one pressed furthest, once it is let go: the wheel's device's own, or pedals
+   of their own */
 static bool take_pedal(int pedal)
 {
-	SDL_Joystick *device = devices[setup.device];
-	const int axes = axes_of(device);
-	int best = -1, value, rest;
+	int best_slot = -1, best = -1, value, rest;
 
-	for (int axis = 0; axis < axes; axis++)
-	{
-		int moved;
+	for (int slot = 0; slot < DEVICES; slot++)
+		for (int axis = 0; devices[slot] && axis < axes_of(devices[slot]); axis++)
+		{
+			const bool gas_axis = pedal == 1 && slot == setup.pedal_device[0] && axis == setup.pedal_axis[0];
+			int moved;
 
-		if (axis == setup.wheel_axis || (pedal == 1 && axis == setup.pedal_axis[0] && setup.pedal_half[0] == 0))
-			continue;
-		moved = SDL_JoystickGetAxis(device, axis) - setup.rest[setup.device][axis];
-		if (pedal == 1 && axis == setup.pedal_axis[0] && (moved > 0 ? 1 : -1) == setup.pedal_half[0])
-			moved = 0;    /* (the gas' half) */
-		if (abs(moved) > abs(setup.pressed[axis]))
-			setup.pressed[axis] = moved;
-		if (best < 0 || abs(setup.pressed[axis]) > abs(setup.pressed[best]))
-			best = axis;
-	}
-	if (best < 0 || abs(setup.pressed[best]) < PRESSED)
+			if ((slot == setup.device && axis == setup.wheel_axis) || (gas_axis && setup.pedal_half[0] == 0))
+				continue;
+			moved = SDL_JoystickGetAxis(devices[slot], axis) - setup.rest[slot][axis];
+			if (gas_axis && (moved > 0 ? 1 : -1) == setup.pedal_half[0])
+				moved = 0;    /* (the gas' half) */
+			if (abs(moved) > abs(setup.pressed[slot][axis]))
+				setup.pressed[slot][axis] = moved;
+			if (best < 0 || abs(setup.pressed[slot][axis]) > abs(setup.pressed[best_slot][best]))
+			{
+				best_slot = slot;
+				best = axis;
+			}
+		}
+	if (best < 0 || abs(setup.pressed[best_slot][best]) < PRESSED)
 		return false;
-	rest = setup.rest[setup.device][best];
-	value = SDL_JoystickGetAxis(device, best);
-	if (abs(value - rest) > abs(setup.pressed[best]) / 4)
+	rest = setup.rest[best_slot][best];
+	value = SDL_JoystickGetAxis(devices[best_slot], best);
+	if (abs(value - rest) > abs(setup.pressed[best_slot][best]) / 4)
 		return false;    /* (still pressed) */
+	setup.pedal_device[pedal] = best_slot;
 	setup.pedal_axis[pedal] = best;
-	setup.pedal_half[pedal] = abs(rest) < PEDALS_MIDDLE ? (setup.pressed[best] > 0 ? 1 : -1) : 0;
+	setup.pedal_half[pedal] = abs(rest) < PEDALS_MIDDLE ? (setup.pressed[best_slot][best] > 0 ? 1 : -1) : 0;
 	setup.pedal_inverted[pedal] = setup.pedal_half[pedal] == 0 && rest > 0;
 	return true;
 }
 
-/* SHIFT UP, SHIFT DOWN, START ('which' 0-2): the device's first button pressed, of those not taken */
+/* SHIFT UP, SHIFT DOWN, START ('which' 0-2): the first button pressed of any device, of those not taken */
 static bool take_button(int which)
 {
-	SDL_Joystick *device = devices[setup.device];
-
-	for (int button = 0; button < buttons_of(device); button++)
-	{
-		const Uint8 down = SDL_JoystickGetButton(device, button);
-		const bool fresh = down && !setup.held[button];
-		bool taken = false;
-
-		setup.held[button] = down;
-		for (int other = 0; other < which; other++)
-			taken = taken || setup.buttons[other] == button;
-		if (fresh && !taken)
+	for (int slot = 0; slot < DEVICES; slot++)
+		for (int button = 0; devices[slot] && button < buttons_of(devices[slot]); button++)
 		{
-			setup.buttons[which] = button;
-			return true;
+			const Uint8 down = SDL_JoystickGetButton(devices[slot], button);
+			const bool fresh = down && !setup.held[slot][button];
+			bool taken = false;
+
+			setup.held[slot][button] = down;
+			for (int other = 0; other < which; other++)
+				taken = taken || (setup.button_device[other] == slot && setup.buttons[other] == button);
+			if (fresh && !taken)
+			{
+				setup.button_device[which] = slot;
+				setup.buttons[which] = button;
+				return true;
+			}
 		}
-	}
+	return false;
+}
+
+/* (a button the steps took on the wheel's device) */
+static bool chosen(int button)
+{
+	for (int which = 0; which < 3; which++)
+		if (setup.button_device[which] == setup.device && setup.buttons[which] == button)
+			return true;
 	return false;
 }
 
@@ -245,13 +265,15 @@ static void append_pedal(char *mapping, SDL_GameControllerAxis trigger, int peda
 {
 	const char *name = SDL_GameControllerGetStringForAxis(trigger);
 
+	if (setup.pedal_device[pedal] != setup.device)
+		return;    /* (on its own device: wheel_extras') */
 	if (setup.pedal_half[pedal] != 0)
 		append(mapping, "%s:%ca%d,", name, setup.pedal_half[pedal] > 0 ? '+' : '-', setup.pedal_axis[pedal]);
 	else
 		append(mapping, "%s:a%d%s,", name, setup.pedal_axis[pedal], setup.pedal_inverted[pedal] ? "~" : "");
 }
 
-/* The device's line: its GUID, its name (no commas), what the steps took, its other buttons and its hat */
+/* The device's line: its GUID, its name (no commas), what the steps took on it, its other buttons and its hat */
 static void make_mapping(SDL_Joystick *device, char *mapping, char *guid, size_t guid_size)
 {
 	const char *name = SDL_JoystickName(device);
@@ -267,10 +289,11 @@ static void make_mapping(SDL_Joystick *device, char *mapping, char *guid, size_t
 	append_pedal(mapping, SDL_CONTROLLER_AXIS_TRIGGERRIGHT, 0);
 	append_pedal(mapping, SDL_CONTROLLER_AXIS_TRIGGERLEFT, 1);
 	for (int which = 0; which < 3; which++)
-		append(mapping, "%s:b%d,", SDL_GameControllerGetStringForButton(chosen_buttons[which]), setup.buttons[which]);
+		if (setup.button_device[which] == setup.device)
+			append(mapping, "%s:b%d,", SDL_GameControllerGetStringForButton(chosen_buttons[which]), setup.buttons[which]);
 	for (int button = 0; button < buttons_of(device); button++)
 	{
-		if (button == setup.buttons[0] || button == setup.buttons[1] || button == setup.buttons[2])
+		if (chosen(button))
 			continue;
 		while (other < SDL_arraysize(other_buttons) && hat && is_pad(other_buttons[other]))
 			other++;
@@ -349,11 +372,35 @@ static void write_mapping(const char *mapping, const char *guid)
 	free(text);
 }
 
-/* The steps all taken: the device's layout made, added to SDL and kept */
+/* What the steps took on other devices than the wheel's, for wheel_extras */
+static void make_extras(wheel_extra extras[WHEEL_EXTRAS])
+{
+	memset(extras, 0, sizeof(wheel_extra) * WHEEL_EXTRAS);
+	for (int pedal = 0; pedal < 2; pedal++)
+		if (setup.pedal_device[pedal] != setup.device && devices[setup.pedal_device[pedal]])
+		{
+			extras[WHEEL_EXTRA_GAS + pedal].used = true;
+			extras[WHEEL_EXTRA_GAS + pedal].device = SDL_JoystickGetGUID(devices[setup.pedal_device[pedal]]);
+			extras[WHEEL_EXTRA_GAS + pedal].index = setup.pedal_axis[pedal];
+			extras[WHEEL_EXTRA_GAS + pedal].half = setup.pedal_half[pedal];
+			extras[WHEEL_EXTRA_GAS + pedal].inverted = setup.pedal_inverted[pedal];
+		}
+	for (int which = 0; which < 3; which++)
+		if (setup.button_device[which] != setup.device && devices[setup.button_device[which]])
+		{
+			extras[WHEEL_EXTRA_SHIFT_UP + which].used = true;
+			extras[WHEEL_EXTRA_SHIFT_UP + which].device = SDL_JoystickGetGUID(devices[setup.button_device[which]]);
+			extras[WHEEL_EXTRA_SHIFT_UP + which].index = setup.buttons[which];
+		}
+}
+
+/* The steps all taken: the device's layout made, added to SDL and kept; what is on other devices, to
+   wheel_extras (none where every control is the wheel's) */
 static SDL_JoystickID finish(void)
 {
 	SDL_Joystick *device = devices[setup.device];
 	char mapping[MAPPING_SIZE], guid[64];
+	wheel_extra extras[WHEEL_EXTRAS];
 
 	make_mapping(device, mapping, guid, sizeof(guid));
 	fprintf(stderr, "SET UP WHEEL: %s\n", mapping);
@@ -363,6 +410,8 @@ static SDL_JoystickID finish(void)
 		return -1;
 	}
 	write_mapping(mapping, guid);
+	make_extras(extras);
+	wheel_extras_save(SDL_JoystickGetGUID(device), extras);
 	return SDL_JoystickInstanceID(device);
 }
 

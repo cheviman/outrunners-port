@@ -80,8 +80,9 @@
 #include "touch.h"
 #endif
 #if defined(ORUNNERS_CONSOLE) && !defined(ORUNNERS_HANDHELD)
-#define WHEEL_SETUP    /* OPTIONS > STEERING's SET UP WHEEL: a computer's (wheel_setup.c) */
+#define WHEEL_SETUP    /* OPTIONS > STEERING's SET UP WHEEL: a computer's (wheel_setup.c, wheel_extras.c) */
 #include "wheel_setup.h"
+#include "wheel_extras.h"
 #endif
 
 #include <SDL.h>
@@ -1139,6 +1140,11 @@ static uint32_t read_actions(const Uint8 *keys)
 			held |= ACTION_BIT(ACTION_BACK);
 		if (SDL_GameControllerGetButton(pad, SDL_CONTROLLER_BUTTON_START))
 			held |= ACTION_BIT(ACTION_START) | PAUSE_BIT;
+#ifdef WHEEL_SETUP
+		if (wheel_extras_is_wheel(SDL_JoystickGetGUID(SDL_GameControllerGetJoystick(pad)))
+			&& wheel_extras_button(WHEEL_EXTRA_START))
+			held |= ACTION_BIT(ACTION_START) | PAUSE_BIT;    /* (its START on a device of its own) */
+#endif
 	}
 	return held;
 }
@@ -1311,20 +1317,36 @@ static void read_events(void)
 #ifdef WHEEL_SETUP
 				if (controller_player(SDL_JoystickGetDeviceInstanceID(event.cdevice.which)) >= 0)
 					break;    /* (a wheel SET UP WHEEL opened already) */
+				if (wheel_extras_is_part(SDL_JoystickGetDeviceGUID(event.cdevice.which)))
+					break;    /* (the set up wheel's pedals or shifter: its player's, no player's game controller) */
 #endif
 				for (int player = 0; player < PLAYERS; player++)
 					if (!controllers[player])
 					{
 						controllers[player] = SDL_GameControllerOpen(event.cdevice.which);
+#ifdef WHEEL_SETUP
+						if (player > 0 && controllers[player]
+							&& wheel_extras_is_wheel(SDL_JoystickGetDeviceGUID(event.cdevice.which)))
+						{
+							/* (the wheel set up with its pedals or shifter apart: player 1's, as SET UP WHEEL
+							   made it, whatever device came first; its forces with it) */
+							SDL_GameController *first = controllers[0];
+
+							controllers[0] = controllers[player];
+							controllers[player] = first;
+						}
+#endif
 						break;
 					}
 				break;
 #ifdef WHEEL_SETUP
 			case SDL_JOYDEVICEADDED:
 				wheel_setup_device_added(event.jdevice.which);
+				wheel_extras_device_added(event.jdevice.which);
 				break;
 			case SDL_JOYDEVICEREMOVED:
 				wheel_setup_device_removed(event.jdevice.which);
+				wheel_extras_device_removed(event.jdevice.which);
 				break;
 #endif
 			case SDL_CONTROLLERDEVICEREMOVED:
@@ -1548,6 +1570,23 @@ static void on_controls_update(void)
 			if (pad_brake > brakes[player])
 				brakes[player] = pad_brake;
 		}
+#ifdef WHEEL_SETUP
+		if (wheel_extras_is_wheel(SDL_JoystickGetGUID(SDL_GameControllerGetJoystick(pad))))
+		{
+			/* the set up wheel's pedals and shifter on devices of their own (wheel_extras.c), as its own
+			   triggers and buttons would be */
+			const int extra_gas = trigger_pedal(wheel_extras_pedal(WHEEL_EXTRA_GAS));
+			const int extra_brake = trigger_pedal(wheel_extras_pedal(WHEEL_EXTRA_BRAKE));
+
+			if (extra_gas > gases[player])
+				gases[player] = extra_gas;
+			if (extra_brake > brakes[player])
+				brakes[player] = extra_brake;
+			shift_up[player] |= wheel_extras_button(WHEEL_EXTRA_SHIFT_UP);
+			shift_down[player] |= wheel_extras_button(WHEEL_EXTRA_SHIFT_DOWN);
+			start[player] |= wheel_extras_button(WHEEL_EXTRA_START);
+		}
+#endif
 #ifndef ORUNNERS_CONSOLE    /* (the console's buttons are its bindings') */
 		shift_up[player] |= SDL_GameControllerGetButton(pad, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER) != 0;
 		shift_down[player] |= SDL_GameControllerGetButton(pad, SDL_CONTROLLER_BUTTON_LEFTSHOULDER) != 0;
@@ -1963,6 +2002,7 @@ static char *saves_folder(void)
    a device, which SDL reads as it starts (where SDL_GAMECONTROLLERCONFIG_FILE names no other): a player's
    own, SDL's community's, and SET UP WHEEL's, which writes its own there */
 #define MAPPINGS_FILE "gamecontrollerdb.txt"
+#define EXTRAS_FILE   "wheel_devices.txt"    /* SET UP WHEEL's controls on other devices (wheel_extras.c) */
 
 static void read_mappings_file(void)
 {
@@ -1970,11 +2010,13 @@ static void read_mappings_file(void)
 	char path[1024];
 
 	snprintf(path, sizeof(path), "%s" MAPPINGS_FILE, saves ? saves : "");
-	SDL_free(saves);
 	SDL_SetHint(SDL_HINT_GAMECONTROLLERCONFIG_FILE, path);
 #ifdef WHEEL_SETUP
 	wheel_setup_open(path);
+	snprintf(path, sizeof(path), "%s" EXTRAS_FILE, saves ? saves : "");
+	wheel_extras_open(path);
 #endif
+	SDL_free(saves);
 }
 #endif
 

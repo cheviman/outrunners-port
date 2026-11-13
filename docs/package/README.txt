@@ -27,6 +27,8 @@ left stick and the pedals the triggers; set OPTIONS > STEERING > WHEEL ROTATION 
 G29) and the DEAD ZONE to 0%. A wheel the game does not see (a Thrustmaster T300RS on Windows): OPTIONS >
 STEERING > SET UP WHEEL asks for its wheel, pedals and buttons one by one, and keeps them in
 gamecontrollerdb.txt in the same folder, where SDL's controller layouts made elsewhere can go too.
+Pedals and a shifter plugged in on their own are taken too, as they are pressed: they are kept in
+wheel_devices.txt, and the wheel is player 1's, its force feedback with it.
 STEERING's INPUT TEST shows the wheel and the pedals as the game sees them.
 
 NETWORK
