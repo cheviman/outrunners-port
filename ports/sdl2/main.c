@@ -136,7 +136,9 @@ static void android_multicast_lock(bool wanted);
 #define VIDEO_WORKERS       SDL_min(SDL_GetCPUCount() - 1, 3)    /* up to three more cores (a handheld's four) */
 #endif
 #ifdef ORUNNERS_HANDHELD_KEYS
+#ifndef HANDHELD_MENU_BUTTON
 #define HANDHELD_MENU_BUTTON 8         /* the joystick button that leaves the game: the RG40XX H's MENU */
+#endif
 #endif
 #define WHEEL_MOTOR         0x10       /* output port D: the cabinet's wheel motor (forces.c) */
 #ifdef ORUNNERS_CONSOLE
@@ -896,6 +898,9 @@ static void show_screens(void)
 
 #ifdef ORUNNERS_HANDHELD
 static uint64_t pace_video, pace_showing;    /* a handheld's log: the frames' time drawing them, showing them */
+#ifdef ORUNNERS_FRAMESKIP
+static uint32_t frames_skipped;    /* the frames not drawn, behind the game's pace */
+#endif
 #endif
 
 static void on_frame_shown(void)
@@ -910,6 +915,19 @@ static void on_frame_shown(void)
 #ifdef ORUNNERS_HANDHELD
 	const uint64_t start = SDL_GetPerformanceCounter();
 	uint64_t drawn;
+#ifdef ORUNNERS_FRAMESKIP
+	/* a slower handheld (the R36S's RK3326): a frame already past its time is not drawn, so that the game and
+	   its sound keep their 60 a second; never more than ORUNNERS_FRAMESKIP frames in a row */
+	static int skipped_in_row;
+
+	if (start > next_frame + SDL_GetPerformanceFrequency() / S32_FRAME_RATE && skipped_in_row < ORUNNERS_FRAMESKIP)
+	{
+		skipped_in_row++;
+		frames_skipped++;
+		return;
+	}
+	skipped_in_row = 0;
+#endif
 
 	s32_video_draw_frame();
 	drawn = SDL_GetPerformanceCounter();
@@ -1887,6 +1905,11 @@ static void log_pace(bool work_done)
 		fprintf(stderr, "%.1f frames a second; a frame takes %.1f ms (its video %.1f, showing it %.1f), at most %.1f\n",
 			pace_frames * (double)frequency / (double)(now - pace_start), (double)pace_work * per_frame,
 			(double)pace_video * per_frame, (double)pace_showing * per_frame, 1000.0 * (double)pace_most / (double)frequency);
+#ifdef ORUNNERS_FRAMESKIP
+		fprintf(stderr, "  %u of 300 frames not drawn; sound queued %u bytes\n", frames_skipped,
+			audio ? SDL_GetQueuedAudioSize(audio) : 0);
+		frames_skipped = 0;
+#endif
 		fflush(stderr);    /* (not to the card at once: a write to it would hold a frame) */
 		pace_start = now;
 		pace_frames = 0;
@@ -2476,6 +2499,16 @@ int main(int argc, char **argv)
 	wanted.channels = 2;
 	wanted.samples = 1024;
 	audio = SDL_OpenAudioDevice(NULL, 0, &wanted, NULL, 0);
+#ifdef ORUNNERS_FRAMESKIP
+	if (audio)
+	{
+		/* a cushion of silence: a late frame on a slower handheld does not leave the device without sound */
+		static int16_t silence[2 * 1024 * 4];
+		const Uint32 cushion = sound_chips_mix_rate() / S32_FRAME_RATE * 4 * 3;    /* (3 frames) */
+
+		SDL_QueueAudio(audio, silence, cushion < sizeof(silence) ? cushion : (Uint32)sizeof(silence));
+	}
+#endif
 	if (audio)
 		SDL_PauseAudioDevice(audio, 0);
 

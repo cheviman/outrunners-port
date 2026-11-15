@@ -262,6 +262,7 @@ if(ORUNNERS_DECOMPILED AND ORUNNERS_SOUND_DECOMPILED)
 	# pieces, ports/switch), Android (the NDK's: libmain.so in its APKs, ports/android) and Anbernic's H700
 	# handhelds (ports/anbernic)
 	option(ORUNNERS_ANBERNIC "Build the game for Anbernic's H700 handhelds" OFF)
+	option(ORUNNERS_R36S "With ORUNNERS_ANBERNIC: the build for the R36S and its RK3326 kin on ArkOS (ports/r36s)" OFF)
 	if(ORUNNERS_SWITCH)
 		include(${CMAKE_SOURCE_DIR}/ports/switch/switch.cmake)
 	elseif(ANDROID)

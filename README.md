@@ -35,6 +35,8 @@ that makes it on your computer with your ROM set:
   ([ports/android](ports/android/README.md)).
 - **Anbernic's H700 handhelds** (`outrunners-anbernic.zip`, RG35XX, RG40XX...): OutRunners Anbernic makes the
   folder for PORTS ([ports/anbernic](ports/anbernic/README.md)).
+- **The R36S on ArkOS** (RK3326): the Anbernic folder with this build's launcher and game in it
+  ([ports/r36s](ports/r36s/README.md)).
 
 What a tool makes has the game's data in it: it is yours alone, never share it.
 

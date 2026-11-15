@@ -19,6 +19,23 @@
 target_compile_definitions(orunners_game_console PUBLIC ORUNNERS_HANDHELD ORUNNERS_HANDHELD_KEYS
 	ORUNNERS_CONTROLS_PAGE ORUNNERS_ANBERNIC_BUTTONS)    # (L1 the gas, L2 the brake, Y and B the gears, SELECT the music)
 
+# ORUNNERS_R36S (ports/r36s): the same game for the R36S on ArkOS (RK3326, glibc 2.30, its toolchain
+# ports/r36s/zig_aarch64.cmake): no MENU button of Anbernic's numbering (the R36S's 8 is the d-pad's up; PortMaster's
+# SELECT + START leave the game), a frame past its time not drawn so that the game and its sound keep their 60 a
+# second, and PortMaster's launcher
+if(ORUNNERS_R36S)
+	target_compile_definitions(orunners_game_console PUBLIC HANDHELD_MENU_BUTTON=255 ORUNNERS_FRAMESKIP=2)
+	target_compile_options(orunners_game_console PUBLIC -mcpu=cortex_a35)
+	if(TARGET orunners_sound)
+		target_compile_options(orunners_sound PRIVATE -mcpu=cortex_a35)
+	endif()
+	set(ORUNNERS_HANDHELD_LAUNCHER ${CMAKE_SOURCE_DIR}/ports/r36s/OutRunners.sh)
+	set(ORUNNERS_HANDHELD_OUT_NAME r36s)
+else()
+	set(ORUNNERS_HANDHELD_LAUNCHER ${CMAKE_SOURCE_DIR}/ports/anbernic/OutRunners.sh)
+	set(ORUNNERS_HANDHELD_OUT_NAME anbernic)
+endif()
+
 set(ORUNNERS_SDL2_INCLUDE "" CACHE PATH "SDL2's headers (the folder with SDL.h)")
 if(NOT ORUNNERS_SDL2_INCLUDE)
 	file(GLOB ORUNNERS_SDL2_INCLUDES ${CMAKE_SOURCE_DIR}/build/downloads/sdl2/SDL2-*/include)
@@ -34,7 +51,7 @@ set_target_properties(SDL2_device PROPERTIES OUTPUT_NAME SDL2-2.0 SUFFIX ".so.0"
 	LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/sdl2_device)
 target_link_options(SDL2_device PRIVATE -Wl,-soname,libSDL2-2.0.so.0)
 
-set(ORUNNERS_ANBERNIC_OUT ${ORUNNERS_BIN_DIR}/anbernic)    # (PORTS's files, beside OutRunners Anbernic)
+set(ORUNNERS_ANBERNIC_OUT ${ORUNNERS_BIN_DIR}/${ORUNNERS_HANDHELD_OUT_NAME})    # (PORTS's files, beside OutRunners Anbernic)
 add_executable(OutRunners ports/sdl2/main.c ports/sdl2/forces.c ports/sdl2/controls.c)
 target_include_directories(OutRunners PRIVATE ${ORUNNERS_SDL2_INCLUDE})
 target_link_libraries(OutRunners PRIVATE orunners_game_console orunners_sound SDL2_device m)
@@ -47,7 +64,7 @@ endforeach()
 # the launcher beside the folder; in it CONTROLS' button pictures (input_prompts.bmp). The assets pack is
 # OutRunners Anbernic's, made from the player's ROM set with the rest of PORTS
 add_custom_command(TARGET OutRunners POST_BUILD
-	COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_SOURCE_DIR}/ports/anbernic/OutRunners.sh ${ORUNNERS_ANBERNIC_OUT}
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different ${ORUNNERS_HANDHELD_LAUNCHER} ${ORUNNERS_ANBERNIC_OUT}
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_SOURCE_DIR}/ports/sdl2/prompts/input_prompts.bmp
 		${ORUNNERS_ANBERNIC_OUT}/outrunners
 	VERBATIM)

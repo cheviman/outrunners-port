@@ -13,7 +13,10 @@
 
 set(CMAKE_SYSTEM_NAME Linux)
 set(CMAKE_SYSTEM_PROCESSOR aarch64)
-set(ORUNNERS_ZIG_TARGET aarch64-linux-gnu.2.35)    # the stock firmware's Ubuntu 22.04: glibc 2.35
+if(NOT ORUNNERS_ZIG_GLIBC)
+	set(ORUNNERS_ZIG_GLIBC 2.35)    # the stock firmware's Ubuntu 22.04: glibc 2.35 (ports/r36s's sets 2.30)
+endif()
+set(ORUNNERS_ZIG_TARGET aarch64-linux-gnu.${ORUNNERS_ZIG_GLIBC})
 
 if(NOT ZIG)
 	if(CMAKE_HOST_WIN32)
