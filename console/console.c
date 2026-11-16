@@ -4,7 +4,7 @@
  *                 what it tells the port
  *    Version:     0.1.4
  *    Created:     29-10-2026
- *    Modified:    13-11-2026
+ *    Modified:    15-11-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
@@ -276,10 +276,14 @@ uint32_t check_game_start(uint32_t mode, uint32_t seat_credits)
 
 	if (console.quit_seats & (1u << screen->index))
 	{
-		/* (the pause's QUIT GAME: a game being played ends, back to the title) */
+		/* (the pause's QUIT GAME: a game being played ends, back to the title, with the sound and the wheel
+		   motor off as the ranking's first step leaves them before the title: game mode 1 does not do it, and
+		   the engine kept its revs and the race's song its sequence, issue 39) */
 		console.quit_seats &= (uint8_t)~(1u << screen->index);
 		if (mode == GAME_MODE_PLAY)
 		{
+			game->wheel_motor[screen->index] = 0u;
+			reset_screen_sound();
 			AS32(screen->game_mode) = GAME_MODE_RESTART;
 			return GAME_MODE_RESTART;
 		}
@@ -464,11 +468,27 @@ void console_attach(void)
 	s32_video_use_extra_palette(true);    /* (REVERSE's start line) */
 }
 
+static int screen_wide;    /* WIDE AUTO's, as the port says the screen is (WIDE_OFF till it does) */
+
+void console_set_screen_wide(int kind)
+{
+	screen_wide = kind > WIDE_OFF && kind < WIDE_AUTO ? kind : WIDE_OFF;
+}
+
+int console_wide_in_effect(void)
+{
+	const int wide = console_window_settings.wide;
+
+	if (wide == WIDE_AUTO)
+		return screen_wide;
+	return wide > WIDE_OFF && wide < WIDE_AUTO ? wide : WIDE_OFF;
+}
+
 int console_wide_side(void)
 {
 	if (console.two_players)
 		return 0;    /* (2 PLAYERS: both screens alike) */
-	switch (console_window_settings.wide)
+	switch (console_wide_in_effect())
 	{
 		case WIDE_16_10: return S32_VIDEO_WIDE_SIDE_16_10;
 		case WIDE_16_9: return S32_VIDEO_WIDE_SIDE_16_9;
@@ -502,6 +522,33 @@ bool console_can_pause(void)
 	   where the others race on: it held this device's car alone, issue 34) */
 	return SCREEN(SCREEN_1)->game_mode == GAME_MODE_PLAY && racing(SCREEN_1) && !console_route_select_running()
 		&& !console_network_linked();
+}
+
+/* ---- the radio's hidden song ---- */
+
+#define LAST_RADIO_SONG     9u    /* Last Wave: the game's >> goes on from it to the first, Magical Sound Shower */
+#define FIRST_RADIO_SONG    0u
+#define HIDDEN_RADIO_SONG   10u   /* Jingle Bell, radio_songs' eleventh */
+
+void console_radio_buttons(int player, bool *previous, bool *next)
+{
+	static bool held[CONTROL_PLAYERS][2];    /* the seat's << and >> the frame before */
+	const uint32_t seat = player == 0 ? SCREEN_1 : SCREEN_2;
+	const bool previous_pressed = *previous && !held[player][0], next_pressed = *next && !held[player][1];
+	uint8_t song;
+
+	held[player][0] = *previous;
+	held[player][1] = *next;
+	if (previous_pressed == next_pressed || SCREEN(seat)->game_mode != GAME_MODE_PLAY || !racing(seat))
+		return;
+	song = CAR(seat + SCREEN_CAR)->song;
+	if ((next_pressed && song == LAST_RADIO_SONG) || (previous_pressed && song == FIRST_RADIO_SONG))
+	{
+		/* (both pressed: the game plays Jingle Bell, and leaves the car's song as it was, which its next << or
+		   >> steps from: 10, between Last Wave and Magical Sound Shower) */
+		*previous = *next = true;
+		CAR(seat + SCREEN_CAR)->song = HIDDEN_RADIO_SONG;
+	}
 }
 
 bool console_manual_gears(int player)

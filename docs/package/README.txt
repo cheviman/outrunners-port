@@ -18,7 +18,16 @@ OutRunners           the console version: one screen, a menu (ARCADE, 2 PLAYERS,
 OutRunners Arcade    the arcade game as it is, both cabinet screens side by side
 
 The first time either starts it takes the assets out of orunners.zip (a few seconds) and keeps them:
-beside the game on Windows, in your user folder for the game elsewhere.
+beside the game on Windows, in your user folder for the game elsewhere. Started with --game and the ROM
+set's path (OutRunners --game D:\roms\orunners.zip), it takes them from there, as a shortcut or a launcher
+can. recomplauncher.json tells RecompLauncher (recomplauncher.com) how to do it all for you: it asks for
+orunners.zip once, and shows the video settings on the game's page.
+
+What the game writes (the records, outrunners.ini, controls.ini, TIME ATTACK's ghosts) and its log,
+outrunners.log with the two runs before beside it, go to the same folder: beside the game on Windows, and on
+Linux and macOS too where a file portable.txt is beside the game (beside the .app); else ~/.local/share/
+OutRunners on Linux and ~/Library/Application Support/OutRunners on macOS. A game started from a terminal
+says it there instead.
 
 Racing wheels
 -------------
@@ -42,9 +51,9 @@ heard is out of the race after 3 seconds, and the race goes on. The game uses UD
 The devices
 -----------
 The Nintendo Switch, Android and Anbernic's H700 handhelds have packages of their own on the same release
-page: outrunners-switch.zip, outrunners-android.zip and outrunners-anbernic.zip. Each has the device's game
-without assets and the tool, for Windows, macOS and Linux, that makes yours on your computer with your ROM
-set.
+page: outrunners-VERSION-switch.zip, outrunners-VERSION-android.zip and outrunners-VERSION-anbernic.zip
+(VERSION is the release's, v1.3.2 say). Each has the device's game without assets and the tool, for
+Windows, macOS and Linux, that makes yours on your computer with your ROM set.
 
 Licenses
 --------

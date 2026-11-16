@@ -1,10 +1,11 @@
 /**
  *    Name:        first_run.c
- *    Description: the first run: the game's assets out of the player's ROM set, found beside the game (on
- *                 macOS beside its .app) or where it keeps its files, or dropped on a window that asks for it
- *    Version:     0.1.0
+ *    Description: the first run: the game's assets out of the player's ROM set, given (--game), found beside
+ *                 the game (on macOS beside its .app) or where it keeps its files, or dropped on a window that
+ *                 asks for it
+ *    Version:     0.1.1
  *    Created:     29-10-2026
- *    Modified:    29-10-2026
+ *    Modified:    15-11-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
@@ -164,7 +165,7 @@ static int extracted_from(const char *place, const char *folder, char *problem, 
 	return 0;
 }
 
-int first_run(const char *title, const char *base, const char *saves, const char *folder)
+int first_run(const char *title, const char *base, const char *saves, const char *folder, const char *set)
 {
 	SDL_Window *window;
 	SDL_Renderer *renderer;
@@ -172,6 +173,15 @@ int first_run(const char *title, const char *base, const char *saves, const char
 	char problem[400] = "", beside_app[1024];
 	int done = 0, running = 1;
 
+	if (set)
+	{
+		/* (--game: the set a launcher or a shortcut gives, first) */
+		const char *failed = game_assets_extract(set, folder);
+
+		if (!failed)
+			return 1;
+		say_problem(failed, problem, sizeof(problem));
+	}
 	if (extracted_from(base, folder, problem, sizeof(problem))
 		|| (app_folder(base, beside_app, sizeof(beside_app)) && extracted_from(beside_app, folder, problem, sizeof(problem)))
 		|| ((!base || !saves || strcmp(base, saves) != 0) && extracted_from(saves, folder, problem, sizeof(problem))))

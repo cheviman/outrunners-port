@@ -4,12 +4,12 @@
  *                 keeps the pace, around the same game and board the headless runs check
  *    Version:     0.1.4
  *    Created:     21-10-2026
- *    Modified:    13-11-2026
+ *    Modified:    15-11-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
  *    Usage: "OutRunners Arcade" or OutRunners [--script FILE [--fast]] [--hashes FILE] [--video-hashes FILE]
- *                    [--sound-hashes FILE] [--assets FOLDER]
+ *                    [--sound-hashes FILE] [--assets FOLDER] [--game SET] [--prepare --game SET]
  *
  *    The game (src/) and the board (runtime/) run as they are: this file only wraps them. Where the board
  *    has its hooks, the port does its part: when VBLANK starts the video draws both screens and the port
@@ -28,7 +28,11 @@
  *    ROM set: --assets, or the folder 'assets' beside the executable, beside the .app on macOS, in the
  *    folder of what the game keeps, or in the current folder. Where there is none, the first run takes them
  *    out of the ROM set itself into the folder of what the game keeps (first_run.c, runtime/src/extract.c):
- *    orunners.zip or rom/ beside the game or in that folder, or a set dropped on its window.
+ *    orunners.zip or rom/ beside the game or in that folder, or a set dropped on its window. --game SET gives
+ *    it the set (orunners.zip, or a folder of its files) to take them out of first, as a launcher or a
+ *    shortcut can; --prepare --game SET only takes them out, with no window, saying how far it is on the
+ *    standard output ("progress 0.1 Reading the ROM set"), and ends (RecompLauncher's setup step:
+ *    recomplauncher.json). Without them the game starts as before.
  *
  *    The game devices (ORUNNERS_HANDHELD) make nothing from the ROM set: their assets pack (outrunners.assets)
  *    comes with the game, made on a computer, and their picture is fixed (fix_window_settings). On Anbernic's
@@ -96,12 +100,22 @@
 #if defined(ORUNNERS_HANDHELD) && !defined(_WIN32) && !defined(__SWITCH__)
 #include <unistd.h>        /* fsync: the log on the card as it is written */
 #endif
+#ifndef ORUNNERS_HANDHELD
+#ifdef _WIN32
+#include <io.h>            /* _isatty: the log, unless a terminal shows what the game says */
+#define STDERR_TERMINAL()  (_isatty(_fileno(stderr)) != 0)
+#else
+#include <unistd.h>        /* isatty */
+#define STDERR_TERMINAL()  (isatty(fileno(stderr)) != 0)
+#endif
+#endif
 
 #include <inttypes.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #if defined(__ANDROID__) && defined(ORUNNERS_CONSOLE)
 static void android_multicast_lock(bool wanted);
@@ -159,7 +173,9 @@ static void android_multicast_lock(bool wanted);
 #define BACKUP_RAM_SIZE     0xfa
 
 #define USAGE "Usage: orunners [--script FILE [--fast]] [--hashes FILE] [--video-hashes FILE] [--sound-hashes FILE]" \
-	" [--assets FILE]"
+	" [--assets FILE] [--game SET] [--prepare --game SET]"
+#define PREPARE_NO_SET      2          /* --prepare's end without --game */
+#define PREPARE_NOT_TAKEN   3          /* --prepare's end with a set the assets could not come out of */
 
 static SDL_Window *window;
 static SDL_Renderer *renderer;
@@ -328,11 +344,13 @@ static bool screens_stacked(void)
 static int screen_width(void)
 {
 #ifdef ORUNNERS_CONSOLE
-	if (console_window_settings.wide == WIDE_16_10)
+	const int wide = console_wide_in_effect();
+
+	if (wide == WIDE_16_10)
 		return WIDE_16_10_WIDTH;
-	if (console_window_settings.wide == WIDE_16_9)
+	if (wide == WIDE_16_9)
 		return WIDE_16_9_WIDTH;
-	if (console_window_settings.wide == WIDE_20_9)
+	if (wide == WIDE_20_9)
 		return WIDE_20_9_WIDTH;
 #endif
 	return 320;
@@ -350,7 +368,14 @@ static void picture_size(int *width, int *height)
    mid-game, a Fold opened or closed (Sebas): WIDE is chosen again then, the picture's new width from the next
    frame (on_controls_update sees it) */
 #define WIDE_BY_SCREEN
+#elif defined(ORUNNERS_CONSOLE) && !defined(ORUNNERS_HANDHELD)
+/* A computer's OPTIONS > VIDEO > WIDE AUTO (issue 40): WIDE as the shape of the screen the window is on asks,
+   chosen again where it changes, a Steam Deck's 16:10 in its hands and 16:9 docked to a TV, as the Simpsons
+   port's; the window sized again for it */
+#define WIDE_AUTO_BY_SCREEN
+#endif
 
+#if defined(WIDE_BY_SCREEN) || defined(WIDE_AUTO_BY_SCREEN)
 static int shape_width, shape_height;    /* the screen WIDE was last chosen for */
 
 /* WIDE for a screen of 'width' x 'height' (either way up: its long side across): 20:9 where it is twice as wide
@@ -363,11 +388,22 @@ static int wide_for_screen(int width, int height)
 
 	if (long_side >= 2 * short_side)
 		return WIDE_20_9;
+#ifdef ORUNNERS_TOUCH
 	if (9 * long_side >= 16 * short_side || tablet_screen(width, height))
+#else
+	if (9 * long_side >= 16 * short_side)
+#endif
 		return WIDE_16_9;
 	return 2 * long_side >= 3 * short_side ? WIDE_16_10 : WIDE_OFF;
 }
 
+static const char *wide_name(int wide)
+{
+	return wide == WIDE_20_9 ? "20:9" : wide == WIDE_16_9 ? "16:9" : wide == WIDE_16_10 ? "16:10" : "OFF";
+}
+#endif
+
+#ifdef WIDE_BY_SCREEN
 /* The screen's size at a frame, as the renderer has it: WIDE chosen again where it changed (the log says so) */
 static void follow_screen(int width, int height)
 {
@@ -376,9 +412,45 @@ static void follow_screen(int width, int height)
 	shape_width = width;
 	shape_height = height;
 	console_window_settings.wide = wide_for_screen(width, height);
-	fprintf(stderr, "screen %dx%d: WIDE %s\n", width, height, console_window_settings.wide == WIDE_20_9 ? "20:9"
-		: console_window_settings.wide == WIDE_16_9 ? "16:9" : console_window_settings.wide == WIDE_16_10 ? "16:10"
-		: "OFF");
+	fprintf(stderr, "screen %dx%d: WIDE %s\n", width, height, wide_name(console_window_settings.wide));
+}
+#endif
+
+#ifdef WIDE_AUTO_BY_SCREEN
+/* The screen's shape: full screen, the renderer's whole output; in a window, the desktop's mode of the display
+   the window is on (the monitor's) */
+static void screen_shape(int *width, int *height)
+{
+	SDL_DisplayMode mode;
+
+	*width = *height = 0;
+	if (window && !(SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN)
+		&& SDL_GetDesktopDisplayMode(SDL_GetWindowDisplayIndex(window), &mode) == 0)
+	{
+		*width = mode.w;
+		*height = mode.h;
+		return;
+	}
+	if (renderer)
+		SDL_GetRendererOutputSize(renderer, width, height);
+}
+
+/* WIDE AUTO's chosen again where the screen's shape changed (the log says so); the window sized again for it, as
+   for a setting changed (apply_window_settings), where the WIDE in effect changed */
+static void follow_screen(void)
+{
+	const int before = console_wide_in_effect();
+	int width, height;
+
+	screen_shape(&width, &height);
+	if (width <= 0 || height <= 0 || (width == shape_width && height == shape_height))
+		return;
+	shape_width = width;
+	shape_height = height;
+	console_set_screen_wide(wide_for_screen(width, height));
+	fprintf(stderr, "screen %dx%d: WIDE AUTO -> %s\n", width, height, wide_name(wide_for_screen(width, height)));
+	if (console_wide_in_effect() != before)
+		console_window_settings.changed = true;
 }
 #endif
 
@@ -614,6 +686,8 @@ static void present(SDL_Rect source)
 	SDL_GetRendererOutputSize(renderer, &out_width, &out_height);
 #ifdef WIDE_BY_SCREEN
 	follow_screen(out_width, out_height);    /* (a Fold opened or closed: its WIDE, from the next frame) */
+#elif defined(WIDE_AUTO_BY_SCREEN)
+	follow_screen();    /* (the window on another monitor, a Steam Deck docked: WIDE AUTO's, from the next frame) */
 #endif
 	scale = SDL_min((double)out_width / source.w, (double)out_height / source.h);
 	shown[0].w = (int)(source.w * scale);
@@ -714,6 +788,7 @@ typedef struct
 {
 	int what;      /* an SDL_Scancode or an SDL_GameControllerButton */
 	uint8_t row, column, tiles;    /* where in the sheet, and how many tiles wide */
+	uint8_t over;  /* a tile of the same row drawn over it (the rest of PlayStation's symbols), or 0 */
 } prompt;
 
 static const prompt key_prompts[] = {
@@ -764,6 +839,15 @@ static const prompt button_prompts[] = {
 	{ SDL_CONTROLLER_BUTTON_GUIDE, 18, 2, 1 }, { SDL_CONTROLLER_BUTTON_MISC1, 18, 6, 1 },
 };
 
+/* A DualShock's or a DualSense's own, where they differ: cross, circle, square and triangle (each its button and
+   the tile with the rest of its symbol, as the sheet has them), L1, R1, L2 and R2 */
+static const prompt playstation_prompts[] = {
+	{ SDL_CONTROLLER_BUTTON_A, 16, 23, 1, 24 }, { SDL_CONTROLLER_BUTTON_B, 16, 19, 1, 20 },
+	{ SDL_CONTROLLER_BUTTON_X, 16, 21, 1, 22 }, { SDL_CONTROLLER_BUTTON_Y, 16, 17, 1, 18 },
+	{ SDL_CONTROLLER_BUTTON_LEFTSHOULDER, 18, 19, 1 }, { SDL_CONTROLLER_BUTTON_RIGHTSHOULDER, 18, 20, 1 },
+	{ CONTROL_LEFT_TRIGGER, 18, 17, 1 }, { CONTROL_RIGHT_TRIGGER, 18, 18, 1 },
+};
+
 #define PROMPT_SIZE  16
 #define PROMPT_CLEAR 0xFFFF00FFu    /* magenta: the sheet's see-through */
 
@@ -791,28 +875,55 @@ static const prompt *find_prompt(const prompt *list, size_t count, int what)
 	return NULL;
 }
 
-/* One prompt into the picture, its top left at (x, y) */
+/* One prompt into the picture, its top left at (x, y): its tiles, and the one over them where it has one */
 static void draw_prompt(const prompt *icon, int x, int y)
 {
 	const uint32_t *sheet = (const uint32_t *)prompt_sheet->pixels;
 	const int pitch = prompt_sheet->pitch / 4;
 
-	for (int row = 0; row < PROMPT_SIZE; row++)
-		for (int column = 0; column < PROMPT_SIZE * icon->tiles; column++)
-		{
-			const uint32_t color = sheet[(icon->row * PROMPT_SIZE + row) * pitch + icon->column * PROMPT_SIZE + column];
+	for (int layer = 0; layer < (icon->over ? 2 : 1); layer++)
+	{
+		const int from = layer == 0 ? icon->column : icon->over;
 
-			if ((color | 0xFF000000u) == PROMPT_CLEAR || y + row < 0 || y + row >= S32_VIDEO_HEIGHT
-				|| x + column >= S32_VIDEO_MAX_WIDTH)
-				continue;
-			controls_picture[(y + row) * S32_VIDEO_MAX_WIDTH + x + column] = color | 0xFF000000u;
-		}
+		for (int row = 0; row < PROMPT_SIZE; row++)
+			for (int column = 0; column < PROMPT_SIZE * (layer == 0 ? icon->tiles : 1); column++)
+			{
+				const uint32_t color = sheet[(icon->row * PROMPT_SIZE + row) * pitch + from * PROMPT_SIZE + column];
+
+				if ((color | 0xFF000000u) == PROMPT_CLEAR || y + row < 0 || y + row >= S32_VIDEO_HEIGHT
+					|| x + column >= S32_VIDEO_MAX_WIDTH)
+					continue;
+				controls_picture[(y + row) * S32_VIDEO_MAX_WIDTH + x + column] = color | 0xFF000000u;
+			}
+	}
+}
+
+/* The player's game controller's buttons as its own: PlayStation's symbols for a DualShock or a DualSense (SDL's
+   type of it), else the letters; with no controller, RecompLauncher's RECOMPLAUNCHER_PAD ("playstation" or
+   "xbox", the player's) says which. A device's are its own buttons, the letters */
+static bool playstation_buttons(int player)
+{
+#ifndef ORUNNERS_HANDHELD
+	const char *pad = SDL_getenv("RECOMPLAUNCHER_PAD");
+
+	if (player >= 0 && player < PLAYERS && controllers[player])
+	{
+		const SDL_GameControllerType type = SDL_GameControllerGetType(controllers[player]);
+
+		return type == SDL_CONTROLLER_TYPE_PS3 || type == SDL_CONTROLLER_TYPE_PS4 || type == SDL_CONTROLLER_TYPE_PS5;
+	}
+	return pad && strcmp(pad, "playstation") == 0;
+#else
+	(void)player;
+	return false;
+#endif
 }
 
 /* The left screen's frame with each of the shown player's controls' keys and first button on its line */
 static const uint32_t *with_controls(const uint32_t *pixels)
 {
 	const control_binding *bindings = control_bindings[console_controls_player()];
+	const bool playstation = playstation_buttons(console_controls_player());
 
 	memcpy(controls_picture, pixels, sizeof(controls_picture));
 	for (int control = 0; control < CONTROLS; control++)
@@ -830,7 +941,9 @@ static const uint32_t *with_controls(const uint32_t *pixels)
 			draw_prompt(icon, x + (shown++ ? CONSOLE_CONTROLS_SECOND_X : 0), y);
 			first = first ? first : icon;
 		}
-		if ((icon = find_prompt(button_prompts, SDL_arraysize(button_prompts), bindings[control].buttons[0])) != NULL)
+		icon = playstation ? find_prompt(playstation_prompts, SDL_arraysize(playstation_prompts), bindings[control].buttons[0])
+			: NULL;
+		if (icon || (icon = find_prompt(button_prompts, SDL_arraysize(button_prompts), bindings[control].buttons[0])) != NULL)
 			draw_prompt(icon, x + CONSOLE_CONTROLS_BUTTON_X, y);
 	}
 	return controls_picture;
@@ -992,6 +1105,24 @@ static void save_window_settings(void)
 	fclose(output);
 }
 
+/* A line of outrunners.ini as the game writes it, "wide=4", from one with spaces before it or around its '=',
+   "wide = 4", as another program may write it (RecompLauncher's settings: recomplauncher.json) */
+static void tidy_setting(char *line)
+{
+	const size_t lead = strspn(line, " \t");
+	char *equals, *to, *from;
+
+	memmove(line, line + lead, strlen(line + lead) + 1);
+	if ((equals = strchr(line, '=')) == NULL)
+		return;
+	for (to = equals; to > line && (to[-1] == ' ' || to[-1] == '\t'); to--)
+		;
+	for (from = equals + 1; *from == ' ' || *from == '\t'; from++)
+		;
+	*to++ = '=';
+	memmove(to, from, strlen(from) + 1);
+}
+
 static void load_window_settings(void)
 {
 	console_window *settings = &console_window_settings;
@@ -1003,12 +1134,13 @@ static void load_window_settings(void)
 		return;
 	while (fgets(line, sizeof(line), input))
 	{
+		tidy_setting(line);
 		if (sscanf(line, "window_scale=%d", &number) == 1 && number >= 1 && number <= 6)
 			settings->window_scale = number;
 		else if (sscanf(line, "full_screen=%d", &number) == 1)
 			settings->full_screen = number != 0;
 		else if (sscanf(line, "wide=%d", &number) == 1 && number >= 0 && number < WIDE_KINDS)
-			settings->wide = number;    /* (0 off, 1 16:9, 2 20:9) */
+			settings->wide = number;    /* (0 off, 1 16:9, 2 20:9, 3 16:10, 4 AUTO) */
 		else if (sscanf(line, "vsync=%d", &number) == 1)
 			settings->vsync = number != 0;
 		else if (sscanf(line, "volume=%d", &number) == 1 && number >= 0 && number <= 10)
@@ -1655,6 +1787,7 @@ static void on_controls_update(void)
 		}
 		if (console_can_pause())
 			start[player] = false;    /* (in a race START pauses) */
+		console_radio_buttons(player, &previous[player], &next[player]);    /* (Jingle Bell on the way round) */
 	}
 #endif
 	/* each player's 315-5296 (chip 0 player 1, chip 1 player 2); its ports are active low: a cleared bit
@@ -2027,10 +2160,53 @@ static FILE *open_hashes(const char *path)
 	return path ? fopen(path, "w") : NULL;
 }
 
+#ifndef ORUNNERS_HANDHELD
+static char *saves_folder(void);
+
+/* --prepare --game SET (RecompLauncher's setup step, recomplauncher.json's prepare): the assets out of the ROM
+   set SET into the folder the first run takes them out to, with no window and before SDL starts, how far it
+   is on the standard output as the launcher reads it; 0 when they came out, PREPARE_NO_SET without --game,
+   PREPARE_NOT_TAKEN with a set they did not come out of (what was wrong, said) */
+static int prepare(int argc, char **argv)
+{
+	const char *set = NULL, *failed;
+	char *base, *saves, folder[1100];
+
+	for (int index = 1; index < argc; index++)
+		if (strcmp(argv[index], "--game") == 0 && index + 1 < argc)
+			set = argv[++index];
+	if (!set)
+	{
+		printf("--prepare takes the ROM set with --game (orunners.zip)\n");
+		return PREPARE_NO_SET;
+	}
+	base = SDL_GetBasePath();
+	saves = saves_folder();
+	snprintf(folder, sizeof(folder), "%sassets", saves ? saves : (base ? base : ""));
+	printf("progress 0.1 Reading the ROM set\n");
+	fflush(stdout);
+	failed = game_assets_extract(set, folder);
+	SDL_free(base);
+	SDL_free(saves);
+	if (failed)
+	{
+		printf("The graphics and sounds did not come out of the ROM set: %s\n", failed);
+		fflush(stdout);
+		return PREPARE_NOT_TAKEN;
+	}
+	printf("progress 1 The graphics and sounds taken out\n");
+	fflush(stdout);
+	return 0;
+}
+#endif
+
+static int app_folder(const char *base, char *folder, size_t size);
+
 /* Where the game keeps what it writes (the EEPROM, the sound RAM's bookkeeping): beside the executable on
    Windows; elsewhere the user's own folder for the game (SDL_GetPrefPath: ~/.local/share/OutRunners,
-   ~/Library/Application Support/OutRunners), as the executable's may not be written (an .app, /usr/bin).
-   The caller frees it (SDL_free) */
+   ~/Library/Application Support/OutRunners), as the executable's may not be written (an .app, /usr/bin),
+   but beside the game (beside the .app on macOS) where a file portable.txt is there, as on Windows (a
+   launcher's saves and mods follow it). The caller frees it (SDL_free) */
 static char *saves_folder(void)
 {
 #ifdef __SWITCH__
@@ -2041,9 +2217,60 @@ static char *saves_folder(void)
 #elif defined(_WIN32) || defined(ORUNNERS_HANDHELD)
 	return SDL_GetBasePath();    /* (a handheld's: the game's folder on its card) */
 #else
+	char *base = SDL_GetBasePath(), beside_app[1024], probe[1100];
+	const char *folder = base && app_folder(base, beside_app, sizeof(beside_app)) ? beside_app : base;
+	FILE *portable;
+
+	snprintf(probe, sizeof(probe), "%sportable.txt", folder ? folder : "");
+	if (folder && (portable = fopen(probe, "rb")) != NULL)
+	{
+		char *kept = SDL_strdup(folder);
+
+		fclose(portable);
+		SDL_free(base);
+		return kept;
+	}
+	SDL_free(base);
 	return SDL_GetPrefPath("", "OutRunners");
 #endif
 }
+
+#ifndef ORUNNERS_HANDHELD
+#define LOGS_KEPT 3    /* FILE_NAME.log, .1.log and .2.log: this run's and the two before */
+
+/* What the game says (stderr) into FILE_NAME.log in the folder of what it keeps, the runs before beside it
+   (FILE_NAME.1.log, .2.log), for a player to send (RecompLauncher's crash reports take it: recomplauncher.json's
+   folder 'logs'); left on a terminal where the game was started from one */
+static void start_log(void)
+{
+	char *folder, path[1100], older[1100], when[32];
+	const time_t now = time(NULL);
+
+	if (STDERR_TERMINAL() || (folder = saves_folder()) == NULL)
+		return;
+	for (int run = LOGS_KEPT - 1; run > 0; run--)
+	{
+		if (run == 1)
+			snprintf(path, sizeof(path), "%s" FILE_NAME ".log", folder);
+		else
+			snprintf(path, sizeof(path), "%s" FILE_NAME ".%d.log", folder, run - 1);
+		snprintf(older, sizeof(older), "%s" FILE_NAME ".%d.log", folder, run);
+		remove(older);
+		rename(path, older);
+	}
+	snprintf(path, sizeof(path), "%s" FILE_NAME ".log", folder);
+	SDL_free(folder);
+	if (!freopen(path, "w", stderr))
+		return;
+	setvbuf(stderr, NULL, _IONBF, 0);    /* (all of it, if the game ends badly) */
+	strftime(when, sizeof(when), "%Y-%m-%d %H:%M:%S", localtime(&now));
+#ifdef ORUNNERS_VERSION
+	fprintf(stderr, "%s %s, %s\n", TITLE, ORUNNERS_VERSION, when);
+#else
+	fprintf(stderr, "%s, %s\n", TITLE, when);
+#endif
+}
+#endif
 
 #ifndef ORUNNERS_HANDHELD
 /* gamecontrollerdb.txt in the folder of what the game keeps: game controller layouts in SDL's format, a line
@@ -2236,6 +2463,14 @@ int main(int argc, char **argv)
 	const char *hashes_path = NULL, *video_hashes_path = NULL, *sound_hashes_path = NULL;
 	const char *assets_path = NULL;
 	char *base, *saves;
+#ifndef ORUNNERS_HANDHELD
+	const char *set_path = NULL;    /* --game: the ROM set the first run takes the assets out of first */
+
+	for (int index = 1; index < argc; index++)
+		if (strcmp(argv[index], "--prepare") == 0)
+			return prepare(argc, argv);    /* (no window, no SDL: the assets alone) */
+	start_log();
+#endif
 
 #ifdef __SWITCH__
 	romfsInit();
@@ -2293,6 +2528,10 @@ int main(int argc, char **argv)
 			fast = true;
 		else if (strcmp(argv[index], "--assets") == 0 && index + 1 < argc)
 			assets_path = argv[++index];
+#ifndef ORUNNERS_HANDHELD
+		else if (strcmp(argv[index], "--game") == 0 && index + 1 < argc)
+			set_path = argv[++index];
+#endif
 		else
 			return fail("Unknown option.", USAGE);
 	}
@@ -2327,6 +2566,15 @@ int main(int argc, char **argv)
 	load_window_settings();
 #ifdef ORUNNERS_HANDHELD
 	fix_window_settings();
+#else
+	{
+		/* RecompLauncher's Big Picture mode (a controller, the couch, a Steam Deck): full screen, whatever
+		   outrunners.ini says, without writing it there (but where OPTIONS changes the settings) */
+		const char *mode = SDL_getenv("RECOMPLAUNCHER_MODE");
+
+		if (mode && strcmp(mode, "bigpicture") == 0)
+			console_window_settings.full_screen = true;
+	}
 #endif
 	{
 		char controls_path[1024];
@@ -2433,7 +2681,7 @@ int main(int argc, char **argv)
 		{
 			if (!stale)
 				snprintf(folder, sizeof(folder), "%sassets", saves ? saves : (base ? base : ""));
-			if (!first_run(TITLE, base, saves, folder))
+			if (!first_run(TITLE, base, saves, folder, set_path))
 			{
 				/* (the window closed before a ROM set came) */
 				SDL_free(base);
@@ -2475,6 +2723,10 @@ int main(int argc, char **argv)
 		screens_shown() * 320 * WINDOW_SCALE, S32_VIDEO_HEIGHT * WINDOW_SCALE, SDL_WINDOW_RESIZABLE);
 #endif
 #ifdef ORUNNERS_CONSOLE
+#ifdef WIDE_AUTO_BY_SCREEN
+	if (window)
+		follow_screen();    /* (WIDE AUTO's before the window is sized: the first frame at its width) */
+#endif
 	if (window)
 		apply_window_settings();
 #endif

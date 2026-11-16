@@ -1,0 +1,131 @@
+{
+  "$schema": "https://recomplauncher.com/schema/recomplauncher.json",
+  "format": 1,
+  "name": "OutRunners",
+  "repo": "cheviman/outrunners-port",
+  "game": {
+    "kind": "iso",
+    "label": "Your arcade ROM set of OutRunners: orunners.zip, MAME's set (World). The game takes its graphics and sounds from it."
+  },
+  "start": {
+    "program": ["OutRunners.exe", "OutRunners.app/Contents/MacOS/OutRunners", "OutRunners"],
+    "args": ["--game", "{game}"]
+  },
+  "prepare": {
+    "program": ["OutRunners.exe", "OutRunners.app/Contents/MacOS/OutRunners", "OutRunners"],
+    "args": ["--prepare", "--game", "{game}"],
+    "label": "The graphics and sounds from your ROM set",
+    "timeout": 120
+  },
+  "config": [
+    {
+      "id": "main",
+      "format": "ini",
+      "file": [
+        { "path": "{install}/outrunners.ini", "if": "{install}/portable.txt" },
+        { "path": "{install}/outrunners.ini", "if": "{install}/OutRunners.exe" },
+        { "path": "{home}/Library/Application Support/OutRunners/outrunners.ini", "if": "{install}/OutRunners.app" },
+        { "path": "{local}/OutRunners/outrunners.ini" }
+      ]
+    }
+  ],
+  "settings": [
+    {
+      "id": "window", "label": "Window",
+      "help": "Full screen fills your screen; Window uses Window size.",
+      "choices": [
+        { "label": "Window", "set": { "full_screen": "0" } },
+        { "label": "Full screen", "set": { "full_screen": "1" } }
+      ],
+      "defaults": { "full_screen": "0" }
+    },
+    {
+      "id": "window_size", "label": "Window size",
+      "help": "Times the arcade's picture. A size larger than your screen is brought down to the largest that fits.",
+      "choices": [
+        { "label": "1x", "set": { "window_scale": "1" } },
+        { "label": "2x", "set": { "window_scale": "2" } },
+        { "label": "3x", "set": { "window_scale": "3" } },
+        { "label": "4x", "set": { "window_scale": "4" } }
+      ],
+      "defaults": { "window_scale": "2", "full_screen": "0" },
+      "when": { "full_screen": "0" }
+    },
+    {
+      "id": "wide", "label": "Wide",
+      "help": "The road and the scenery go on at the sides. Auto follows your screen's shape: 16:10 on a Steam Deck, 16:9 on a TV.",
+      "choices": [
+        { "label": "Auto", "set": { "wide": "4" } },
+        { "label": "Off (4:3)", "set": { "wide": "0" } },
+        { "label": "16:10", "set": { "wide": "3" } },
+        { "label": "16:9", "set": { "wide": "1" } },
+        { "label": "20:9", "set": { "wide": "2" } }
+      ],
+      "defaults": { "wide": "4" }
+    },
+    {
+      "id": "pixels", "label": "Pixels",
+      "help": "Sharp keeps the arcade's pixels square; Smooth softens only their edges; CRT adds scanlines.",
+      "choices": [
+        { "label": "Sharp", "set": { "pixels": "sharp" } },
+        { "label": "Smooth", "set": { "pixels": "smooth" } },
+        { "label": "Bilinear", "set": { "pixels": "bilinear" } },
+        { "label": "CRT", "set": { "pixels": "crt" } }
+      ],
+      "defaults": { "pixels": "sharp" }
+    },
+    {
+      "id": "vsync", "label": "V-Sync",
+      "help": "Waits for the screen's refresh: no tearing. The game keeps its 60 frames a second either way.",
+      "choices": [
+        { "label": "On", "set": { "vsync": "1" } },
+        { "label": "Off", "set": { "vsync": "0" } }
+      ],
+      "defaults": { "vsync": "1" }
+    },
+    {
+      "id": "volume", "label": "Volume",
+      "help": "5 is the arcade's own.",
+      "slider": { "key": "volume", "min": 0, "max": 10, "step": 1, "format": "%d" },
+      "defaults": { "volume": "5" }
+    },
+    {
+      "id": "fps", "label": "Show FPS",
+      "help": "The frames a second in a corner of the picture.",
+      "choices": [
+        { "label": "Off", "set": { "fps": "0" } },
+        { "label": "On", "set": { "fps": "1" } }
+      ],
+      "defaults": { "fps": "0" }
+    }
+  ],
+  "saves": [
+    "{install}/*.eeprom", "{install}/*.bookkeeping", "{install}/*.ini", "{install}/ghost_*.bin",
+    "{install}/gamecontrollerdb.txt", "{install}/wheel_devices.txt",
+    "{local}/OutRunners/*.eeprom", "{local}/OutRunners/*.bookkeeping", "{local}/OutRunners/*.ini",
+    "{local}/OutRunners/ghost_*.bin", "{local}/OutRunners/gamecontrollerdb.txt", "{local}/OutRunners/wheel_devices.txt",
+    "{home}/Library/Application Support/OutRunners/*.eeprom",
+    "{home}/Library/Application Support/OutRunners/*.bookkeeping",
+    "{home}/Library/Application Support/OutRunners/*.ini",
+    "{home}/Library/Application Support/OutRunners/ghost_*.bin",
+    "{home}/Library/Application Support/OutRunners/gamecontrollerdb.txt",
+    "{home}/Library/Application Support/OutRunners/wheel_devices.txt"
+  ],
+  "folders": {
+    "saves": [
+      { "path": "{install}", "if": "{install}/portable.txt" },
+      { "path": "{install}", "if": "{install}/OutRunners.exe" },
+      { "path": "{home}/Library/Application Support/OutRunners", "if": "{install}/OutRunners.app" },
+      { "path": "{local}/OutRunners" }
+    ],
+    "logs": [
+      { "path": "{install}", "if": "{install}/portable.txt" },
+      { "path": "{install}", "if": "{install}/OutRunners.exe" },
+      { "path": "{home}/Library/Application Support/OutRunners", "if": "{install}/OutRunners.app" },
+      { "path": "{local}/OutRunners" }
+    ]
+  },
+  "actions": [
+    { "id": "saves", "label": "Saves", "help": "The records, the settings, the controls and TIME ATTACK's ghosts, and the last three runs' logs.", "open": "saves" }
+  ]
+}

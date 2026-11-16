@@ -27,7 +27,7 @@ You need three things of your own, which never leave your computer:
 - `orunners.zip`, MAME's ROM set of *OutRunners* (World), or a folder of its files;
 - the tool, `OutRunners NSP` (`OutRunners NSP.exe` on Windows), with the `switch` folder beside it: the
   game's Switch build (below); and `font.bmp`, its window's letters. The release's Switch package,
-  `outrunners-switch.zip`, has them all, the tool for Windows, macOS and Linux.
+  `outrunners-VERSION-switch.zip`, has them all, the tool for Windows, macOS and Linux.
 
 Start the tool (a double click). Its window shows what the `.nsp` will be made of, each with its state
 (found, not found, or what is wrong with it):

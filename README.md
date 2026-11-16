@@ -1,5 +1,7 @@
 # OutRunners — port
 
+<a href="https://recomplauncher.com/game/outrunners-port"><picture><source media="(prefers-color-scheme: dark)" srcset="https://recomplauncher.com/assets/press/launcher/badge-light.svg"><img alt="Get it on RecompLauncher" src="https://recomplauncher.com/assets/press/launcher/badge-dark.svg" height="48"></picture></a>
+
 Sega's 1992 arcade game *OutRunners* as a native game for computers, the Nintendo Switch, Android and Anbernic's
 handhelds, built on its decompilation, [outrunners-decomp](https://github.com/cheviman/outrunners-decomp): the
 game's program in C, checked frame by frame against MAME in picture and sound. Two games come out of it:
@@ -24,17 +26,21 @@ its assets out of it.
 
 Download the package for Windows, Linux or macOS from the
 [releases](https://github.com/cheviman/outrunners-port/releases). Keep `orunners.zip` beside the game, or drop it
-on its window when it asks: the first time, it takes the assets out of it.
+on its window when it asks: the first time, it takes the assets out of it. `--game` gives it the set's path
+(`OutRunners --game D:\roms\orunners.zip`), for a shortcut; with
+[RecompLauncher](https://recomplauncher.com/game/outrunners-port) you pick `orunners.zip` once and it does the
+rest (`recomplauncher.json`, in each package).
 
 Each device has a package of its own: the game without its assets, and the tool (for Windows, macOS and Linux)
-that makes it on your computer with your ROM set:
+that makes it on your computer with your ROM set. Each package's name carries the release's version
+(`outrunners-v1.3.2-windows-x64.zip`):
 
-- **Nintendo Switch** (`outrunners-switch.zip`): OutRunners NSP makes `OutRunners.nsp`, for a console with
-  Atmosphere ([ports/switch](ports/switch/README.md)).
-- **Android** (`outrunners-android.zip`): OutRunners APK makes `OutRunners.apk`
+- **Nintendo Switch** (`outrunners-VERSION-switch.zip`): OutRunners NSP makes `OutRunners.nsp`, for a console
+  with Atmosphere ([ports/switch](ports/switch/README.md)).
+- **Android** (`outrunners-VERSION-android.zip`): OutRunners APK makes `OutRunners.apk`
   ([ports/android](ports/android/README.md)).
-- **Anbernic's H700 handhelds** (`outrunners-anbernic.zip`, RG35XX, RG40XX...): OutRunners Anbernic makes the
-  folder for PORTS ([ports/anbernic](ports/anbernic/README.md)).
+- **Anbernic's H700 handhelds** (`outrunners-VERSION-anbernic.zip`, RG35XX, RG40XX...): OutRunners Anbernic
+  makes the folder for PORTS ([ports/anbernic](ports/anbernic/README.md)).
 - **The R36S on ArkOS** (RK3326): the Anbernic folder with this build's launcher and game in it
   ([ports/r36s](ports/r36s/README.md)).
 
@@ -48,7 +54,10 @@ What a tool makes has the game's data in it: it is yours alone, never share it.
 - **& KNUCKLES**: CLASSIC (the arcade's game, a little more time), TIME ATTACK (against your fastest run's ghost),
   FULL (all 31 courses in one race), REVERSE (from a goal back to the start).
 - **OPTIONS**: controls, difficulty, time, video (window, full screen, sharp, smooth or CRT pixels, a wider
-  picture: 16:10 for a Steam Deck, 16:9 or 20:9; VSYNC), volume, sound test, steering, FPS.
+  picture: AUTO, the screen's shape, as a Steam Deck's in its hands or on a TV, or 16:10, 16:9 or 20:9;
+  VSYNC), volume, sound test, steering, FPS.
+- **The radio**: << and >> go round its ten songs and Jingle Bell, the hidden one, between Last Wave and
+  Magical Sound Shower.
 - **The pause** in a race: CONTINUE, RESTART, QUIT GAME.
 - **The picture**: the scenery the arcade draws every other frame to make it look faint (the spray of Niagara's
   falls, the pyramids) is drawn see-through instead, so it does not blink.

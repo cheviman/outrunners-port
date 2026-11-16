@@ -1,12 +1,12 @@
 """
     Name:        pack_devices.py
     Description: the release's packages of the devices, one each (Sebas, 09-11-2026: not inside the
-                 computers' packages): outrunners-switch.zip, outrunners-android.zip and
-                 outrunners-anbernic.zip, each the device's game without assets beside the tool that makes the
-                 player's game of it, for Windows, macOS and Linux
-    Version:     0.1.0
+                 computers' packages): outrunners-VERSION-switch.zip, -android.zip and -anbernic.zip, each the
+                 device's game without assets beside the tool that makes the player's game of it, for Windows,
+                 macOS and Linux
+    Version:     0.1.1
     Created:     09-11-2026
-    Modified:    09-11-2026
+    Modified:    15-11-2026
     Author:      Sebastian Toyos
 
     license:BSD-3-Clause
@@ -16,9 +16,10 @@
     font.bmp (the tools' letters) and the licenses. The tools, font.bmp and the licenses come from each
     computer's kit (the CI's build job: dist/kit, packed as outrunners-OS-kit.tar.gz), given as a folder each
     under --kits: windows-x64, macos-universal and linux-x64. The zip keeps the programs' permissions (Unix
-    entries), so that the macOS and Linux tools run as they are unpacked there.
+    entries), so that the macOS and Linux tools run as they are unpacked there. The zip's name carries the
+    release's version (--version: v1.3.2, the CI's "dev" else), the folder in it does not.
 
-    python3 ports/pack_devices.py --kits DIR --switch DIR --android DIR --anbernic DIR --out DIR
+    python3 ports/pack_devices.py --kits DIR --switch DIR --android DIR --anbernic DIR [--version V] --out DIR
 """
 import argparse
 import os
@@ -73,9 +74,9 @@ def need(path):
     return path
 
 
-def pack(device, tool, readme, game, kits, out):
+def pack(device, tool, readme, game, kits, out, version):
     top = "outrunners-" + device
-    target = os.path.join(out, top + ".zip")
+    target = os.path.join(out, "outrunners-%s-%s.zip" % (version, device) if version else top + ".zip")
     shared = os.path.join(kits, "linux-x64", "kit")    # (font.bmp and the licenses: the same in every kit)
     with zipfile.ZipFile(target, "w") as archive:
         add(archive, need(os.path.join(DOCS, readme)), top + "/README.txt", FILE)
@@ -99,12 +100,13 @@ def main():
     parser.add_argument("--switch", required=True, help="the Switch's game: main, main.npdm, control.nacp, icon.jpg")
     parser.add_argument("--android", required=True, help="Android's game: outrunners-base.apk")
     parser.add_argument("--anbernic", required=True, help="Anbernic's game: OutRunners.sh and outrunners/")
+    parser.add_argument("--version", default="", help="the release's version in the zips' names (v1.3.2)")
     parser.add_argument("--out", required=True, help="where the zips go")
     arguments = parser.parse_args()
     os.makedirs(arguments.out, exist_ok=True)
     games = {"switch": arguments.switch, "android": arguments.android, "anbernic": arguments.anbernic}
     for device, tool, readme in DEVICES:
-        pack(device, tool, readme, games[device], arguments.kits, arguments.out)
+        pack(device, tool, readme, games[device], arguments.kits, arguments.out, arguments.version)
 
 
 if __name__ == "__main__":

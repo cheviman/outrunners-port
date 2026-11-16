@@ -526,6 +526,57 @@ merged here; this repository adds console/, the ports and their documents.
   scenarios identical, picture and sound; the console's headless game the same before and after on
   tests/console (menu, controls, classic, time_attack, two_players, arcade_niagara, full, reverse: state,
   picture and sound) but OPTIONS' version; the assets pack's version the same.
+
+## Done (15-11-2026)
+
+- The pause's QUIT GAME leaves the race's sound off (issue 39: the engine went on at the title, and the
+  race's song till the menu's): game mode 1 goes to the title without turning it off, which the arcade never
+  needed, as it comes there from the ranking, whose first step does it; check_game_start's QUIT GAME now does
+  what that step does, the wheel motor off and reset_screen_sound (RESTART, which goes through it, too).
+  Checked with the console headless's new --quit N: ARCADE to Niagara, QUIT GAME at frame 6000 with the gas
+  down, the sound the same up to it and then silent from frame 6100 (it went on before); tests/console the
+  same before and after (state, picture and sound).
+- OPTIONS > VIDEO > WIDE AUTO, the computers' default (issue 40, as the Simpsons port's): WIDE as the shape of
+  the screen the window is on asks (wide_for_screen, Android's: 20:9, 16:9, 16:10 or off), chosen again where
+  it changes, every frame (a Steam Deck's 16:10 in its hands, 16:9 docked to a TV; the window on another
+  monitor), the window sized again for it; what draws and sizes the picture reads console_wide_in_effect.
+  outrunners.ini keeps 4 for it; a file that says another keeps it. Checked on Windows (a 3072 x 1728
+  monitor): a first start in AUTO, "screen 3072x1728: WIDE AUTO -> 16:9" and the window 796 x 448; with
+  wide=0 the window 640 x 448; VIDEO shows AUTO, then OFF; tests/console the same but menu's VIDEO page, WIDE's
+  line AUTO. Not tried on a Steam Deck, a 16:10 screen or with two monitors.
+- The radio's hidden song, Jingle Bell (Sebas): the game plays it for << and >> pressed together, which a game
+  controller's pad (both on it) cannot; console_radio_buttons presses the other one with >> past Last Wave and
+  with << before Magical Sound Shower and leaves the car's song at 10, which the game's next << or >> steps
+  from (to Last Wave or Magical Sound Shower). Checked on the console headless (the window port's buttons
+  through it too): TIME ATTACK, >> twelve times and << ten times, the titles going round with Jingle Bell
+  between the two.
+- RecompLauncher (Sebas, its guide recomplauncher.com/sdk-files/recomplauncher-agent.md): recomplauncher.json
+  at the top of the computers' packages (build.yml), levels 1-3: the player's orunners.zip (game), the console
+  game started with --game {game} (start), --prepare --game {game} on its setup screen (prepare), and
+  outrunners.ini's video settings, volume and FPS on the game's page (config, settings), the saves' files and
+  folder; the README's badge (the port is in its catalog as outrunners-port). In the window ports, only with
+  the new arguments: --game SET, the first run's set first (else the window as before, with what was wrong);
+  --prepare --game SET, the assets out of it with no window and before SDL starts, "progress 0.1 ..." lines,
+  0, 2 without --game, 3 when they did not come out; outrunners.ini's lines read with spaces around '='
+  too ("wide = 4"), as a launcher may write them. Checked on Windows: the file valid against the guide's
+  schema; --prepare 0 in 0.6 s, 3 with another file, 2 alone; then the game starts with no window between;
+  --game with no assets takes them out and plays; with no arguments and no set, the first run's window as
+  before; "wide = 0" and "  window_scale =  3" read (960 x 672). Not tried in RecompLauncher itself, on
+  Linux or on macOS.
+- The Recomp Standards the port did not meet (RecompLauncher's guide), but the achievements (Sebas): the
+  computers' games write their log, FILE_NAME.log in the folder of what they keep, the two runs before as
+  .1.log and .2.log (stderr, left on a terminal where one shows it); portable.txt beside the game (beside the
+  .app) keeps what they write there on Linux and macOS too, as on Windows; RecompLauncher's Big Picture
+  (RECOMPLAUNCHER_MODE=bigpicture) starts the console game full screen, not written to outrunners.ini; a
+  DualShock's or a DualSense's buttons on CONTROLS are its own (SDL's type of it: cross, circle, square,
+  triangle, L1, R1, L2, R2, from Kenney's sheet the game has, each symbol in two tiles), and with no
+  controller RECOMPLAUNCHER_PAD=playstation; the release's packages carry its version in their names
+  (outrunners-v1.3.2-windows-x64.zip; the CI's "dev" else), the folders in them as before. Checked on
+  Windows: four starts, outrunners.log, .1.log and .2.log, the newest first ("OutRunners 1.3.1, the date");
+  Big Picture's window 3072 x 1728, the screen's; CONTROLS (keys posted to the window, PrintWindow) with RT,
+  LT, RB, LB and Y, and with R2, L2, R1, L1 and a triangle; the devices' packer's names with and without
+  --version. portable.txt and the log on Linux and macOS not tried (the CI builds them); a real DualSense
+  not tried. The ROM set picked with a dialog waits for SDL3 (its branch).
 ## To do
 
 - REVERSE's finish (AUSTRALIA's at the pre-stage): the pair of kangaroos under the riders at each side of

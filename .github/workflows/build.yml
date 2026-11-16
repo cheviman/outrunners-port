@@ -8,10 +8,11 @@
 #              .nsp, APK or PORTS of it, for the three computers; with their licenses. A tag v* makes a release
 #              of those six packages. It runs on main, its pull requests and the tags v* alone (Sebas,
 #              30-10-2026: not on the other branches); by hand on any branch. And on the newest Ubuntu, as the
-#              README builds there (its GCC, Python and SDL2)
-# Version:     0.3.0
+#              README builds there (its GCC, Python and SDL2). The computers' packages carry recomplauncher.json
+#              beside the games: RecompLauncher sets the game up from it (the ROM set, its settings)
+# Version:     0.3.1
 # Created:     27-10-2026
-# Modified:    09-11-2026
+# Modified:    15-11-2026
 # Author:      Sebastian Toyos
 name: build
 
@@ -22,6 +23,11 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+
+# The packages' names carry the release's version, the tag (outrunners-v1.3.2-windows-x64.zip), or "dev" on
+# the other builds: one file a system, its name the same way every time (RecompLauncher's Recomp Standards)
+env:
+  VERSION: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'dev' }}
 
 jobs:
   build:
@@ -92,6 +98,7 @@ jobs:
           done
           cp LICENSE dist/outrunners/LICENSE.txt
           cp docs/package/README.txt dist/outrunners/README.txt
+          cp recomplauncher.json dist/outrunners/    # (RecompLauncher sets the game up from it: beside the games)
           cp tools/core/system32/reference/mame/LICENSE dist/outrunners/licenses/MAME.txt
           cp tools/core/system32/reference/ymfm/LICENSE dist/outrunners/licenses/ymfm.txt
           cp build/cmake/_deps/sdl2-src/LICENSE.txt dist/outrunners/licenses/SDL2.txt
@@ -110,9 +117,9 @@ jobs:
           ls -la dist/outrunners dist/outrunners/licenses dist/kit
           cd dist
           case "$RUNNER_OS" in
-            Linux) tar czf outrunners-${{ matrix.name }}.tar.gz outrunners ;;
-            macOS) ditto -c -k --keepParent outrunners outrunners-${{ matrix.name }}.zip ;;
-            Windows) 7z a -tzip outrunners-${{ matrix.name }}.zip outrunners ;;
+            Linux) tar czf outrunners-$VERSION-${{ matrix.name }}.tar.gz outrunners ;;
+            macOS) ditto -c -k --keepParent outrunners outrunners-$VERSION-${{ matrix.name }}.zip ;;
+            Windows) 7z a -tzip outrunners-$VERSION-${{ matrix.name }}.zip outrunners ;;
           esac
           tar czf outrunners-${{ matrix.name }}-kit.tar.gz kit
           cd ..
@@ -122,7 +129,7 @@ jobs:
         with:
           name: outrunners-${{ matrix.name }}
           path: |
-            dist/outrunners-${{ matrix.name }}.*
+            dist/outrunners-${{ env.VERSION }}-${{ matrix.name }}.*
             dist/outrunners-${{ matrix.name }}-kit.tar.gz
             dist/outrunners-${{ matrix.name }}-all.tar.gz
 
@@ -214,8 +221,8 @@ jobs:
           name: outrunners-anbernic
           path: build/bin/anbernic/
 
-  # The devices' packages (ports/pack_devices.py): outrunners-switch.zip, outrunners-android.zip and
-  # outrunners-anbernic.zip, each the device's game beside its tool for Windows, macOS and Linux (the
+  # The devices' packages (ports/pack_devices.py): outrunners-VERSION-switch.zip, -android.zip and
+  # -anbernic.zip, each the device's game beside its tool for Windows, macOS and Linux (the
   # computers' kits), font.bmp, the licenses and its README (docs/package)
   devices:
     name: devices
@@ -261,7 +268,7 @@ jobs:
             tar xzf "computers/$computer/outrunners-$computer-kit.tar.gz" -C "kits/$computer"
           done
           python3 ports/pack_devices.py --kits kits --switch devices/switch --android devices/android \
-            --anbernic devices/anbernic --out dist
+            --anbernic devices/anbernic --version "$VERSION" --out dist
 
       - uses: actions/upload-artifact@v7
         with:
@@ -321,5 +328,6 @@ jobs:
         run: |
           gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag \
             --title "OutRunners $GITHUB_REF_NAME" --notes-file "docs/releases/$GITHUB_REF_NAME.md" \
-            dist/outrunners-windows-x64.zip dist/outrunners-linux-x64.tar.gz dist/outrunners-macos-universal.zip \
-            dist/outrunners-switch.zip dist/outrunners-android.zip dist/outrunners-anbernic.zip
+            "dist/outrunners-$VERSION-windows-x64.zip" "dist/outrunners-$VERSION-linux-x64.tar.gz" \
+            "dist/outrunners-$VERSION-macos-universal.zip" "dist/outrunners-$VERSION-switch.zip" \
+            "dist/outrunners-$VERSION-android.zip" "dist/outrunners-$VERSION-anbernic.zip"
