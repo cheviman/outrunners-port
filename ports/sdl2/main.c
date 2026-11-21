@@ -1020,7 +1020,7 @@ static void show_screens(void)
 	present(source);
 }
 
-#ifdef ORUNNERS_HANDHELD
+#if defined(ORUNNERS_HANDHELD) || defined(ORUNNERS_PACING)
 static uint64_t pace_video, pace_showing;    /* a handheld's log: the frames' time drawing them, showing them */
 #ifdef ORUNNERS_FRAMESKIP
 static uint32_t frames_skipped;    /* the frames not drawn, behind the game's pace */
@@ -1036,7 +1036,7 @@ static void on_frame_shown(void)
 #else
 	s32_video_show_screens(screens_shown() == 2 || video_hashes ? 3 : 1);
 #endif
-#ifdef ORUNNERS_HANDHELD
+#if defined(ORUNNERS_HANDHELD) || defined(ORUNNERS_PACING)
 	const uint64_t start = SDL_GetPerformanceCounter();
 	uint64_t drawn;
 #ifdef ORUNNERS_FRAMESKIP
@@ -1975,7 +1975,7 @@ static void wait_for_frame(void)
 	}
 }
 
-#ifdef ORUNNERS_HANDHELD
+#if defined(ORUNNERS_HANDHELD) || defined(ORUNNERS_PACING)
 /* ---- a handheld's log (stderr: the launcher's outrunners.log): what SDL found, the frames' pace ---- */
 
 /* Handhelds' own buttons as SDL's game controller has them, where SDL does not know them: Anbernic's H700
@@ -2070,7 +2070,7 @@ static void log_pace(bool work_done)
 
 static void on_frame_done(void)
 {
-#ifdef ORUNNERS_HANDHELD
+#if defined(ORUNNERS_HANDHELD) || defined(ORUNNERS_PACING)
 	log_pace(true);
 #endif
 	const uint64_t frame = program_frames() - 1;
@@ -2145,7 +2145,7 @@ static void on_frame_done(void)
 #endif
 	if (!fast)
 		wait_for_frame();
-#ifdef ORUNNERS_HANDHELD
+#if defined(ORUNNERS_HANDHELD) || defined(ORUNNERS_PACING)
 	log_pace(false);
 #endif
 }

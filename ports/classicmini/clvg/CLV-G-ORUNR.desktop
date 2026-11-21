@@ -1,0 +1,17 @@
+[Desktop Entry]
+Type=Application
+Exec=/bin/sh /var/games/CLV-G-ORUNR/outrunners.sh
+Path=/var/saves/CLV-G-ORUNR
+Name=OutRunners
+Icon=/var/games/CLV-G-ORUNR/CLV-G-ORUNR.png
+
+[X-CLOVER Game]
+Code=CLV-G-ORUNR
+TestID=0
+ID=0
+Players=1
+Simultaneous=0
+ReleaseDate=1992-01-01
+SaveCount=0
+SortRawTitle=outrunners
+SortRawPublisher=SEGA
