@@ -5,9 +5,11 @@ is the same game as on a computer, with what a game console asks for:
 
 - **The picture is WIDE, fixed**: the Switch's screen and a TV are 16:9, and the game's 16:9 picture fills
   them. OPTIONS has no VIDEO page.
-- **The controls are fixed**: the left stick or the d-pad steers, ZR or A is the gas, ZL or B the brake, R
-  and L shift up and down, Y is the radio (the d-pad's up and down its songs), + starts and pauses. OPTIONS
-  has no CONTROLS page.
+- **The controls**: the left stick or the d-pad steers, ZR or A is the gas, ZL or B the brake, R and L shift
+  up and down, Y is the radio (the d-pad's up and down its songs), + starts and pauses. OPTIONS has no
+  CONTROLS page; `/switch/outrunners/controls.ini` on the SD card changes them by hand, a line a control with
+  its buttons after the `|`: `gas = Up | rightstickup, righttrigger, a` and `brake = Down | rightstickdown,
+  lefttrigger, b` give the right stick's up and down the pedals, pressed as far as the stick goes (issue 42).
 - **2 PLAYERS side by side**, with a second controller (another pair of Joy-Con or a Pro Controller).
 - **The board's video is drawn on three cores**: the game runs on core 0, the video's rows on cores 1 and 2
   too (`runtime/src/workers.c`, libnx's threads, each on its core); in a one player game only the screen

@@ -68,7 +68,9 @@ What a tool makes has the game's data in it: it is yours alone, never share it.
   starts and pauses. OPTIONS > STEERING > SPEED is how fast the keys (and a d-pad) turn the wheel, 1 to 9, or
   INSTANT: all the way at once, and back to the centre at once.
 - **Game controller**: the left stick or the d-pad steers, the right trigger accelerates, the left trigger
-  brakes, the shoulders shift. OPTIONS > CONTROLS changes them.
+  brakes, the shoulders shift. OPTIONS > CONTROLS changes them: the key or button pressed there takes the
+  control's place. A stick's way can be one too (the right stick's up and down as the pedals, pressed as far
+  as the stick goes); in `controls.ini`, by hand, a control can have 2 keys and 3 buttons.
 - **Racing wheel**: a wheel SDL knows (a Logitech G29) works as it is plugged in. Any other (a Thrustmaster
   T300RS) is set up once in OPTIONS > STEERING > SET UP WHEEL: turn the wheel left, press the gas, the brake, and
   the buttons it asks for; pedals and a shifter plugged in on their own are taken as they are pressed. Also in

@@ -630,16 +630,44 @@ merged here; this repository adds console/, the ports and their documents.
   roadside's sprites end where the game stops placing them and the layers' scenery is cut and comes round
   again. See To do.
 
+## Done (24-11-2026)
+
+- CONTROLS' key or button takes the control's place (issue 56: << given another button, the pad's down still
+  went back a song): controls_bind_key and controls_bind_button leave the control that key alone, or that
+  button alone (a key the keys, a button, trigger or stick's way the buttons); before, it went in front and
+  the others stayed. The page shows all the control's buttons, three at most (CONSOLE_CONTROLS_BUTTON_STEP;
+  it showed the first, and the pedals' A and B worked unseen). More than one is controls.ini's, by hand.
+- The sticks' ways as buttons (issue 42: the right stick's up and down as the pedals on the Switch):
+  CONTROL_LEFT_STICK_UP to CONTROL_RIGHT_STICK_RIGHT past the triggers, the axes' buttons (controls.c's
+  axis_buttons: each its axis and way), "leftstickup", "leftstickdown", "rightstickup", "rightstickdown",
+  "rightstickleft", "rightstickright" in controls.ini (the left stick's left and right are the wheel's). On
+  the pedals they press as far as they go, as a trigger does, past STICK_REST (4000 of 32767); on any other
+  control they hold it past its wobble (AXIS_PRESSED). CONTROLS takes one pushed halfway
+  (controls_axis_button); its pictures are Kenney's sheet's (rows 12 and 14). The Switch has no CONTROLS
+  page: its controls.ini, by hand (ports/switch/README.md).
+- CONTROLS' pictures with WIDE on (since WIDE came, 30f8aff; every computer's since 1.3.2's AUTO): drawn the
+  side's columns to the left of their names; console_controls_place counts the side.
+  Checked on Windows: controls.c against an SDL virtual controller (40 checks: the bindings replaced and
+  saved, the other controls letting go, the stick's travel to the pedals past its rest, the names read and
+  written, which axis CONTROLS takes); the page in the window with WIDE 16:9 and OFF (keys posted to the
+  window, PrintWindow) with the sticks' pictures and three buttons; every Windows target, the Switch's and the
+  Anbernic's with no warnings. Not tried: a pad's stick on the page, a Switch.
+- REVERSE's finish's kangaroos (issue 29): not wrong. The ones that cross in front of the crowd are
+  AUSTRALIA's goal parade (goal_parade_leftward_update, goal_parade_rightward_update: back and forth for
+  ever, from the view 96 segments before them); the comparison took REVERSE and ARCADE at the same frame,
+  but REVERSE's race (tests/console/reverse.txt) comes to its goal 146 frames later. ARCADE through
+  0-1-3-7-D-15 (route_branches and route_stages put after race_progress_update, a build of its own): every
+  object of the finish the same (record, place from the view, side, x_offset), the parade starting and
+  moving the same frame by frame, and at the same time after the goal (REVERSE's 22000-22500 against
+  ARCADE's 146 before) every sprite's pixel the same; the background, the road's colours and the HUD the
+  pre-stage's. The pair 02E1A6 is the one at 256 either side, the same in both.
+
 ## To do
 
 - 32:9 (issue 44): for one player it would need each stage's scenery drawn further out than the game places
   it; for 2 PLAYERS side by side it is 16:9 a screen, which needs WIDE in 2 PLAYERS (today both screens are the
   board's 320).
 
-- REVERSE's finish (AUSTRALIA's at the pre-stage): the pair of kangaroos under the riders at each side of
-  the road (scenery_pair 02E1A6) is drawn nearer the middle than at AUSTRALIA, behind the crowd (its
-  pixels at x 79-237 where the game's are at 50-75 and 245-270), its record, place and the road's width
-  code (5) the same as there; the riders (020DCF) where the game has them.
 - Issue 25's last report, a split second of something wrong from the results to the title: not seen
   pressing START on the route map or the ranking after ARCADE's race (the fades smooth, frame by frame);
   the player to say which screen.

@@ -847,6 +847,9 @@ static const prompt button_prompts[] = {
 	{ SDL_CONTROLLER_BUTTON_LEFTSHOULDER, 18, 7, 1 }, { SDL_CONTROLLER_BUTTON_RIGHTSHOULDER, 18, 8, 1 },
 	{ CONTROL_LEFT_TRIGGER, 18, 9, 1 }, { CONTROL_RIGHT_TRIGGER, 18, 10, 1 },
 	{ SDL_CONTROLLER_BUTTON_LEFTSTICK, 12, 16, 1 }, { SDL_CONTROLLER_BUTTON_RIGHTSTICK, 14, 16, 1 },
+	{ CONTROL_LEFT_STICK_UP, 12, 9, 1 }, { CONTROL_LEFT_STICK_DOWN, 12, 11, 1 },
+	{ CONTROL_RIGHT_STICK_UP, 14, 9, 1 }, { CONTROL_RIGHT_STICK_RIGHT, 14, 10, 1 },
+	{ CONTROL_RIGHT_STICK_DOWN, 14, 11, 1 }, { CONTROL_RIGHT_STICK_LEFT, 14, 12, 1 },
 	{ SDL_CONTROLLER_BUTTON_GUIDE, 18, 2, 1 }, { SDL_CONTROLLER_BUTTON_MISC1, 18, 6, 1 },
 };
 
@@ -930,7 +933,8 @@ static bool playstation_buttons(int player)
 #endif
 }
 
-/* The left screen's frame with each of the shown player's controls' keys and first button on its line */
+/* The left screen's frame with each of the shown player's controls' keys and buttons on its line (all of them:
+   one that works and is not seen was issue 56's) */
 static const uint32_t *with_controls(const uint32_t *pixels)
 {
 	const control_binding *bindings = control_bindings[console_controls_player()];
@@ -952,10 +956,15 @@ static const uint32_t *with_controls(const uint32_t *pixels)
 			draw_prompt(icon, x + (shown++ ? CONSOLE_CONTROLS_SECOND_X : 0), y);
 			first = first ? first : icon;
 		}
-		icon = playstation ? find_prompt(playstation_prompts, SDL_arraysize(playstation_prompts), bindings[control].buttons[0])
-			: NULL;
-		if (icon || (icon = find_prompt(button_prompts, SDL_arraysize(button_prompts), bindings[control].buttons[0])) != NULL)
-			draw_prompt(icon, x + CONSOLE_CONTROLS_BUTTON_X, y);
+		shown = 0;
+		for (int button = 0; button < CONTROL_BUTTONS; button++)
+		{
+			const int what = bindings[control].buttons[button];
+
+			icon = playstation ? find_prompt(playstation_prompts, SDL_arraysize(playstation_prompts), what) : NULL;
+			if (icon || (icon = find_prompt(button_prompts, SDL_arraysize(button_prompts), what)) != NULL)
+				draw_prompt(icon, x + CONSOLE_CONTROLS_BUTTON_X + shown++ * CONSOLE_CONTROLS_BUTTON_STEP, y);
+		}
 	}
 	return controls_picture;
 }
@@ -1335,10 +1344,7 @@ static uint32_t read_actions(const Uint8 *keys)
 	return held;
 }
 
-/* A trigger takes the control CONTROLS waits for from halfway down (of 32767) */
-#define TRIGGER_BOUND  16384
-
-/* The button or trigger pressed on game controller 'which' for the control CONTROLS waits for, when it is
+/* The button, trigger or stick's way pressed on game controller 'which' for the control CONTROLS waits for, when it is
    the shown player's */
 static void bind_button(SDL_JoystickID which, SDL_GameControllerButton button)
 {
@@ -1492,11 +1498,15 @@ static void read_events(void)
 					bind_button(event.cbutton.which, (SDL_GameControllerButton)event.cbutton.button);
 				break;
 			case SDL_CONTROLLERAXISMOTION:
-				/* ... or one of its triggers, pressed halfway */
-				if (console_controls_waiting() >= 0 && event.caxis.value >= TRIGGER_BOUND
-					&& (event.caxis.axis == SDL_CONTROLLER_AXIS_TRIGGERLEFT || event.caxis.axis == SDL_CONTROLLER_AXIS_TRIGGERRIGHT))
-					bind_button(event.caxis.which, event.caxis.axis == SDL_CONTROLLER_AXIS_TRIGGERLEFT
-						? CONTROL_LEFT_TRIGGER : CONTROL_RIGHT_TRIGGER);
+				/* ... or one of its triggers, or a stick's way, pressed halfway */
+				if (console_controls_waiting() >= 0)
+				{
+					const SDL_GameControllerButton moved = controls_axis_button(
+						(SDL_GameControllerAxis)event.caxis.axis, event.caxis.value);
+
+					if (moved != SDL_CONTROLLER_BUTTON_INVALID)
+						bind_button(event.caxis.which, moved);
+				}
 				break;
 #endif
 			case SDL_CONTROLLERDEVICEADDED:
@@ -1629,10 +1639,10 @@ static bool holds_buttons(int player, SDL_GameController *pad, int control)
 	return controls_holds(player, pad, control);
 }
 
-/* ... or one of the control's triggers pressed at all */
+/* ... or one of the control's triggers or sticks' ways pressed at all */
 static bool holds(int player, SDL_GameController *pad, int control)
 {
-	return holds_buttons(player, pad, control) || controls_trigger_travel(player, pad, control) > TRIGGER_PRESSED;
+	return holds_buttons(player, pad, control) || controls_axis_travel(player, pad, control) > AXIS_PRESSED;
 }
 #endif
 
@@ -1748,8 +1758,8 @@ static void on_controls_update(void)
 		{
 			const int stick = SDL_GameControllerGetAxis(pad, SDL_CONTROLLER_AXIS_LEFTX);
 #ifdef ORUNNERS_CONSOLE
-			const int pad_gas = trigger_pedal(controls_trigger_travel(player, pad, CONTROL_GAS));
-			const int pad_brake = trigger_pedal(controls_trigger_travel(player, pad, CONTROL_BRAKE));
+			const int pad_gas = trigger_pedal(controls_axis_travel(player, pad, CONTROL_GAS));
+			const int pad_brake = trigger_pedal(controls_axis_travel(player, pad, CONTROL_BRAKE));
 #else
 			const int pad_gas = trigger_pedal(SDL_GameControllerGetAxis(pad, SDL_CONTROLLER_AXIS_TRIGGERRIGHT));
 			const int pad_brake = trigger_pedal(SDL_GameControllerGetAxis(pad, SDL_CONTROLLER_AXIS_TRIGGERLEFT));

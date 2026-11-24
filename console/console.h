@@ -1,9 +1,9 @@
 /**
  *    Name:        console.h
  *    Description: what the console build tells the port
- *    Version:     0.1.6
+ *    Version:     0.1.7
  *    Created:     29-10-2026
- *    Modified:    19-11-2026
+ *    Modified:    24-11-2026
  *    Author:      Sebastian Toyos
  */
 #ifndef ORUNNERS_CONSOLE_H
@@ -114,12 +114,13 @@ enum
 };
 #define CONTROL_PLAYERS 2
 
-/* OPTIONS > CONTROLS on screen: where, in the left screen's pixels, the pictures of 'control''s keys and
-   button go (their top left; false when the page is not shown): the first key's there, the second's and the
-   game controller button's that many pixels to the right */
+/* OPTIONS > CONTROLS on screen: where, in the left screen's pixels (WIDE's side counted), the pictures of
+   'control''s keys and buttons go (their top left; false when the page is not shown): the first key's there,
+   the second's and the game controller buttons' that many pixels to the right, a step each */
 bool console_controls_place(int control, int *x, int *y);
-#define CONSOLE_CONTROLS_SECOND_X   36     /* (room for a key two tiles wide, Enter or Space) */
-#define CONSOLE_CONTROLS_BUTTON_X   76
+#define CONSOLE_CONTROLS_SECOND_X    36    /* (room for a key two tiles wide, Enter or Space) */
+#define CONSOLE_CONTROLS_BUTTON_X    76
+#define CONSOLE_CONTROLS_BUTTON_STEP 20    /* (three in the column's 144) */
 
 /* The player whose controls CONTROLS shows (0, 1) */
 int console_controls_player(void);

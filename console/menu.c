@@ -2,9 +2,9 @@
  *    Name:        menu.c
  *    Description: the console's menus on the left seat's screen: PRESS START in the attract mode, the title's
  *                 menu, DELUXE, NETWORK with its rooms, and OPTIONS with its pages
- *    Version:     0.1.5
+ *    Version:     0.1.6
  *    Created:     29-10-2026
- *    Modified:    19-11-2026
+ *    Modified:    24-11-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
@@ -870,6 +870,7 @@ bool console_controls_place(int control, int *x, int *y)
 	if (menu.page != PAGE_CONTROLS || menu.controls_waiting >= 0 || control < 0 || control >= CONTROLS)
 		return false;
 	control_place(control, x, y);
+	*x += console_wide_side();    /* (the frame's pixels: WIDE's side before the board's 320) */
 	*y += CONTROLS_PICTURES_Y;
 	return true;
 }

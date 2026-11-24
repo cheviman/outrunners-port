@@ -2,17 +2,18 @@
  *    Name:        controls.c
  *    Description: the keys and game controller buttons of each player's controls of the cabinet, and the
  *                 file that keeps them (controls.ini)
- *    Version:     0.1.0
+ *    Version:     0.1.1
  *    Created:     29-10-2026
- *    Modified:    01-11-2026
+ *    Modified:    24-11-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
  *    The defaults below; controls.ini, beside the executable, keeps what the console's CONTROLS page
  *    changes: a section a player, "[player 1]", and a line a control, "gas = Up | righttrigger, a" (SDL's names
- *    of the keys, then of the buttons and the triggers), as SegaSonic's. A player's game controller is the one
- *    plugged in in their turn; its left stick turns the wheel besides (the window port). A trigger is one more
- *    button, the pedals' by default, which it presses as far as it goes.
+ *    of the keys, then of the buttons and the triggers, and the sticks' ways: "rightstickup"), as SegaSonic's.
+ *    A player's game controller is the one plugged in in their turn; its left stick turns the wheel besides
+ *    (the window port). A trigger is one more button, the pedals' by default, which it presses as far as it
+ *    goes; a stick's way too (issue 42).
  */
 #include "controls.h"
 
@@ -103,9 +104,38 @@ static void set_defaults(int player)
 	}
 }
 
-static bool is_trigger(SDL_GameControllerButton button)
+/* The axes' buttons: each its axis and its way along it (a stick's up is its axis's minus), and its name in
+   controls.ini where SDL has none (the triggers' are their axes') */
+typedef struct
 {
-	return button == CONTROL_LEFT_TRIGGER || button == CONTROL_RIGHT_TRIGGER;
+	SDL_GameControllerButton button;
+	SDL_GameControllerAxis axis;
+	int way;
+	const char *name;
+} axis_button;
+
+static const axis_button axis_buttons[] = {
+	{ CONTROL_LEFT_TRIGGER, SDL_CONTROLLER_AXIS_TRIGGERLEFT, 1, NULL },
+	{ CONTROL_RIGHT_TRIGGER, SDL_CONTROLLER_AXIS_TRIGGERRIGHT, 1, NULL },
+	{ CONTROL_LEFT_STICK_UP, SDL_CONTROLLER_AXIS_LEFTY, -1, "leftstickup" },
+	{ CONTROL_LEFT_STICK_DOWN, SDL_CONTROLLER_AXIS_LEFTY, 1, "leftstickdown" },
+	{ CONTROL_RIGHT_STICK_UP, SDL_CONTROLLER_AXIS_RIGHTY, -1, "rightstickup" },
+	{ CONTROL_RIGHT_STICK_DOWN, SDL_CONTROLLER_AXIS_RIGHTY, 1, "rightstickdown" },
+	{ CONTROL_RIGHT_STICK_LEFT, SDL_CONTROLLER_AXIS_RIGHTX, -1, "rightstickleft" },
+	{ CONTROL_RIGHT_STICK_RIGHT, SDL_CONTROLLER_AXIS_RIGHTX, 1, "rightstickright" },
+};
+
+/* A stick's travel at rest, its wobble (of 32767): its ways' travel starts past it. CONTROLS takes an axis's
+   button from halfway */
+#define STICK_REST  4000
+#define AXIS_BOUND  16384
+
+static const axis_button *axis_of(SDL_GameControllerButton button)
+{
+	for (size_t each = 0; each < SDL_arraysize(axis_buttons); each++)
+		if (axis_buttons[each].button == button)
+			return &axis_buttons[each];
+	return NULL;
 }
 
 bool controls_holds(int player, SDL_GameController *pad, int control)
@@ -117,26 +147,38 @@ bool controls_holds(int player, SDL_GameController *pad, int control)
 		if (binding->keys[key] != NO_KEY && keys[binding->keys[key]])
 			return true;
 	for (int button = 0; pad && button < CONTROL_BUTTONS; button++)
-		if (binding->buttons[button] != NO_BUTTON && !is_trigger(binding->buttons[button])
+		if (binding->buttons[button] != NO_BUTTON && !axis_of(binding->buttons[button])
 			&& SDL_GameControllerGetButton(pad, binding->buttons[button]))
 			return true;
 	return false;
 }
 
-int controls_trigger_travel(int player, SDL_GameController *pad, int control)
+int controls_axis_travel(int player, SDL_GameController *pad, int control)
 {
 	const control_binding *binding = &control_bindings[player][control];
 	int travel = 0;
 
 	for (int button = 0; pad && button < CONTROL_BUTTONS; button++)
-		if (is_trigger(binding->buttons[button]))
-		{
-			const int axis = SDL_GameControllerGetAxis(pad, binding->buttons[button] == CONTROL_LEFT_TRIGGER
-				? SDL_CONTROLLER_AXIS_TRIGGERLEFT : SDL_CONTROLLER_AXIS_TRIGGERRIGHT);
+	{
+		const axis_button *axis = axis_of(binding->buttons[button]);
+		int along;
 
-			travel = axis > travel ? axis : travel;
-		}
+		if (!axis)
+			continue;
+		along = SDL_min(SDL_GameControllerGetAxis(pad, axis->axis) * axis->way, 32767);    /* (-32768 up: 32768) */
+		if (axis->axis != SDL_CONTROLLER_AXIS_TRIGGERLEFT && axis->axis != SDL_CONTROLLER_AXIS_TRIGGERRIGHT)
+			along = along > STICK_REST ? (along - STICK_REST) * 32767 / (32767 - STICK_REST) : 0;
+		travel = along > travel ? along : travel;
+	}
 	return travel;
+}
+
+SDL_GameControllerButton controls_axis_button(SDL_GameControllerAxis axis, int value)
+{
+	for (size_t each = 0; each < SDL_arraysize(axis_buttons); each++)
+		if (axis_buttons[each].axis == axis && value * axis_buttons[each].way >= AXIS_BOUND)
+			return axis_buttons[each].button;
+	return NO_BUTTON;
 }
 
 /* ---- controls.ini ---- */
@@ -153,12 +195,14 @@ static char *trimmed(char *text)
 	return text;
 }
 
-/* A button's name in controls.ini: SDL's, the triggers' its axes' ("lefttrigger", "righttrigger") */
+/* A button's name in controls.ini: SDL's, the triggers' their axes' ("lefttrigger", "righttrigger"), the
+   sticks' ways' the table's ("rightstickup") */
 static const char *button_name(SDL_GameControllerButton button)
 {
-	if (is_trigger(button))
-		return SDL_GameControllerGetStringForAxis(button == CONTROL_LEFT_TRIGGER
-			? SDL_CONTROLLER_AXIS_TRIGGERLEFT : SDL_CONTROLLER_AXIS_TRIGGERRIGHT);
+	const axis_button *axis = axis_of(button);
+
+	if (axis)
+		return axis->name ? axis->name : SDL_GameControllerGetStringForAxis(axis->axis);
 	return SDL_GameControllerGetStringForButton(button);
 }
 
@@ -170,6 +214,9 @@ static SDL_GameControllerButton named_button(const char *name)
 		return CONTROL_LEFT_TRIGGER;
 	if (axis == SDL_CONTROLLER_AXIS_TRIGGERRIGHT)
 		return CONTROL_RIGHT_TRIGGER;
+	for (size_t each = 0; each < SDL_arraysize(axis_buttons); each++)
+		if (axis_buttons[each].name && SDL_strcasecmp(axis_buttons[each].name, name) == 0)
+			return axis_buttons[each].button;
 	return SDL_GameControllerGetButtonFromString(name);
 }
 
@@ -276,8 +323,10 @@ void controls_save(void)
 	if (!file)
 		return;
 	fputs("; The console's controls, a section a player: a control a line, its keys (SDL's names), then after |\n"
-		"; its game controller buttons and triggers. OPTIONS > CONTROLS writes this file; it can be changed by\n"
-		"; hand too.\n", file);
+		"; its game controller buttons, triggers and sticks' ways (leftstickup, leftstickdown, rightstickup,\n"
+		"; rightstickdown, rightstickleft, rightstickright: a trigger or a stick's way presses the gas and the\n"
+		"; brake as far as it goes). OPTIONS > CONTROLS writes this file; it can be changed by hand too, and\n"
+		"; there a control can have 2 keys and 3 buttons.\n", file);
 	fprintf(file, "version = %d\n", FILE_VERSION);
 	for (int player = 0; player < CONTROL_PLAYERS; player++)
 	{
@@ -314,51 +363,41 @@ void controls_defaults(int player)
 	controls_save();
 }
 
-/* The key or button the player pressed for 'control': its first one, the ones it had before moving on (one
-   that was already the control's moves to the front, the last falls off); the player's other controls let go
-   of it */
+/* The key or button the player pressed for 'control': its only one, the ones it had before let go of it (issue
+   56: the pad's down still went back a song once << had another button); the player's other controls let go
+   of it too. More than one is controls.ini's, by hand */
 void controls_bind_key(int player, int control, SDL_Scancode key)
 {
-	control_binding *binding = &control_bindings[player][control];
-	int slot;
-
 	for (int other = 0; other < CONTROLS; other++)
 	{
 		SDL_Scancode *keys = control_bindings[player][other].keys;
 
-		for (slot = CONTROL_KEYS - 1; other != control && slot >= 0; slot--)
+		for (int slot = CONTROL_KEYS - 1; other != control && slot >= 0; slot--)
 			if (keys[slot] == key)
 			{
 				memmove(&keys[slot], &keys[slot + 1], (size_t)(CONTROL_KEYS - 1 - slot) * sizeof(keys[0]));
 				keys[CONTROL_KEYS - 1] = NO_KEY;
 			}
 	}
-	for (slot = 0; slot < CONTROL_KEYS - 1 && binding->keys[slot] != key; slot++)
-		;
-	memmove(&binding->keys[1], &binding->keys[0], (size_t)slot * sizeof(binding->keys[0]));
-	binding->keys[0] = key;
+	for (int slot = 0; slot < CONTROL_KEYS; slot++)
+		control_bindings[player][control].keys[slot] = slot == 0 ? key : NO_KEY;
 	controls_save();
 }
 
 void controls_bind_button(int player, int control, SDL_GameControllerButton button)
 {
-	control_binding *binding = &control_bindings[player][control];
-	int slot;
-
 	for (int other = 0; other < CONTROLS; other++)
 	{
 		SDL_GameControllerButton *buttons = control_bindings[player][other].buttons;
 
-		for (slot = CONTROL_BUTTONS - 1; other != control && slot >= 0; slot--)
+		for (int slot = CONTROL_BUTTONS - 1; other != control && slot >= 0; slot--)
 			if (buttons[slot] == button)
 			{
 				memmove(&buttons[slot], &buttons[slot + 1], (size_t)(CONTROL_BUTTONS - 1 - slot) * sizeof(buttons[0]));
 				buttons[CONTROL_BUTTONS - 1] = NO_BUTTON;
 			}
 	}
-	for (slot = 0; slot < CONTROL_BUTTONS - 1 && binding->buttons[slot] != button; slot++)
-		;
-	memmove(&binding->buttons[1], &binding->buttons[0], (size_t)slot * sizeof(binding->buttons[0]));
-	binding->buttons[0] = button;
+	for (int slot = 0; slot < CONTROL_BUTTONS; slot++)
+		control_bindings[player][control].buttons[slot] = slot == 0 ? button : NO_BUTTON;
 	controls_save();
 }
