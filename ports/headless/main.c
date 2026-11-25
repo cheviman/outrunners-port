@@ -463,18 +463,22 @@ static void on_controls_update(void)
 			console_actions(actions[index].action);
 	for (int player = 0; player < 2; player++)
 	{
-		/* the radio's << and >> as the window port has them (console_radio_buttons); a button it pressed is let
-		   go again the next frame (the script presses and lets go by its own events alone) */
+		/* the radio's MUSIC, << and >> as the window port has them (console_radio_buttons); a button it pressed is
+		   let go again the next frame, and one it let go stays so (the script presses and lets go by its own events
+		   alone) */
 		static uint8_t added[2];
 		uint8_t *port = &s32_board.input.port_b[player];
-		bool previous, next;
+		bool music, previous, next;
 
 		*port |= added[player];
+		music = (*port & 0x01u) == 0u;
 		previous = (*port & 0x02u) == 0u;
 		next = (*port & 0x04u) == 0u;
-		console_radio_buttons(player, &previous, &next);
+		console_radio_buttons(player, &music, &previous, &next);
 		added[player] = (uint8_t)(((*port & 0x02u) != 0u && previous ? 0x02u : 0u) | ((*port & 0x04u) != 0u && next ? 0x04u : 0u));
 		*port &= (uint8_t)~added[player];
+		if (!music)
+			*port |= 0x01u;    /* (MUSIC taken as >>) */
 	}
 	console_set_sides();
 	if (board_edges)

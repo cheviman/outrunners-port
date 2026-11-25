@@ -608,22 +608,55 @@ bool console_can_pause(void)
 		&& !console_network_linked();
 }
 
-/* ---- the radio's hidden song ---- */
+/* ---- the radio: MUSIC round it all, and its hidden song ---- */
 
 #define LAST_RADIO_SONG     9u    /* Last Wave: the game's >> goes on from it to the first, Magical Sound Shower */
 #define FIRST_RADIO_SONG    0u
 #define HIDDEN_RADIO_SONG   10u   /* Jingle Bell, radio_songs' eleventh */
+#define RADIO_ON_SONGS      1u    /* the radio's states 0 and 1 play the car's song (car_radio_update); 2 on, the station */
 
-void console_radio_buttons(int player, bool *previous, bool *next)
+/* The seat's radio (the object car_radio_read_buttons runs while its car races; its objects are the 0x7C00
+   bytes before its block, as console_find_object's of the screen), or 0 */
+static uint32_t seat_radio(uint32_t seat)
 {
-	static bool held[CONTROL_PLAYERS][2];    /* the seat's << and >> the frame before */
+	for (uint32_t object = seat - 0x7C00u; object < seat; object += 0x100u)
+		if ((OBJECT(object)->flags & 1u) != 0u && OBJECT(object)->handler == FUNCTION_car_radio_read_buttons)
+			return object;
+	return 0u;
+}
+
+void console_radio_buttons(int player, bool *music, bool *previous, bool *next)
+{
+	static bool held[CONTROL_PLAYERS][3];        /* the seat's << , >> and MUSIC the frame before */
+	static bool music_steps[CONTROL_PLAYERS];    /* MUSIC, as it was pressed, held as >> */
 	const uint32_t seat = player == 0 ? SCREEN_1 : SCREEN_2;
-	const bool previous_pressed = *previous && !held[player][0], next_pressed = *next && !held[player][1];
+	const bool on_race = SCREEN(seat)->game_mode == GAME_MODE_PLAY && racing(seat);
+	bool previous_pressed, next_pressed;
 	uint8_t song;
 
+	if (*music && !held[player][2])
+	{
+		/* (MUSIC newly pressed: on a song but the last, >> while it is held; on the station back to the first
+		   song, which any of its buttons goes back to, from the car's) */
+		const uint32_t radio = on_race ? seat_radio(seat) : 0u;
+
+		music_steps[player] = false;
+		if (radio && OBJECT(radio)->state <= RADIO_ON_SONGS)
+			music_steps[player] = CAR(seat + SCREEN_CAR)->song != LAST_RADIO_SONG;
+		else if (radio)
+			CAR(seat + SCREEN_CAR)->song = FIRST_RADIO_SONG;
+	}
+	held[player][2] = *music;
+	if (*music && music_steps[player])
+	{
+		*music = false;
+		*next = true;
+	}
+	previous_pressed = *previous && !held[player][0];
+	next_pressed = *next && !held[player][1];
 	held[player][0] = *previous;
 	held[player][1] = *next;
-	if (previous_pressed == next_pressed || SCREEN(seat)->game_mode != GAME_MODE_PLAY || !racing(seat))
+	if (previous_pressed == next_pressed || !on_race)
 		return;
 	song = CAR(seat + SCREEN_CAR)->song;
 	if ((next_pressed && song == LAST_RADIO_SONG) || (previous_pressed && song == FIRST_RADIO_SONG))

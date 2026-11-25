@@ -61,17 +61,18 @@ What a tool makes has the game's data in it: it is yours alone, never share it.
   picture: AUTO, the screen's shape, as a Steam Deck's in its hands, a TV's or an ultrawide monitor's, or
   16:10, 16:9, 20:9 or 21:9; VSYNC), sound (the volume, and the music, the effects and the voices apart),
   sound test, steering, FPS.
-- **The radio**: << and >> go round its ten songs and Jingle Bell, the hidden one, between Last Wave and
-  Magical Sound Shower.
+- **The radio**: MUSIC goes round it all, one button: each song, then after Last Wave the station and its DJ,
+  then Magical Sound Shower again. << and >> go round the ten songs and Jingle Bell, the hidden one, between
+  Last Wave and Magical Sound Shower.
 - **The pause** in a race: CONTINUE, RESTART, QUIT GAME.
 - **The picture**: the scenery the arcade draws every other frame to make it look faint (the spray of Niagara's
   falls, the pyramids) is drawn see-through instead, so it does not blink.
 
 ## Controls
 
-- **Keyboard**: the arrows steer, accelerate and brake; Q and A shift up and down; space is the radio; Enter
-  starts and pauses. OPTIONS > STEERING > SPEED is how fast the keys (and a d-pad) turn the wheel, 1 to 9, or
-  INSTANT: all the way at once, and back to the centre at once.
+- **Keyboard**: the arrows steer, accelerate and brake; Q and A shift up and down; space is the radio's MUSIC,
+  [ and ] its << and >>; Enter starts and pauses. OPTIONS > STEERING > SPEED is how fast the keys (and a d-pad)
+  turn the wheel, 1 to 9, or INSTANT: all the way at once, and back to the centre at once.
 - **Game controller**: the left stick or the d-pad steers, the right trigger accelerates, the left trigger
   brakes, the shoulders shift. OPTIONS > CONTROLS changes them: the key or button pressed there takes the
   control's place. A stick's way can be one too (the right stick's up and down as the pedals, pressed as far

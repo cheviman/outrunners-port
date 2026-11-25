@@ -845,6 +845,16 @@ merged here; this repository adds console/, the ports and their documents.
   the same as before, state, picture and sound. Looked at too, and the game's: the kangaroos of Uluru start small in
   the middle (where they stand, at the side of a road narrow in the distance, then jump across as the car comes
   near), the same at 4:3 and in WIDE's middle (20:9, --board-edges: 128 frames the same to the pixel).
+- The radio's MUSIC goes round it all (Sebas's: the space bar, MUSIC, went from the car's song to the station and
+  back, two of them; the songs were << and >> alone, [ and ]): console_radio_buttons takes MUSIC too, and a press
+  of it on a song but the last is >> while it is held (decided as it is pressed: a song that turns the last one
+  meanwhile does not make it the game's MUSIC halfway), on Last Wave the game's own (the station, its DJ), and on
+  the station the game's own with the car's song set to the first, Magical Sound Shower (any of the station's
+  buttons goes back to the car's song). The seat's radio is the object car_radio_read_buttons runs (seat_radio),
+  on its songs in its states 0 and 1. The arcade build's MUSIC is the cabinet's. Checked on the console's
+  headless game, CLASSIC with MUSIC pressed every 300 frames: the songs 7, 8, 9, the station (states 2 and 3),
+  0, 1 and on to 9; the console's menu, CONTROLS, CLASSIC, 2 PLAYERS and ARCADE's race to Niagara the same as
+  before, state, picture and sound (none presses the radio).
 
 ## To do
 
