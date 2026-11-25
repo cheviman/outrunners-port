@@ -54,6 +54,7 @@
 #define GOALS               10
 #define GOAL_CHECKPOINT     5            /* the game's checkpoints: the forks 0-4, then the goal */
 #define REVERSE_START_EXTRA 59           /* REVERSE's start: 99 seconds, the clock's most beside FINAL STAGE */
+#define WATER_LEFT_GOAL     0x15         /* AUSTRALIA: its start has the harbour at the left (REVERSE's start line) */
 #define GOAL_FORK           1792         /* a goal stage's goal, where the routes fork */
 #define STAGE_FORK          1664         /* the other stages' fork */
 #define FORK_OBJECTS_FROM   1408         /* stage 1's stream: its fork camera on */
@@ -590,8 +591,23 @@ static void start_line_colours(void)
 	}
 }
 
-/* A start line object of REVERSE's (a goal stage's stream): its own handler, then its sprites (the entries it
-   put in the list) marked for the extra palette, where the pre-stage's colours are */
+/* A start line object's handler where REVERSE starts: its own, but at a goal with water at the left (AUSTRALIA's
+   harbour) the rows drawn at both sides of the road (the stands and the people: scenery_pair and
+   animated_scenery_pair) at the right alone, by their one side's (scenery and animated_scenery: the same record
+   and steps, the pair's first item, which is at the right) */
+static uint32_t start_line_handler(uint32_t handler)
+{
+	if (routes.running != ROUTE_REVERSE || routes.goal != WATER_LEFT_GOAL)
+		return handler;
+	if (handler == FUNCTION_scenery_pair_update)
+		return FUNCTION_scenery_update;
+	if (handler == FUNCTION_animated_scenery_pair_update)
+		return FUNCTION_animated_scenery_update;
+	return handler;
+}
+
+/* A start line object of REVERSE's (a goal stage's stream): its own handler (start_line_handler), then its sprites
+   (the entries it put in the list) marked for the extra palette, where the pre-stage's colours are */
 void presentation_start_line_update(void)
 {
 	const uint32_t record = current_object->parameter;
@@ -600,7 +616,7 @@ void presentation_start_line_update(void)
 	for (int kind = 0; kind < routes.start_line_kinds; kind++)
 		if (routes.start_line[kind].record == record)
 		{
-			call_function(routes.start_line[kind].handler);
+			call_function(start_line_handler(routes.start_line[kind].handler));
 			break;
 		}
 	for (uint32_t sprite = first; sprite <= screen->sprite_list_last; sprite += 0x10u)

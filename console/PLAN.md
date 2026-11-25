@@ -834,6 +834,17 @@ merged here; this repository adds console/, the ports and their documents.
   voices' (SEGA's at 2 s, the menus' and the car select's, Go! at 61 s, the checkpoint at 181 s), the state the
   same; with MUSIC 0 in 15,306; the windows' runs at 5 each the same as before, state, picture and sound. Not
   heard yet: the mix by ear.
+- REVERSE's start at AUSTRALIA without the people over the water (Sebas's: the start line's stands and people at
+  both sides, and its left is the harbour): the pre-stage's start line the console puts in where REVERSE starts has
+  its rows drawn in pairs (scenery_pair, animated_scenery_pair: one item each side of the road, the second
+  mirrored); at AUSTRALIA (WATER_LEFT_GOAL) presentation_start_line_update runs their one side's handlers instead
+  (scenery, animated_scenery: the same record and steps, the pair's first item, at the right). The ten goals'
+  starts looked at: only AUSTRALIA's has water at a side (the ATLANTIC OCEAN's is under the sea all round). Checked:
+  REVERSE from AUSTRALIA (6,000 frames) different from frame 1,969 on, the sound the same, the left there the gate,
+  its sign, the balloon, the flagman and the stage's planters before the harbour; REVERSE from JAPAN and CLASSIC
+  the same as before, state, picture and sound. Looked at too, and the game's: the kangaroos of Uluru start small in
+  the middle (where they stand, at the side of a road narrow in the distance, then jump across as the car comes
+  near), the same at 4:3 and in WIDE's middle (20:9, --board-edges: 128 frames the same to the pixel).
 
 ## To do
 
