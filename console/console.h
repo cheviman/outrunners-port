@@ -235,6 +235,10 @@ extern console_window console_window_settings;
    2 PLAYERS, whose screens are both the board's) */
 int console_wide_side(void);
 
+/* Each frame, before VBLANK's sprites and the frame: WIDE's side for the video (s32_video_set_wide_side) and for
+   the game's edges (screen_more_left and screen_more_right, support.h's SCREEN_MORE_LEFT and SCREEN_MORE_RIGHT) */
+void console_set_sides(void);
+
 /* WIDE AUTO: the port says which WIDE the screen's shape asks for (WIDE_OFF till it does), and the one in effect
    is that one with AUTO, else the setting (what draws and sizes the picture reads this, not the setting) */
 void console_set_screen_wide(int kind);

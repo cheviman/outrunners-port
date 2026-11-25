@@ -676,6 +676,24 @@ merged here; this repository adds console/, the ports and their documents.
   16 scenarios identical, tests/console's eight identical to the build before in state, picture and sound
   (TIME ATTACK with an empty ghost folder each: a ghost left by one run changes the next). A start line
   object whose record START_LINE_KINDS (16) leaves out does nothing in REVERSE, as before.
+- WIDE's sides and the game's edges (as The Simpsons' and TMNT's ports had in players' reports): the game takes
+  objects away, stops drawing them, turns them back or puts them in a little past the board's 320, which WIDE
+  showed inside the picture (Niagara's spray and the landmarks cut at the sides in every WIDE, the title's palm
+  trees short of the right edge at 20:9 and 21:9, the road's crossers taken away in sight at 20:9 and 21:9). The
+  decompilation names those places (278e004: PAST_LEFT, PAST_RIGHT, FROM_MIDDLE, support.h) and the console
+  moves them by WIDE's side: console_set_sides, each frame where the ports set the video's side, sets
+  screen_more_left and screen_more_right too (0 with WIDE off and in 2 PLAYERS). backdrop_off_screen, whose A0
+  the decompilation keeps (the middle and the edges' distance at once), is the console's (replaced.txt): off past
+  the wider screen's side, but the game's own while the sprite waits to come in (state 0), or a backdrop born
+  in a side would stay away from the middle. The headless's --middle-hashes (each screen's 320 columns) and
+  --board-edges (WIDE's frames with the board's edges) check it. Checked on Windows: every target with no
+  warnings; tests/console's eight at 4:3 identical to the build before the merges (state, picture, sound);
+  ARCADE, FULL, REVERSE and the menus at 16:9, 20:9 and 21:9 against --board-edges: the player's screen's middle
+  the same but the title (its palm trees put in past the wider side, its logo's cars taken out past it, so the
+  logo shines a few frames later), the goal parade (turned back 16 columns past the wider side, as the board's
+  past its own) and the landmarks (their height, which the game keeps only while it draws them, a pixel apart);
+  Niagara's spray now at the sides, the middle the same. The right screen is the title all along. Not tried:
+  the devices' builds, a monitor, the network.
 
 ## To do
 

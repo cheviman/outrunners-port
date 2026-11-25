@@ -360,6 +360,7 @@ void backdrop_translucent_start(void);
 void backdrop_translucent_update(void);
 void CONSOLE_ORIGINAL(backdrop_translucent_update)(void);
 uint32_t backdrop_off_screen(void);
+uint32_t CONSOLE_ORIGINAL(backdrop_off_screen)(void);
 
 /* objects/car_radio.c: the car radio: the songs, the DJ and his messages, the songs' titles */
 void car_radio_start(void);

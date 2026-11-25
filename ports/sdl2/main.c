@@ -1676,7 +1676,7 @@ static void on_controls_update(void)
 		/* the menus' actions newly pressed; EXIT; the settings OPTIONS changed */
 		const uint32_t held = read_actions(keys);
 
-		s32_video_set_wide_side(console_wide_side());    /* (before VBLANK's sprites and the frame) */
+		console_set_sides();    /* (before VBLANK's sprites and the frame) */
 
 		if (console_can_pause() && (held & ~actions_held & PAUSE_BIT))
 			pause_requested = true;    /* (run_pause, once the frame is done) */

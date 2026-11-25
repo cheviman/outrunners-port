@@ -166,6 +166,33 @@ void backdrop_translucent_update(void)
 		}
 }
 
+/* WIDE's sides as the game's edges read them (support.h's SCREEN_MORE_LEFT and SCREEN_MORE_RIGHT): where the
+   game takes an object away, stops drawing it, turns it back or puts it in at a side, past the wider screen's
+   side; 0 with WIDE off and in 2 PLAYERS. console_set_sides sets them each frame. */
+int screen_more_left, screen_more_right;
+
+/* Whether a sprite on the background is wholly off the screen, with WIDE's sides: past the wider screen's side,
+   so that WIDE shows the spray of Niagara's falls, the pyramids and the landmarks at the sides too (the
+   decompilation keeps the function's numbers: its A0 is both the screen's middle and how far each edge is from
+   it). While the sprite waits to come in (state 0: off the screen first, so that it does not pop up in view)
+   and with no sides it is the game's own, so that when it comes in, and all the board's 320 columns show, are
+   the board's. */
+uint32_t backdrop_off_screen(void)
+{
+	const int16_t centre = (int16_t)(current_object->x - 0xA0u);
+	const int16_t half_width = (int16_t)current_object->backdrop.half_width;
+
+	if (current_object->state == 0u || (screen_more_left == 0 && screen_more_right == 0))
+		return original_backdrop_off_screen();
+	if ((int16_t)(centre - half_width) > 0xA0 + screen_more_right
+		|| (int16_t)(0 - centre - half_width) > 0xA0 + screen_more_left)
+	{
+		current_object->flags &= 0xDFu;    /* (as the game's) */
+		return 1u;
+	}
+	return 0u;
+}
+
 /* ---- the sound ---- */
 
 #define RADIO_SONGS 11    /* radio_songs' records: the cars' ten and Jingle Bell */
@@ -502,6 +529,15 @@ int console_wide_side(void)
 		case WIDE_21_9: return S32_VIDEO_WIDE_SIDE_21_9;
 		default: return 0;
 	}
+}
+
+void console_set_sides(void)
+{
+	const int side = console_wide_side();
+
+	s32_video_set_wide_side(side);
+	screen_more_left = side;
+	screen_more_right = side;
 }
 
 bool console_both_screens(void)
