@@ -12,3 +12,6 @@ __pycache__/
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
 CLAUDE.md
+
+# The posts of each release (Reddit, Patreon, Twitter) and their screenshots, a folder by the posting date: local
+post/

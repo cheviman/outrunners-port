@@ -19,7 +19,9 @@ is the same game as on a computer, with what a game console asks for:
   player's ROM set on the player's computer. The Switch only installs and plays it.
 
 What the game writes (its settings, the EEPROM, the bookkeeping, TIME ATTACK's times) goes to
-`/switch/outrunners/` on the SD card, with `outrunners.log`, the steps of its start and its frames' pace.
+`/switch/outrunners/` on the SD card, with `outrunners.log`, the steps of its start; with an empty file
+`pace.txt` in that folder, its frames' pace too, every 300 frames (without it nothing is written to the card
+while the game runs).
 
 ## Making the .nsp (for players)
 

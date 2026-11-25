@@ -855,6 +855,12 @@ merged here; this repository adds console/, the ports and their documents.
   headless game, CLASSIC with MUSIC pressed every 300 frames: the songs 7, 8, 9, the station (states 2 and 3),
   0, 1 and on to 9; the console's menu, CONTROLS, CLASSIC, 2 PLAYERS and ARCADE's race to Niagara the same as
   before, state, picture and sound (none presses the radio).
+- The devices' frames' pace goes to the log only where it is asked for (Sebas's, from the main checkout's
+  ports/sdl2/main.c, brought to ports/sdl/main.c): with --pace, or an empty pace.txt beside the log (the Switch's
+  folder, Android's external storage, the game's folder elsewhere); a line every 300 frames is a write to the card
+  while the game runs, which can hold a frame. The Anbernic's and the Switch's READMEs say so. Compiled for
+  Windows, Android and iOS.
+- 1.4.0: the version (CMakeLists.txt; the examples of the packages' names), docs/releases/v1.4.0.md.
 
 ## To do
 

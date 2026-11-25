@@ -19,8 +19,9 @@ is the same game as on a computer, with what a handheld asks for:
   the player's ROM set on the player's computer by OutRunners Anbernic.
 
 What the game writes (its settings, the EEPROM, the bookkeeping, TIME ATTACK's times) goes to its folder on
-the card, with `outrunners.log`: what SDL found (its version, video and audio, the screen, the controls) and
-every 300 frames the frames a second and a frame's time.
+the card, with `outrunners.log`: what SDL found (its version, video and audio, the screen, the controls).
+With an empty file `pace.txt` in that folder (or `--pace` in `OutRunners.sh`) it also gets, every 300 frames,
+the frames a second and a frame's time; without it nothing is written to the card while the game runs.
 
 ## Making PORTS (for players)
 

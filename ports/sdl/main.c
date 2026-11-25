@@ -2161,13 +2161,34 @@ static void log_device(void)
 	log_written();
 }
 
+/* The frames' pace goes to the log only where it is asked for: with --pace, or a file pace.txt beside the log
+   (a line every 300 frames is a write to the card while the game runs, which can hold a frame) */
+static bool pace_logged;
+
+static void pace_asked(const char *folder)
+{
+	char path[1100];
+	FILE *probe;
+
+	snprintf(path, sizeof(path), "%s%space.txt", folder ? folder : "", folder ? "/" : "");
+	if ((probe = fopen(path, "rb")) != NULL)
+	{
+		fclose(probe);
+		pace_logged = true;
+	}
+}
+
 /* Every 300 frames, the frames a second and the time a frame's work takes */
 static void log_pace(bool work_done)
 {
 	static uint64_t pace_start, pace_work, pace_most, frame_start;
 	static int pace_frames;
-	const uint64_t now = SDL_GetPerformanceCounter(), frequency = SDL_GetPerformanceFrequency();
+	uint64_t now, frequency;
 
+	if (!pace_logged)
+		return;
+	now = SDL_GetPerformanceCounter();
+	frequency = SDL_GetPerformanceFrequency();
 	if (!work_done)
 	{
 		frame_start = now;
@@ -2726,6 +2747,13 @@ int main(int argc, char **argv)
 #endif
 #ifdef ORUNNERS_HANDHELD
 	log_device();
+#if defined(__SWITCH__)
+	pace_asked(SWITCH_FOLDER);
+#elif defined(__ANDROID__)
+	pace_asked(SDL_GetAndroidExternalStoragePath());
+#else
+	pace_asked(NULL);    /* (the game's folder: its launcher starts it there) */
+#endif
 #endif
 	/* the video's layers, sprites and mixing a band of rows on each core beside the game's (the same frames
 	   as on one: runtime/src/workers.c) */
@@ -2741,6 +2769,10 @@ int main(int argc, char **argv)
 			video_hashes_path = argv[++index];
 		else if (strcmp(argv[index], "--sound-hashes") == 0 && index + 1 < argc)
 			sound_hashes_path = argv[++index];
+#ifdef ORUNNERS_HANDHELD
+		else if (strcmp(argv[index], "--pace") == 0)
+			pace_logged = true;
+#endif
 		else if (strcmp(argv[index], "--fast") == 0)
 			fast = true;
 		else if (strcmp(argv[index], "--assets") == 0 && index + 1 < argc)
