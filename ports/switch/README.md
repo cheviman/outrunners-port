@@ -64,7 +64,7 @@ With [devkitPro](https://devkitpro.org/wiki/Getting_Started): its installer's **
 then, in devkitPro's MSys2 shell (Windows) or a shell with devkitPro's pacman (Linux, macOS):
 
 ```bash
-pacman -S --needed switch-sdl2 switch-cmake switch-pkg-config
+pacman -S --needed switch-mesa switch-libdrm_nouveau switch-cmake switch-pkg-config
 ```
 
 Then, from the repository's folder, in that shell:
@@ -93,8 +93,8 @@ the game alone (`switch.cmake`), into `build/bin/switch/`:
 cmake --build build/cmake --config Release --target orunners_nsp
 ```
 
-Its window is built where the game's is, with SDL2 (with `font.bmp`, and on Windows `SDL2.dll` unless
-SDL2 is built in); without SDL2 the tool is its command line alone. It lands in `build/bin/`, beside
+Its window is built where the game's is, with SDL 3 (with `font.bmp`, and on Windows `SDL3.dll` unless
+SDL is built in); without SDL 3 the tool is its command line alone. It lands in `build/bin/`, beside
 `build/bin/switch/`, so from the repository it makes the `.nsp` at once:
 
 ```bash
@@ -137,10 +137,10 @@ As SegaSonic NSP makes SegaSonic's (its `crypto.c`, `formats.c`, `make_nsp.c`, `
 | `nsp/rom_pack.c` | the assets pack out of the ROM set, as the first run makes it |
 | `nsp/make_nsp.c` | the `.nsp` from its inputs, for the command line and the window |
 | `nsp/main.c` | the tool's command line; started with nothing, its window |
-| `nsp/window.c` | the window (SDL2, with Kenney Mini's letters: `ports/sdl2/letters.c`) |
+| `nsp/window.c` | the window (SDL 3, with Kenney Mini's letters: `ports/sdl/letters.c`) |
 | `nsp/folder_dialog.c` | the system's folder dialog: Windows', macOS's (`osascript`), Linux's (`zenity` or `kdialog`) |
 
-The game's own changes for the Switch are in `ports/sdl2/main.c` (`__SWITCH__`: the romfs, the SD card
+The game's own changes for the Switch are in `ports/sdl/main.c` (`__SWITCH__`: the romfs, the SD card
 folder, the screen; `ORUNNERS_HANDHELD`: the fixed picture), `console/menu.c` (OPTIONS without VIDEO and
 CONTROLS, `ORUNNERS_TWO_PLAYERS`, `ORUNNERS_SYSTEM_EXIT`) and `runtime/src/tasks.c` (the game's two tasks
 on stacks of their own without ucontext, which the Switch's C library has not).

@@ -59,7 +59,7 @@ Licenses
 --------
 LICENSE.txt is the project's (BSD-3-Clause). licenses/ holds MAME's and ymfm's (the board's video and
 sound follow their behavior and tables), arcade-lan's (BSD-3-Clause: NETWORK's rooms and datagrams,
-github.com/cheviman/arcade-lan), SDL2's (zlib) and Kenney's (CC0: the windows' letters, the controls'
+github.com/cheviman/arcade-lan), SDL's (zlib) and Kenney's (CC0: the windows' letters, the controls'
 pictures).
 
 OutRunners is a trademark of SEGA. This project is not affiliated with or endorsed by SEGA, Nintendo,

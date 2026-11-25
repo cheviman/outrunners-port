@@ -695,6 +695,119 @@ merged here; this repository adds console/, the ports and their documents.
   Niagara's spray now at the sides, the middle the same. The right screen is the title all along. Not tried:
   the devices' builds, a monitor, the network.
 
+## Done (25-11-2026)
+
+- SDL 3 and the Raspberry Pi (issue 47; Sebas, 19-11-2026: "primero pasarlo a sdl3 o el mas reciente que sirva con
+  todo, y agrega una version de raspberi 3 en adelante. y va como regla para todos los ports"; on 25-11-2026, what
+  issue 47 is: "sdl3, ios, pi"). TMNT's port did it first (its 1.1.0); this follows it.
+- The window port is written for SDL 3 now (ports/sdl, which was ports/sdl2), port_sdl.h what its files include.
+  SDL 3.4.20 (03-11-2026), CMakeLists.txt's ORUNNERS_SDL_VERSION, its release's archive by its SHA-256 (the one in
+  build/downloads/sdl3-source where it is there); ORUNNERS_STATIC_SDL was ORUNNERS_STATIC_SDL2.
+- Each platform: Windows, Linux, macOS and the Raspberry Pi, SDL 3.4.20 from its source inside the games (the
+  packages); Android, the same from its source, libSDL3.so beside libmain.so, its Java from its android-project; the
+  Switch, devkitPro's own branch of SDL 3 (github.com/devkitPro/SDL, switch-sdl-3.4 at c329016: SDL 3.4.0, not
+  released; devkitPro has no switch-sdl3 package yet) built into the game by switch.cmake, by its archive's SHA-256;
+  Anbernic's H700 handhelds and the R36S keep their system's SDL 2 (the firmware's 2.0.12, ArkOS's) under the same
+  source: ORUNNERS_SDL2_LAYER, ports/sdl/sdl2_layer.h (TMNT's, with what OutRunners adds: the haptic part forces.c
+  uses, the right stick's axes, a texture turned, the display's mode, the joysticks' list, the processors' count),
+  the stand-in library with SDL_malloc and SDL_RenderFillRect more, and the build's last step
+  ports/anbernic/check_sdl.py (no SDL function newer than 2.0.12 asked for).
+- The move: SDL's own rename scripts over the sources, then by hand what changed underneath: bool results; float
+  rectangles (float_rect in main.c, whole pixels as before); the window and the renderer made with no place and no
+  flags (Direct3D 11 is SDL 3's first on Windows); full screen as a bool (SDL 3's is the desktop's mode); the events'
+  fields; joysticks, gamepads and haptics by their ids (SDL_GetJoysticks, SDL_GetHaptics); the sound as a stream on
+  the default device (SDL_OpenAudioDeviceStream, 1024 sample frames asked of the device as before, the queue's bytes
+  by SDL_GetAudioStreamQueued); SDL's base path SDL's own (base_copy); the tools' window handle from its
+  properties; SDL_main.h included by main.c (the tools, with a main of their own, SDL_MAIN_HANDLED); Android's
+  tablet by the display's content scale (SDL_GetDisplayDPI is gone); an iPad by SDL_IsTablet.
+- What the compiler did not say, found and set right: SDL 3 gives an ARGB texture blending by its alpha, and the
+  game's frames have none (the picture would be black): texture and scaled SDL_BLENDMODE_NONE. SDL 3's joystick id
+  is unsigned and 0 is none: forces.c's -1 and id < 0, and wheel_setup.c's -1 (SET UP WHEEL's "nothing set up"),
+  are 0. SDL_GetTouchDevices gives an empty list, not NULL, with no touch screen. The touch controls' shapes kept at
+  whole pixels. SDL's rename script had made __APPLE__ SDL_PLATFORM_APPLE in two files that include no SDL
+  (ports/android/apk/key.c, ports/switch/nsp/folder_dialog.c): put back.
+- The Switch (TMNT's issue 27 on SDL 3): devkitPro's SDL 3 loads EGL only for a window made with SDL_WINDOW_OPENGL,
+  and its Switch window is an EGL surface: without it the game stops at its start. And F11 or Alt+Enter on a USB
+  keyboard leaves the Switch's window as it is (never full screen: the 1920 x 1080 desktop mode, the picture's top
+  left alone; the checklist's point for OutRunners).
+- The computers' log says SDL's version, the renderer and the drivers: "SDL 3.4.20, renderer direct3d11, video
+  windows, audio wasapi".
+- What a player sees changed, as TMNT's port measured it on the same SDL (not measured here): on Windows the
+  window is DPI-aware (with the desktop at 125% WINDOW 3 is its real pixels, sharper and smaller); a Nintendo
+  controller's buttons by their place (SDL 3's SOUTH, EAST...).
+- Checked on Windows (MSVC, every target with no warnings): OutRunners Arcade's and OutRunners' windows run with
+  control scripts (attract; ARCADE's race to Niagara in both games; 2 PLAYERS), SDL's dummy video and sound, --fast:
+  the same frame by frame on SDL 2 (the same commit built beside it) and on SDL 3, state, picture and sound, 53,604
+  frames. The package's build (ORUNNERS_STATIC_SDL=ON): no SDL3.dll and no C runtime asked for, Windows' own
+  libraries alone. rom_in_executables: the build's games 0; the package's 4 stretches of "program", 1 of "sound" and
+  4 of "pcm", which are SDL 3's own tables inside them (steps 0a 0a ... 0b 0b ... 0c; 00 ... 01 02 03 ... 14; the
+  same games with SDL beside them: 0); tools/rom_in_executables.py's trivial() does not know those shapes (the
+  decompilation's tool).
+- Every port source compiled by Zig against SDL 3.4.20's headers with every warning an error, for Windows, Linux,
+  macOS and Android's branches (the NDK's clang).
+- The Switch: devkitPro's build, OutRunners.nro and the .nsp's pieces, "SDL-3.4.0" and its Switch video in it.
+- Android (NDK 28.2, SDK 35): outrunners-base.apk and this computer's signed one, apksigner v2 and v3; aapt:
+  io.github.cheviman.outrunners, SDK 24 to 35, arm64-v8a with libmain.so and libSDL3.so.
+- Anbernic and R36S (Zig, the layer over SDL 2.0.12): 86 SDL functions each, the newest of SDL 2.0.12.
+- The layer run: the Anbernic's game built natively on Linux (WSL's GCC, the same configuration; it links the
+  stand-in library and loads the system's SDL 2.30 as it starts), with SDL's dummy video and sound and ARCADE's race
+  to Niagara: 16,001 frames the same as on Windows with SDL 2, state, picture and sound; its log by the layer
+  ("SDL 2.30.0, video dummy, audio dummy", the screen's mode, the joysticks).
+- Not played by hand yet: the sound heard, game controllers and racing wheels (the haptic part), the pause, VSYNC.
+  Not tried on a device: a Switch, a phone, a handheld, a Mac, a Raspberry Pi.
+- The Raspberry Pi (3 and later, the 64-bit Raspberry Pi OS): ports/raspberrypi (TMNT's, with OutRunners' names):
+  build.sh builds and packs outrunners-VERSION-raspberrypi-arm64.tar.gz (the two games, font.bmp, input_prompts.bmp,
+  outrunners.png, recomplauncher.json, README.txt, LICENSE.txt and licenses/), on Debian 12 "Bookworm" for arm64
+  (Raspberry Pi OS Legacy's base, glibc 2.36: the games run on it and on Trixie's), SDL 3 inside with Wayland, X11,
+  KMS/DRM, ALSA, PulseAudio and PipeWire; the CI's raspberrypi job runs it in debian:bookworm on an arm64 runner;
+  wsl.sh makes that system in a folder of WSL's and runs it under QEMU. 64-bit only: every Pi from the 3 on runs the
+  64-bit OS.
+- Checked under QEMU in that system (wsl.sh): the games ask for libc and libm alone (glibc 2.34 at most) and for no
+  SDL function of a library; the package's OutRunners Arcade takes the assets out of orunners.zip (--prepare, the
+  first run on arm64); with SDL's dummy video ("SDL 3.4.20, renderer software"), attract (18,001 frames) and
+  2 PLAYERS (3,301) the same frame by frame as on Windows with SDL 2, state, picture and sound. Not tried on a
+  Raspberry Pi: the screen (Wayland, X11, KMS/DRM), the sound, game controllers, the speed on a Pi 3.
+- iOS and iPadOS (issue 47; TMNT's port's, on SDL 3, and outrunners-port's pull request 14, yoshisuga's, the first
+  iOS version of the game, on SDL 2, played on an iPhone on iOS 27.2): OutRunners, the console game alone, as on
+  Android, for an iPhone or an iPad (arm64, iOS 13 on), an unsigned .ipa in outrunners-VERSION-ios.zip
+  (ports/pack_devices.py --ios, docs/package/README-ios.txt), sideloaded (AltStore, SideStore, Sideloadly), never
+  the App Store. ports/ios: ios.cmake (CMake's Xcode generator, SDL 3.4.20 static with no HIDAPI, the target
+  orunners_ios_games), Info.plist.in, LaunchScreen.storyboard (black), Assets.xcassets (the project's car,
+  tools/make_icon.py, which writes it now), README.md. The app takes its assets out of the player's orunners.zip
+  in its Documents (main.c's ios_assets, the extractor linked: ORUNNERS_IOS), which the Files app shows; with none,
+  its message on the screen and in outrunners.log there. main.c's SDL_PLATFORM_IOS: the log, the settings and the
+  records in Documents, the whole screen at its pixels, landscape, the home indicator dimmed, the sound as
+  AVAudioSession's playback, the screen kept on, WIDE and the picture between the sides the notch or the Dynamic
+  Island takes (ios_side_inset), nothing drawn in the background (an event watch) and a race paused there, an
+  iPad as a tablet (SDL_IsTablet).
+- iOS's scenes: iOS 27's SDK asks every app for UIKit's scene life cycle, and one without it does not start (pull
+  request 14 found it; SDL 2 has none, and it brought its own ios.m). SDL 3.4 has it itself (its app delegate gives
+  the scene SDLUIKitSceneDelegate): the Info.plist declares UIApplicationSceneManifest, with
+  UIApplicationSupportsMultipleScenes false and no configuration of the port's own. TMNT's port's iOS has no such
+  key yet.
+- iOS's tasks: runtime/src/tasks.c (the port's own; the decompilation's has fibers and ucontext alone) switches the
+  game's two tasks by their stacks on iOS as on the Switch and Android, Apple's ucontext being "No longer
+  supported" (pull request 14's way), with Mach-O's names (_host_switch_stacks, no symbol types nor sizes); macOS
+  keeps ucontext.
+- NETWORK on iOS: arcade-lan at ad5dfe7 (was bd84786; its protocol still 2, so the devices of 1.3.2 play with it),
+  built with ARCADE_LAN_NO_BROADCAST on iOS (the rooms found by datagrams to each address of the local network:
+  iOS gives an app no broadcasts without Apple's entitlement); its two tests pass.
+- The CI's jobs ios (macos-15: the app and its .ipa, read back: the Info.plist's keys, arm64 for iOS, the launch
+  screen and the icon in the bundle, no assets in the .ipa) and ios-simulator (the app started with no ROM set: its
+  log must say where orunners.zip goes, a screenshot of it); the devices' job packs outrunners-VERSION-ios.zip; the
+  release's packages are nine.
+- Checked here, with no Mac: ports/sdl's main.c, letters.c, touch.c, forces.c and controls.c compiled by Zig for
+  aarch64-ios and aarch64-ios-simulator with its Darwin headers and SDL 3.4.20's, every warning an error, iOS's
+  branches in them (the message, the hints, SDL_main); the whole game for both (runtime/src, src/, console/,
+  arcade-lan: 81 sources, no warning; runtime/src/byte_order.c is the byte order check's, GCC's alone, not iOS's);
+  tasks.c: _host_switch_stacks on iOS and its Simulator, ucontext on macOS, host_switch_stacks on Android; the
+  workflow's YAML parsed (ten jobs); pack_devices.py --ios with stand-in folders. Not built, not run: Xcode's build
+  (the storyboard, the asset catalog, the link), the Simulator, an iPhone or an iPad: the CI's ios jobs, at the
+  next push.
+- The windows seen (PrintWindow, a DPI-aware capture: the desktop at 125%): the first run's window 640 x 448 in
+  real pixels, its letters whole and sharp; OutRunners' title in WIDE 16:9 (796 x 448) and OutRunners Arcade's two
+  screens (1280 x 448), the pictures right (the blend mode above).
+
 ## To do
 
 - 32:9 (issue 44): for one player it would need each stage's scenery drawn further out than the game places

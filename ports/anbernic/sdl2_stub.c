@@ -4,7 +4,7 @@
  *                 functions the window port calls, by name only
  *    Version:     0.1.3
  *    Created:     30-10-2026
- *    Modified:    19-11-2026
+ *    Modified:    25-11-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
@@ -636,5 +636,15 @@ void SDL_strlcat(void)
 
 void SDL_strlcpy(void);
 void SDL_strlcpy(void)
+{
+}
+
+void SDL_RenderFillRect(void);
+void SDL_RenderFillRect(void)
+{
+}
+
+void SDL_malloc(void);
+void SDL_malloc(void)
 {
 }

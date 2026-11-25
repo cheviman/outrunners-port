@@ -1,9 +1,9 @@
 # Name:        android.cmake
-# Description: the Android build (the NDK's toolchain): the console game as libmain.so beside SDL2's, both from
+# Description: the Android build (the NDK's toolchain): the console game as libmain.so beside SDL's, both from
 #              their source, and the APKs around them: the game's, for OutRunners APK, and this computer's own
 # Version:     0.1.1
 # Created:     30-10-2026
-# Modified:    06-11-2026
+# Modified:    25-11-2026
 # Author:      Sebastian Toyos
 #
 # Included by CMakeLists.txt when the toolchain is the NDK's (build/cmake/android.toolchain.cmake, with
@@ -41,19 +41,18 @@ if(NOT ORUNNERS_ANDROID_ICON AND EXISTS ${CMAKE_SOURCE_DIR}/local/icon_android.p
 	set(ORUNNERS_ANDROID_ICON ${CMAKE_SOURCE_DIR}/local/icon_android.png)    # (local/: the player's own pictures,
 endif()                                                                      #  never in the repository)
 
-# SDL2 from its source, as the releases' (FETCHCONTENT_SOURCE_DIR_SDL2 picks a copy already here): its
-# library, libSDL2.so, and its Java
+# SDL from its source, the computers' version (CMakeLists.txt's ORUNNERS_SDL_VERSION; FETCHCONTENT_SOURCE_DIR_SDL3
+# picks a copy already here): its library, libSDL3.so, and its Java
 include(FetchContent)
-FetchContent_Declare(SDL2 GIT_REPOSITORY https://github.com/libsdl-org/SDL.git GIT_TAG release-2.32.10
-	GIT_SHALLOW TRUE)
+FetchContent_Declare(SDL3 URL ${ORUNNERS_SDL_URL} URL_HASH SHA256=${ORUNNERS_SDL_SHA256})
 set(SDL_SHARED ON CACHE BOOL "" FORCE)
 set(SDL_STATIC OFF CACHE BOOL "" FORCE)
-set(SDL_TEST OFF CACHE BOOL "" FORCE)
-FetchContent_MakeAvailable(SDL2)
+set(SDL_TEST_LIBRARY OFF CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(SDL3)
 
-add_library(main SHARED ports/sdl2/main.c ports/sdl2/forces.c ports/sdl2/controls.c ports/sdl2/letters.c
-	ports/sdl2/touch.c)
-target_link_libraries(main PRIVATE orunners_game_console orunners_sound SDL2::SDL2)
+add_library(main SHARED ports/sdl/main.c ports/sdl/forces.c ports/sdl/controls.c ports/sdl/letters.c
+	ports/sdl/touch.c)
+target_link_libraries(main PRIVATE orunners_game_console orunners_sound SDL3::SDL3)
 
 # The SDK around the NDK (sdk/ndk/<version>), else ANDROID_HOME: the platform's android.jar, the newest
 # build-tools
@@ -86,7 +85,7 @@ set(ORUNNERS_APK_WORK ${CMAKE_BINARY_DIR}/apk)
 set(ORUNNERS_APK ${ORUNNERS_BIN_DIR}/android/OutRunners-debug.apk)    # (not OutRunners APK's OutRunners.apk)
 
 # SDL's Java, the activity that starts libmain.so: classes.dex
-file(GLOB ORUNNERS_SDL_JAVA ${sdl2_SOURCE_DIR}/android-project/app/src/main/java/org/libsdl/app/*.java)
+file(GLOB ORUNNERS_SDL_JAVA ${sdl3_SOURCE_DIR}/android-project/app/src/main/java/org/libsdl/app/*.java)
 add_custom_command(OUTPUT ${ORUNNERS_APK_WORK}/dex/classes.dex
 	COMMAND ${CMAKE_COMMAND} -E rm -rf ${ORUNNERS_APK_WORK}/classes ${ORUNNERS_APK_WORK}/dex
 	COMMAND ${CMAKE_COMMAND} -E make_directory ${ORUNNERS_APK_WORK}/classes ${ORUNNERS_APK_WORK}/dex
@@ -105,18 +104,18 @@ add_custom_command(OUTPUT ${ORUNNERS_APK_WORK}/dex/classes.dex
 set(ORUNNERS_APK_FILES ${ORUNNERS_APK_WORK}/files)
 set(ORUNNERS_APK_LIB lib/${ANDROID_ABI})
 add_custom_command(OUTPUT ${ORUNNERS_APK_FILES}/classes.dex ${ORUNNERS_APK_FILES}/${ORUNNERS_APK_LIB}/libmain.so
-		${ORUNNERS_APK_FILES}/${ORUNNERS_APK_LIB}/libSDL2.so
+		${ORUNNERS_APK_FILES}/${ORUNNERS_APK_LIB}/libSDL3.so
 	COMMAND ${CMAKE_COMMAND} -E rm -rf ${ORUNNERS_APK_FILES}
 	COMMAND ${CMAKE_COMMAND} -E make_directory ${ORUNNERS_APK_FILES}/${ORUNNERS_APK_LIB}
 	COMMAND ${CMAKE_STRIP} --strip-unneeded -o ${ORUNNERS_APK_FILES}/${ORUNNERS_APK_LIB}/libmain.so $<TARGET_FILE:main>
-	COMMAND ${CMAKE_STRIP} --strip-unneeded -o ${ORUNNERS_APK_FILES}/${ORUNNERS_APK_LIB}/libSDL2.so
-		$<TARGET_FILE:SDL2::SDL2>
+	COMMAND ${CMAKE_STRIP} --strip-unneeded -o ${ORUNNERS_APK_FILES}/${ORUNNERS_APK_LIB}/libSDL3.so
+		$<TARGET_FILE:SDL3::SDL3>
 	COMMAND ${CMAKE_COMMAND} -E copy ${ORUNNERS_APK_WORK}/dex/classes.dex ${ORUNNERS_APK_FILES}
-	DEPENDS main SDL2 ${ORUNNERS_APK_WORK}/dex/classes.dex
+	DEPENDS main SDL3-shared ${ORUNNERS_APK_WORK}/dex/classes.dex
 	COMMENT "The APK's libraries and Java"
 	VERBATIM)
 set(ORUNNERS_APK_GAME_FILES ${ORUNNERS_APK_FILES}/classes.dex ${ORUNNERS_APK_FILES}/${ORUNNERS_APK_LIB}/libmain.so
-	${ORUNNERS_APK_FILES}/${ORUNNERS_APK_LIB}/libSDL2.so)
+	${ORUNNERS_APK_FILES}/${ORUNNERS_APK_LIB}/libSDL3.so)
 
 # An APK's manifest, icon and assets, as aapt2 links them from the folder 'stage' (its res/ and assets/,
 # which 'commands' fill), then the game's files in and aligned: 'apk'
@@ -125,7 +124,7 @@ function(orunners_apk apk stage commands depends)
 		COMMAND ${CMAKE_COMMAND} -E rm -rf ${stage}
 		COMMAND ${CMAKE_COMMAND} -E make_directory ${stage}/assets
 		COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/ports/android/res ${stage}/res
-		COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/ports/sdl2/font/font.bmp ${stage}/assets
+		COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/ports/sdl/font/font.bmp ${stage}/assets
 		${commands}
 		COMMAND ${ORUNNERS_AAPT2} compile --dir ${stage}/res -o ${stage}/res.zip
 		COMMAND ${ORUNNERS_AAPT2} link -o ${stage}/linked.apk -I ${ORUNNERS_ANDROID_JAR}
@@ -134,10 +133,10 @@ function(orunners_apk apk stage commands depends)
 			--version-code ${ORUNNERS_ANDROID_VERSION_CODE} --version-name ${ORUNNERS_ANDROID_VERSION}
 			-A ${stage}/assets -0 assets ${stage}/res.zip    # (the pack stored: read in place, never unpacked)
 		COMMAND ${CMAKE_COMMAND} -E chdir ${ORUNNERS_APK_FILES} ${ORUNNERS_AAPT} add ${stage}/linked.apk classes.dex
-			${ORUNNERS_APK_LIB}/libmain.so ${ORUNNERS_APK_LIB}/libSDL2.so
+			${ORUNNERS_APK_LIB}/libmain.so ${ORUNNERS_APK_LIB}/libSDL3.so
 		COMMAND ${ORUNNERS_ZIPALIGN} -p -f 4 ${stage}/linked.apk ${apk}
 		DEPENDS ${CMAKE_SOURCE_DIR}/ports/android/AndroidManifest.xml ${ORUNNERS_ANDROID_RES}
-			${CMAKE_SOURCE_DIR}/ports/sdl2/font/font.bmp ${ORUNNERS_APK_GAME_FILES} ${depends}
+			${CMAKE_SOURCE_DIR}/ports/sdl/font/font.bmp ${ORUNNERS_APK_GAME_FILES} ${depends}
 		COMMENT "The APK: ${apk}"
 		VERBATIM)
 endfunction()

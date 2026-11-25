@@ -2,8 +2,8 @@
 
 <a href="https://recomplauncher.com/game/outrunners-port"><picture><source media="(prefers-color-scheme: dark)" srcset="https://recomplauncher.com/assets/press/launcher/badge-light.svg"><img alt="Get it on RecompLauncher" src="https://recomplauncher.com/assets/press/launcher/badge-dark.svg" height="48"></picture></a>
 
-Sega's 1992 arcade game *OutRunners* as a native game for computers, the Nintendo Switch, Android and Anbernic's
-handhelds, built on its decompilation, [outrunners-decomp](https://github.com/cheviman/outrunners-decomp): the
+Sega's 1992 arcade game *OutRunners* as a native game for computers, the Raspberry Pi, the Nintendo Switch,
+Android, iPhone and iPad, and Anbernic's handhelds, built on its decompilation, [outrunners-decomp](https://github.com/cheviman/outrunners-decomp): the
 game's program in C, checked frame by frame against MAME in picture and sound. Two games come out of it:
 
 - **OutRunners Arcade**: the arcade game as it is, both cabinet screens side by side.
@@ -25,7 +25,8 @@ its assets out of it.
 ## Playing it
 
 Download the package for Windows, Linux or macOS from the
-[releases](https://github.com/cheviman/outrunners-port/releases). Keep `orunners.zip` beside the game, or drop it
+[releases](https://github.com/cheviman/outrunners-port/releases); for a Raspberry Pi 3 or later with the 64-bit
+Raspberry Pi OS, `outrunners-VERSION-raspberrypi-arm64.tar.gz`, the Linux games for its processor. Keep `orunners.zip` beside the game, or drop it
 on its window when it asks: the first time, it takes the assets out of it. `--game` gives it the set's path
 (`OutRunners --game D:\roms\orunners.zip`), for a shortcut; with
 [RecompLauncher](https://recomplauncher.com/game/outrunners-port) you pick `orunners.zip` once and it does the
@@ -43,6 +44,9 @@ that makes it on your computer with your ROM set. Each package's name carries th
   makes the folder for PORTS ([ports/anbernic](ports/anbernic/README.md)).
 - **The R36S on ArkOS** (`outrunners-VERSION-r36s.zip`, RK3326, with PortMaster): OutRunners R36S makes the
   folder for ArkOS's ports ([ports/r36s](ports/r36s/README.md)).
+- **iPhone and iPad** (`outrunners-VERSION-ios.zip`): no tool there, an unsigned `OutRunners.ipa` you install
+  with AltStore, SideStore or Sideloadly; the game takes its assets out of your `orunners.zip` on the device,
+  in its folder in the Files app ([ports/ios](ports/ios/README.md)).
 
 What a tool makes has the game's data in it: it is yours alone, never share it.
 
@@ -110,9 +114,10 @@ anyone asks you to pay for this game, it is not this project.
 
 ## Building it
 
-Python 3.10 or newer, CMake 3.20 or newer, a C11 / C++17 compiler and SDL2 2.30 or newer (on Windows its
-development package for Visual C++ unpacked in `build/downloads/sdl2/`; elsewhere the system's, `libsdl2-dev` on
-Debian and Ubuntu; or `-DORUNNERS_STATIC_SDL2=ON` to build it from its source). Clone it with its submodules and
+Python 3.10 or newer, CMake 3.20 or newer, a C11 / C++17 compiler and SDL 3.2 or newer (on Windows its
+development package for Visual C++ unpacked in `build/downloads/sdl3/`; elsewhere the system's, `libsdl3-dev` on
+Debian 13 and Ubuntu 25.04 on; or `-DORUNNERS_STATIC_SDL=ON` to build SDL 3.4.20 from its source, as the packages
+do). Clone it with its submodules and
 build it:
 
 ```bash
@@ -141,6 +146,6 @@ decompilation itself (its status, the tools, the assets' formats, the checks aga
   `ymfm/LICENSE` beside it.
 - NETWORK's rooms and datagrams are [arcade-lan](https://github.com/cheviman/arcade-lan) (`lan/`, a submodule),
   BSD 3-Clause, whose terms are in `lan/LICENSE`.
-- The window port links SDL2 (zlib License); the packages carry it inside the executable, with its terms and the
+- The window port links SDL 3 (zlib License); the packages carry it inside the executable, with its terms and the
   ones above in `licenses/`.
 - OutRunners is a trademark of SEGA. This project is not affiliated with or endorsed by SEGA.

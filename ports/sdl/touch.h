@@ -12,7 +12,7 @@
 #ifndef ORUNNERS_PORT_TOUCH_H
 #define ORUNNERS_PORT_TOUCH_H
 
-#include <SDL.h>
+#include "port_sdl.h"
 #include <stdbool.h>
 #include <stdint.h>
 

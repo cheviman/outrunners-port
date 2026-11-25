@@ -44,7 +44,7 @@ More: github.com/cheviman/outrunners-port/blob/main/ports/android/README.md
 Licenses
 --------
 LICENSE.txt is the project's (BSD-3-Clause). licenses/ holds MAME's and ymfm's (the board's video and
-sound follow their behavior and tables), arcade-lan's (BSD-3-Clause: NETWORK's rooms and datagrams), SDL2's
+sound follow their behavior and tables), arcade-lan's (BSD-3-Clause: NETWORK's rooms and datagrams), SDL's
 (zlib) and Kenney's (CC0: the letters, the controls' pictures).
 
 OutRunners is a trademark of SEGA, and Android one of Google. This project is not affiliated with or

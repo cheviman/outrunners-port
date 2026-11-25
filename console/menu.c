@@ -99,7 +99,7 @@ enum { OPTIONS_CONTROLS, OPTIONS_DIFFICULTY, OPTIONS_TIME, OPTIONS_VIDEO, OPTION
 enum { NETWORK_HOST, NETWORK_JOIN, NETWORK_NAME, NETWORK_PLAYERS, NETWORK_BACK };
 
 /* The lines a build shows of the title's menu and of OPTIONS: a computer's, all of them. A game device's
-   (ORUNNERS_HANDHELD) has no VIDEO, its picture fixed (ports/sdl2/main.c); nor CONTROLS where its controls are
+   (ORUNNERS_HANDHELD) has no VIDEO, its picture fixed (ports/sdl/main.c); nor CONTROLS where its controls are
    fixed (the Switch's), but where they may need putting right (ORUNNERS_CONTROLS_PAGE: a handheld's own
    buttons); nor 2 PLAYERS but where a second player has a controller of their own (ORUNNERS_TWO_PLAYERS: the
    Switch's, side by side) or the port offers it (console_offer_two_players: a tablet's screen, the two facing
@@ -581,7 +581,7 @@ static void force_value(char *value, size_t size, int percent)
 }
 
 /* STEERING: the sticks' dead zone and sensitivity, a racing wheel's rotation and centring, the keys' and pads'
-   speed, the wheel motor's vibration (ports/sdl2/main.c, forces.c) */
+   speed, the wheel motor's vibration (ports/sdl/main.c, forces.c) */
 static void steering_frame(uint32_t pressed)
 {
 	console_window *window = &console_window_settings;

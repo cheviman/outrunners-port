@@ -25,9 +25,20 @@ foreach(config IN ITEMS "" _DEBUG _RELEASE _RELWITHDEBINFO _MINSIZEREL)
 	set(CMAKE_RUNTIME_OUTPUT_DIRECTORY${config} ${ORUNNERS_BIN_DIR})
 endforeach()
 
-# The packages a player downloads (.github/workflows/build.yml) carry SDL2 inside the window port, built
-# from its own source
-option(ORUNNERS_STATIC_SDL2 "Build SDL2 from its source into the executables" OFF)
+# SDL: the window port is written for SDL 3, one version on every platform that has it (Sebas, 19-11-2026:
+# "pasarlo a sdl3 o el mas reciente que sirva con todo"; issue 47): its release's source archive by its hash,
+# the one already in build/downloads/sdl3-source where it is there
+set(ORUNNERS_SDL_VERSION 3.4.20)
+set(ORUNNERS_SDL_SHA256 f3bb06f55bed9557227a700af2ea62e49497ebdf58037732a731a5fb3ef8581f)
+set(ORUNNERS_SDL_ARCHIVE SDL3-${ORUNNERS_SDL_VERSION}.tar.gz)
+set(ORUNNERS_SDL_URL
+	https://github.com/libsdl-org/SDL/releases/download/release-${ORUNNERS_SDL_VERSION}/${ORUNNERS_SDL_ARCHIVE})
+if(EXISTS ${CMAKE_SOURCE_DIR}/build/downloads/sdl3-source/${ORUNNERS_SDL_ARCHIVE})
+	set(ORUNNERS_SDL_URL ${CMAKE_SOURCE_DIR}/build/downloads/sdl3-source/${ORUNNERS_SDL_ARCHIVE})
+endif()
+# The packages a player downloads (.github/workflows/build.yml) carry SDL inside the window port, built from
+# its own source: the package is the executable alone, no library beside it
+option(ORUNNERS_STATIC_SDL "Build SDL from its source into the executables" OFF)
 
 # A development aid: everything built with AddressSanitizer, which stops the game at a read past a piece of
 # its assets (each piece is a block of its own, runtime/src/assets.c: the code reads a table only inside it)
@@ -75,11 +86,11 @@ endif()
 if(MSVC)
 	add_compile_options(/W3 /utf-8)
 	add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
-	# with ORUNNERS_STATIC_SDL2 the C runtime goes inside the executables too: they need no Visual C++
+	# with ORUNNERS_STATIC_SDL the C runtime goes inside the executables too: they need no Visual C++
 	# redistributable on the player's machine
-	if(ORUNNERS_STATIC_SDL2)
+	if(ORUNNERS_STATIC_SDL)
 		set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-		set(CMAKE_POLICY_DEFAULT_CMP0091 NEW)    # (SDL2's targets too)
+		set(CMAKE_POLICY_DEFAULT_CMP0091 NEW)    # (SDL's targets too)
 	endif()
 endif()
 
@@ -109,6 +120,11 @@ endif()
 set(ORUNNERS_SWITCH OFF)
 if(NINTENDO_SWITCH OR CMAKE_SYSTEM_NAME STREQUAL "NintendoSwitch")
 	set(ORUNNERS_SWITCH ON)
+endif()
+# (iOS and iPadOS: Xcode's toolchain, through CMake's Xcode generator, ports/ios/ios.cmake)
+set(ORUNNERS_IOS OFF)
+if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+	set(ORUNNERS_IOS ON)
 endif()
 if(UNIX AND NOT ORUNNERS_SWITCH)
 	find_package(Threads REQUIRED)
@@ -213,7 +229,12 @@ if(ORUNNERS_DECOMPILED AND ORUNNERS_SOUND_DECOMPILED)
 		${ORUNNERS_DECOMPILED} ${ORUNNERS_CONSOLE_SOURCES})
 	target_include_directories(orunners_game_console PUBLIC runtime/include ${ORUNNERS_DECOMPILED_DIR} console)
 	target_compile_definitions(orunners_game_console PUBLIC ORUNNERS_CONSOLE ORUNNERS_VERSION="${PROJECT_VERSION}")
-	# (NETWORK: arcade-lan's linked game, a repository of its own in lan/, its sockets with it)
+	# (NETWORK: arcade-lan's linked game, a repository of its own in lan/, its sockets with it; on iOS, which gives
+	# an app no broadcasts without Apple's multicast entitlement, the rooms found by datagrams to each address of the
+	# local network instead)
+	if(ORUNNERS_IOS)
+		set(ARCADE_LAN_NO_BROADCAST ON CACHE BOOL "" FORCE)
+	endif()
 	add_subdirectory(lan ${CMAKE_BINARY_DIR}/arcade_lan)
 	target_link_libraries(orunners_game_console PUBLIC s32runtime arcade_lan)
 	if(MSVC)
@@ -226,9 +247,9 @@ if(ORUNNERS_DECOMPILED AND ORUNNERS_SOUND_DECOMPILED)
 
 	# The Switch's .nsp, made on the player's computer (ports/switch/nsp): the game's Switch build (main,
 	# main.npdm, control.nacp, icon.jpg), the assets pack of the player's ROM set (the first run's steps, the
-	# console game's loader) and the keys of the player's console. A command line; with SDL2 also a window
+	# console game's loader) and the keys of the player's console. A command line; with SDL also a window
 	# (below, with the game's window)
-	if(NOT ORUNNERS_SWITCH AND NOT ORUNNERS_ANBERNIC AND NOT ANDROID)
+	if(NOT ORUNNERS_SWITCH AND NOT ORUNNERS_ANBERNIC AND NOT ANDROID AND NOT ORUNNERS_IOS)
 		add_executable(orunners_nsp ports/switch/nsp/main.c ports/switch/nsp/make_nsp.c ports/switch/nsp/formats.c
 			ports/switch/nsp/crypto.c ports/switch/nsp/rom_pack.c)
 		target_link_libraries(orunners_nsp PRIVATE orunners_game_console orunners_sound orunners_extract)
@@ -236,7 +257,7 @@ if(ORUNNERS_DECOMPILED AND ORUNNERS_SOUND_DECOMPILED)
 
 		# Anbernic's PORTS, made on the player's computer (ports/anbernic/maker): the game's Anbernic build
 		# (build/bin/anbernic) and the assets pack of the player's ROM set, as OutRunners NSP makes it
-		# (rom_pack.c). A command line; with SDL2 also a window (below). OutRunners R36S is the same tool for the
+		# (rom_pack.c). A command line; with SDL also a window (below). OutRunners R36S is the same tool for the
 		# R36S's ports on ArkOS (ORUNNERS_R36S_MAKER: the game's R36S build, build/bin/r36s, ports/r36s)
 		foreach(maker orunners_anbernic_maker orunners_r36s_maker)
 			add_executable(${maker} ports/anbernic/maker/main.c ports/anbernic/maker/make_ports.c
@@ -250,7 +271,7 @@ if(ORUNNERS_DECOMPILED AND ORUNNERS_SOUND_DECOMPILED)
 
 		# Android's APK, made on the player's computer (ports/android/apk): the game's Android build
 		# (android/outrunners-base.apk) with the assets pack of the player's ROM set (rom_pack.c), signed with
-		# the player's own key; its SHA-256 is OutRunners NSP's (crypto.c). A command line; with SDL2 also a
+		# the player's own key; its SHA-256 is OutRunners NSP's (crypto.c). A command line; with SDL also a
 		# window (below)
 		add_executable(orunners_apk_maker ports/android/apk/main.c ports/android/apk/make_apk.c ports/android/apk/zip.c
 			ports/android/apk/sign.c ports/android/apk/key.c ports/android/apk/ecdsa.c ports/switch/nsp/crypto.c
@@ -264,85 +285,83 @@ if(ORUNNERS_DECOMPILED AND ORUNNERS_SOUND_DECOMPILED)
 	endif()
 
 	# The devices' builds, each with its toolchain: the Nintendo Switch (devkitPro's: its .nro and its .nsp's
-	# pieces, ports/switch), Android (the NDK's: libmain.so in its APKs, ports/android) and Anbernic's H700
-	# handhelds (ports/anbernic)
+	# pieces, ports/switch), Android (the NDK's: libmain.so in its APKs, ports/android), iOS and iPadOS (Xcode's:
+	# the app and its .ipa, ports/ios) and Anbernic's H700 handhelds (ports/anbernic)
 	option(ORUNNERS_ANBERNIC "Build the game for Anbernic's H700 handhelds" OFF)
 	option(ORUNNERS_R36S "With ORUNNERS_ANBERNIC: the build for the R36S and its RK3326 kin on ArkOS (ports/r36s)" OFF)
 	if(ORUNNERS_SWITCH)
 		include(${CMAKE_SOURCE_DIR}/ports/switch/switch.cmake)
 	elseif(ANDROID)
 		include(${CMAKE_SOURCE_DIR}/ports/android/android.cmake)
+	elseif(ORUNNERS_IOS)
+		include(${CMAKE_SOURCE_DIR}/ports/ios/ios.cmake)
 	elseif(ORUNNERS_ANBERNIC)
 		include(${CMAKE_SOURCE_DIR}/ports/anbernic/anbernic.cmake)
 	endif()
 
-	# The game in a window (ports/sdl2): SDL2 from the system, or on Windows the development package
-	# unpacked in build/downloads/sdl2 (SDL2_DIR picks another), a library beside the executable; or, with
-	# ORUNNERS_STATIC_SDL2, SDL2 built from its own source into the executable
-	if(ORUNNERS_ANBERNIC OR ORUNNERS_SWITCH OR ANDROID)
-		set(SDL2_FOUND FALSE)    # (the device's own build above: no computer's window ports)
-	elseif(ORUNNERS_STATIC_SDL2)
+	# The game in a window (ports/sdl): SDL 3 from the system, or on Windows the development package
+	# unpacked in build/downloads/sdl3 (SDL3_DIR picks another), a library beside the executable; or, with
+	# ORUNNERS_STATIC_SDL, SDL 3 built from its own source into the executable
+	if(ORUNNERS_ANBERNIC OR ORUNNERS_SWITCH OR ANDROID OR ORUNNERS_IOS)
+		set(SDL3_FOUND FALSE)    # (the device's own build above: no computer's window ports)
+	elseif(ORUNNERS_STATIC_SDL)
 		include(FetchContent)
-		FetchContent_Declare(SDL2 GIT_REPOSITORY https://github.com/libsdl-org/SDL.git GIT_TAG release-2.32.10
-			GIT_SHALLOW TRUE)
+		FetchContent_Declare(SDL3 URL ${ORUNNERS_SDL_URL} URL_HASH SHA256=${ORUNNERS_SDL_SHA256})
 		set(SDL_SHARED OFF CACHE BOOL "" FORCE)
 		set(SDL_STATIC ON CACHE BOOL "" FORCE)
-		set(SDL_TEST OFF CACHE BOOL "" FORCE)
-		set(SDL_FORCE_STATIC_VCRT ON CACHE BOOL "" FORCE)    # (MSVC: the C runtime inside, as the game's)
-		FetchContent_MakeAvailable(SDL2)
-		set(ORUNNERS_SDL2 SDL2::SDL2-static)
-		set(SDL2_FOUND TRUE)
+		set(SDL_TEST_LIBRARY OFF CACHE BOOL "" FORCE)
+		# (MSVC: the C runtime inside, as the game's, by CMAKE_MSVC_RUNTIME_LIBRARY above)
+		FetchContent_MakeAvailable(SDL3)
+		set(ORUNNERS_SDL SDL3::SDL3-static)
+		set(SDL3_FOUND TRUE)
 	else()
-		set(ORUNNERS_SDL2_UNPACKED "")
+		set(ORUNNERS_SDL_UNPACKED "")
 		if(WIN32)    # (the VC package: its libraries are Windows' only, a source tree shared with WSL has it)
-			file(GLOB ORUNNERS_SDL2_UNPACKED ${CMAKE_SOURCE_DIR}/build/downloads/sdl2/SDL2-*/cmake)
+			file(GLOB ORUNNERS_SDL_UNPACKED ${CMAKE_SOURCE_DIR}/build/downloads/sdl3/SDL3-*/cmake)
 		endif()
-		find_package(SDL2 CONFIG QUIET HINTS ${ORUNNERS_SDL2_UNPACKED})
-		set(ORUNNERS_SDL2 SDL2::SDL2)
+		find_package(SDL3 CONFIG QUIET HINTS ${ORUNNERS_SDL_UNPACKED})
+		set(ORUNNERS_SDL SDL3::SDL3)
 	endif()
-	if(TARGET SDL2::SDL2main)
-		list(APPEND ORUNNERS_SDL2 SDL2::SDL2main)
-	endif()
-	if(SDL2_FOUND)
+	if(SDL3_FOUND)
 		# (an .app on macOS: SDL_GetBasePath is its Resources folder): the arcade game, "OutRunners Arcade" its
 		# executable, .app and window, and the console one beside it, OutRunners. Both make their assets on
-		# their first run from the player's ROM set (ports/sdl2/first_run.c), its window written with Kenney
+		# their first run from the player's ROM set (ports/sdl/first_run.c), its window written with Kenney
 		# Mini (CC0), a picture beside them, in the .app's Resources on macOS
-		add_executable(orunners WIN32 MACOSX_BUNDLE ports/sdl2/main.c ports/sdl2/forces.c ports/sdl2/first_run.c
-			ports/sdl2/letters.c ports/sdl2/font/font.bmp)
-		target_link_libraries(orunners PRIVATE orunners_game orunners_sound orunners_extract ${ORUNNERS_SDL2})
+		add_executable(orunners WIN32 MACOSX_BUNDLE ports/sdl/main.c ports/sdl/forces.c ports/sdl/first_run.c
+			ports/sdl/letters.c ports/sdl/font/font.bmp)
+		target_link_libraries(orunners PRIVATE orunners_game orunners_sound orunners_extract ${ORUNNERS_SDL})
 		set_target_properties(orunners PROPERTIES OUTPUT_NAME "OutRunners Arcade"
 			MACOSX_BUNDLE_BUNDLE_NAME "OutRunners Arcade" MACOSX_BUNDLE_GUI_IDENTIFIER io.github.cheviman.outrunners-arcade)
 		# (OutRunners draws its CONTROLS page's keys and buttons with Kenney's Input Prompts Pixel, a picture
 		# beside it, in the .app's Resources on macOS)
-		add_executable(outrunners WIN32 MACOSX_BUNDLE ports/sdl2/main.c ports/sdl2/forces.c ports/sdl2/controls.c
-			ports/sdl2/wheel_setup.c ports/sdl2/wheel_extras.c ports/sdl2/first_run.c ports/sdl2/letters.c
-			ports/sdl2/prompts/input_prompts.bmp ports/sdl2/font/font.bmp)
-		target_link_libraries(outrunners PRIVATE orunners_game_console orunners_sound orunners_extract ${ORUNNERS_SDL2})
+		add_executable(outrunners WIN32 MACOSX_BUNDLE ports/sdl/main.c ports/sdl/forces.c ports/sdl/controls.c
+			ports/sdl/wheel_setup.c ports/sdl/wheel_extras.c ports/sdl/first_run.c ports/sdl/letters.c
+			ports/sdl/prompts/input_prompts.bmp ports/sdl/font/font.bmp)
+		target_link_libraries(outrunners PRIVATE orunners_game_console orunners_sound orunners_extract ${ORUNNERS_SDL})
 		# a development aid: OutRunners with Android's touch controls, the mouse a finger, to look at them in a
 		# window of any shape
 		option(ORUNNERS_TOUCH_TEST "Build OutRunners with Android's touch controls, the mouse as a finger" OFF)
 		if(ORUNNERS_TOUCH_TEST)
-			target_sources(outrunners PRIVATE ports/sdl2/touch.c)
+			target_sources(outrunners PRIVATE ports/sdl/touch.c)
 			target_compile_definitions(outrunners PRIVATE ORUNNERS_TOUCH ORUNNERS_TOUCH_TEST)
 		endif()
 		set_target_properties(outrunners PROPERTIES OUTPUT_NAME "OutRunners"
 			MACOSX_BUNDLE_BUNDLE_NAME "OutRunners" MACOSX_BUNDLE_GUI_IDENTIFIER io.github.cheviman.outrunners)
-		set_source_files_properties(ports/sdl2/prompts/input_prompts.bmp ports/sdl2/font/font.bmp PROPERTIES
+		set_source_files_properties(ports/sdl/prompts/input_prompts.bmp ports/sdl/font/font.bmp PROPERTIES
 			MACOSX_PACKAGE_LOCATION Resources)
 		if(NOT APPLE)
 			add_custom_command(TARGET outrunners POST_BUILD
-				COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_SOURCE_DIR}/ports/sdl2/prompts/input_prompts.bmp
+				COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_SOURCE_DIR}/ports/sdl/prompts/input_prompts.bmp
 					$<TARGET_FILE_DIR:outrunners>
-				COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_SOURCE_DIR}/ports/sdl2/font/font.bmp
+				COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_SOURCE_DIR}/ports/sdl/font/font.bmp
 					$<TARGET_FILE_DIR:outrunners>)
 			add_custom_command(TARGET orunners POST_BUILD
-				COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_SOURCE_DIR}/ports/sdl2/font/font.bmp
+				COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_SOURCE_DIR}/ports/sdl/font/font.bmp
 					$<TARGET_FILE_DIR:orunners>)
 		endif()
-		if(WIN32 AND NOT ORUNNERS_STATIC_SDL2)
+		if(WIN32 AND NOT ORUNNERS_STATIC_SDL)
 			add_custom_command(TARGET orunners POST_BUILD
-				COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:SDL2::SDL2> $<TARGET_FILE_DIR:orunners>)
+				COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:SDL3::SDL3> $<TARGET_FILE_DIR:orunners>)
 		endif()
 
 		# the executables' icon (tools/make_icon.py): a resource on Windows (which SDL gives the window too),
@@ -354,7 +373,7 @@ if(ORUNNERS_DECOMPILED AND ORUNNERS_SOUND_DECOMPILED)
 		if(NOT ORUNNERS_PC_PICTURE AND EXISTS ${CMAKE_SOURCE_DIR}/local/icon_pc.png)
 			set(ORUNNERS_PC_PICTURE ${CMAKE_SOURCE_DIR}/local/icon_pc.png)
 		endif()
-		set(ORUNNERS_ICON_RC ${CMAKE_SOURCE_DIR}/ports/sdl2/icon/outrunners.rc)
+		set(ORUNNERS_ICON_RC ${CMAKE_SOURCE_DIR}/ports/sdl/icon/outrunners.rc)
 		if(WIN32 AND ORUNNERS_PC_PICTURE AND Python3_FOUND)
 			# (made as CMake configures, once for both: again when the picture changes)
 			set(ORUNNERS_OWN_ICON ${CMAKE_BINARY_DIR}/icon)
@@ -371,33 +390,32 @@ if(ORUNNERS_DECOMPILED AND ORUNNERS_SOUND_DECOMPILED)
 			if(WIN32)
 				target_sources(${game} PRIVATE ${ORUNNERS_ICON_RC})
 			elseif(APPLE)
-				target_sources(${game} PRIVATE ports/sdl2/icon/outrunners.icns)
+				target_sources(${game} PRIVATE ports/sdl/icon/outrunners.icns)
 				set_target_properties(${game} PROPERTIES MACOSX_BUNDLE_ICON_FILE outrunners.icns)
 			else()
 				add_custom_command(TARGET ${game} POST_BUILD
-					COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_SOURCE_DIR}/ports/sdl2/icon/outrunners.png
+					COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_SOURCE_DIR}/ports/sdl/icon/outrunners.png
 						$<TARGET_FILE_DIR:${game}>)
 			endif()
 		endforeach()
 		if(APPLE)
-			set_source_files_properties(ports/sdl2/icon/outrunners.icns PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+			set_source_files_properties(ports/sdl/icon/outrunners.icns PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
 		endif()
 
 		# OutRunners NSP's window (ports/switch/nsp/window.c), when it is started with nothing: still a console
-		# program, with its own main (SDL2 without SDL2main); the folder dialog is COM's on Windows. Its
-		# letters (Kenney Mini, font.bmp) beside it, as SDL2's library is
-		list(GET ORUNNERS_SDL2 0 ORUNNERS_SDL2_LIBRARY)
+		# program, with its own main (SDL_MAIN_HANDLED); the folder dialog is COM's on Windows. Its
+		# letters (Kenney Mini, font.bmp) beside it, as SDL's library is
 		target_sources(orunners_nsp PRIVATE ports/switch/nsp/window.c ports/switch/nsp/folder_dialog.c
-			ports/sdl2/letters.c)
-		target_include_directories(orunners_nsp PRIVATE ports/sdl2)
+			ports/sdl/letters.c)
+		target_include_directories(orunners_nsp PRIVATE ports/sdl)
 		target_compile_definitions(orunners_nsp PRIVATE ORUNNERS_NSP_WINDOW)
-		target_link_libraries(orunners_nsp PRIVATE ${ORUNNERS_SDL2_LIBRARY})
+		target_link_libraries(orunners_nsp PRIVATE ${ORUNNERS_SDL})
 		if(WIN32)
 			target_link_libraries(orunners_nsp PRIVATE ole32 shell32 uuid)
 		endif()
 		if(NOT APPLE)
 			add_custom_command(TARGET orunners_nsp POST_BUILD
-				COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_SOURCE_DIR}/ports/sdl2/font/font.bmp
+				COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_SOURCE_DIR}/ports/sdl/font/font.bmp
 					$<TARGET_FILE_DIR:orunners_nsp>)
 		endif()
 
@@ -405,10 +423,10 @@ if(ORUNNERS_DECOMPILED AND ORUNNERS_SOUND_DECOMPILED)
 		# its folder dialog (with a title of its own) and its letters, font.bmp beside it
 		foreach(maker orunners_anbernic_maker orunners_r36s_maker)
 			target_sources(${maker} PRIVATE ports/anbernic/maker/window.c ports/switch/nsp/folder_dialog.c
-				ports/sdl2/letters.c)
-			target_include_directories(${maker} PRIVATE ports/sdl2)
+				ports/sdl/letters.c)
+			target_include_directories(${maker} PRIVATE ports/sdl)
 			target_compile_definitions(${maker} PRIVATE ORUNNERS_ANBERNIC_WINDOW)
-			target_link_libraries(${maker} PRIVATE ${ORUNNERS_SDL2_LIBRARY})
+			target_link_libraries(${maker} PRIVATE ${ORUNNERS_SDL})
 			if(WIN32)
 				target_link_libraries(${maker} PRIVATE ole32 shell32 uuid)
 			endif()
@@ -421,16 +439,16 @@ if(ORUNNERS_DECOMPILED AND ORUNNERS_SOUND_DECOMPILED)
 		# OutRunners APK's window (ports/android/apk/window.c), as OutRunners NSP's: its folder dialog (with a
 		# title of its own) and its letters, font.bmp beside it
 		target_sources(orunners_apk_maker PRIVATE ports/android/apk/window.c ports/switch/nsp/folder_dialog.c
-			ports/sdl2/letters.c)
-		target_include_directories(orunners_apk_maker PRIVATE ports/sdl2)
+			ports/sdl/letters.c)
+		target_include_directories(orunners_apk_maker PRIVATE ports/sdl)
 		target_compile_definitions(orunners_apk_maker PRIVATE ORUNNERS_APK_WINDOW
 			[[FOLDER_TITLE="The folder for OutRunners.apk"]])
-		target_link_libraries(orunners_apk_maker PRIVATE ${ORUNNERS_SDL2_LIBRARY})
+		target_link_libraries(orunners_apk_maker PRIVATE ${ORUNNERS_SDL})
 		if(WIN32)
 			target_link_libraries(orunners_apk_maker PRIVATE ole32 shell32 uuid)
 		endif()
 	else()
-		message(STATUS "No SDL2: the window ports (OutRunners, OutRunners Arcade) are not built")
+		message(STATUS "No SDL 3: the window ports (OutRunners, OutRunners Arcade) are not built")
 	endif()
 else()
 	message(STATUS "No game C in ${ORUNNERS_DECOMPILED_DIR}")

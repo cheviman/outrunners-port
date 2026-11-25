@@ -18,7 +18,7 @@
 
 #include "game/extract.h"
 
-#include <SDL.h>
+#include "port_sdl.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -99,7 +99,7 @@ static void draw_window(SDL_Renderer *renderer, const letters *font, const char 
    the game is beside the .app); 0 elsewhere */
 static int app_folder(const char *base, char *folder, size_t size)
 {
-#ifdef __APPLE__
+#ifdef SDL_PLATFORM_APPLE
 	static const char inside[] = ".app/Contents/Resources/";
 	const size_t length = base ? strlen(base) : 0, tail = sizeof(inside) - 1;
 	size_t end;
@@ -121,11 +121,11 @@ static int app_folder(const char *base, char *folder, size_t size)
 
 static int exists(const char *path)
 {
-	SDL_RWops *probe = SDL_RWFromFile(path, "rb");
+	SDL_IOStream *probe = SDL_IOFromFile(path, "rb");
 
 	if (!probe)
 		return 0;
-	SDL_RWclose(probe);
+	SDL_CloseIO(probe);
 	return 1;
 }
 
@@ -186,8 +186,8 @@ int first_run(const char *title, const char *base, const char *saves, const char
 		|| (app_folder(base, beside_app, sizeof(beside_app)) && extracted_from(beside_app, folder, problem, sizeof(problem)))
 		|| ((!base || !saves || strcmp(base, saves) != 0) && extracted_from(saves, folder, problem, sizeof(problem))))
 		return 1;
-	window = SDL_CreateWindow(title, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WINDOW_WIDTH, WINDOW_HEIGHT, 0);
-	renderer = window ? SDL_CreateRenderer(window, -1, 0) : NULL;
+	window = SDL_CreateWindow(title, WINDOW_WIDTH, WINDOW_HEIGHT, 0);
+	renderer = window ? SDL_CreateRenderer(window, NULL) : NULL;
 	if (!renderer || !letters_load(renderer, base, &font))
 	{
 		char message[600];
@@ -202,7 +202,7 @@ int first_run(const char *title, const char *base, const char *saves, const char
 		SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, title, message, NULL);
 		return 0;
 	}
-	SDL_EventState(SDL_DROPFILE, SDL_ENABLE);
+	SDL_SetEventEnabled(SDL_EVENT_DROP_FILE, true);
 	draw_window(renderer, &font, title, problem, 0);
 	while (running && !done)
 	{
@@ -210,15 +210,14 @@ int first_run(const char *title, const char *base, const char *saves, const char
 
 		if (!SDL_WaitEvent(&event))
 			break;
-		if (event.type == SDL_QUIT)
+		if (event.type == SDL_EVENT_QUIT)
 			running = 0;
-		else if (event.type == SDL_DROPFILE)
+		else if (event.type == SDL_EVENT_DROP_FILE)
 		{
 			const char *failed;
 
 			draw_window(renderer, &font, title, NULL, 1);
-			failed = game_assets_extract(event.drop.file, folder);
-			SDL_free(event.drop.file);
+			failed = game_assets_extract(event.drop.data, folder);    /* (SDL's own: not freed) */
 			if (!failed)
 				done = 1;
 			else
@@ -227,7 +226,7 @@ int first_run(const char *title, const char *base, const char *saves, const char
 				draw_window(renderer, &font, title, problem, 0);
 			}
 		}
-		else if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_EXPOSED)
+		else if (event.type == SDL_EVENT_WINDOW_EXPOSED)
 			draw_window(renderer, &font, title, problem, 0);
 	}
 	letters_free(&font);

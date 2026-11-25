@@ -74,6 +74,8 @@
 #ifndef ORUNNERS_HANDHELD    /* (a device makes nothing from the ROM set: its pack comes with the game) */
 #include "first_run.h"
 #include "game/extract.h"
+#elif defined(ORUNNERS_IOS)  /* (but iOS, whose package carries none: the player's orunners.zip, ios_assets) */
+#include "game/extract.h"
 #endif
 #include "s32/workers.h"
 #include "forces.h"
@@ -90,7 +92,10 @@
 #include "wheel_extras.h"
 #endif
 
-#include <SDL.h>
+#include "port_sdl.h"           /* SDL 3; or its names over a device's own SDL 2 (sdl2_layer.h) */
+#ifndef ORUNNERS_SDL2_LAYER
+#include <SDL3/SDL_main.h>      /* (the program's start as each platform has it: WinMain, Android's activity) */
+#endif
 
 #ifdef __SWITCH__
 #include <switch.h>        /* romfsInit: the game's own files, its .nro's or .nsp's */
@@ -147,7 +152,7 @@ static void android_multicast_lock(bool wanted);
 #ifdef __SWITCH__
 #define VIDEO_WORKERS       2          /* the video's rows on cores 1 and 2 (the game's is 0; 3 is the system's) */
 #else
-#define VIDEO_WORKERS       SDL_min(SDL_GetCPUCount() - 1, 3)    /* up to three more cores (a handheld's four) */
+#define VIDEO_WORKERS       SDL_min(SDL_GetNumLogicalCPUCores() - 1, 3)    /* up to three more cores (a handheld's four) */
 #endif
 #ifdef ORUNNERS_HANDHELD_KEYS
 #ifndef HANDHELD_MENU_BUTTON
@@ -164,7 +169,7 @@ static void android_multicast_lock(bool wanted);
 #endif
 #if defined(ORUNNERS_HANDHELD)
 #define VSYNC               false      /* (a device's screen as its SDL shows it: Anbernic's 2.0.12 has no
-                                          SDL_RenderSetVSync) */
+                                          SDL_SetRenderVSync) */
 #elif defined(ORUNNERS_CONSOLE)
 #define VSYNC               console_window_settings.vsync    /* OPTIONS > VIDEO's */
 #else
@@ -180,9 +185,11 @@ static void android_multicast_lock(bool wanted);
 static SDL_Window *window;
 static SDL_Renderer *renderer;
 static SDL_Texture *texture;
-static SDL_AudioDeviceID audio;
-static SDL_GameController *controllers[PLAYERS];
-static bool smooth;
+static SDL_AudioStream *audio;    /* the sound's stream, on the default device */
+static SDL_Gamepad *controllers[PLAYERS];
+#ifndef ORUNNERS_CONSOLE
+static bool smooth;                   /* the arcade's F3: smooth pixels (the console's are OPTIONS > VIDEO's) */
+#endif
 static uint64_t next_frame;           /* performance counter value the next frame waits for */
 static bool vsync_on;                 /* the renderer shows each frame at the screen's refresh (apply_vsync) */
 static char eeprom_path[1024];
@@ -298,6 +305,53 @@ static int screens_shown(void)
 #endif
 }
 
+#ifdef SDL_PLATFORM_IOS
+/* ---- iOS and iPadOS (ports/ios, as TMNT's port's) ---- */
+
+static bool ios_background;    /* the app gone to the background (ios_app_events): nothing drawn there */
+
+/* The app's Documents folder, which the Files app shows as the app's own (Info.plist's UIFileSharingEnabled and
+   LSSupportsOpeningDocumentsInPlace): where the player puts orunners.zip, and the folder of what the game keeps
+   and of its log. HOME is the app's own container on iOS. The caller frees it (SDL_free) */
+static char *ios_documents(void)
+{
+	const char *home = getenv("HOME");
+	const size_t length = (home ? strlen(home) : 0) + sizeof("/Documents/");
+	char *folder = SDL_malloc(length);
+
+	if (folder)
+		snprintf(folder, length, "%s/Documents/", home ? home : "");
+	return folder;
+}
+
+/* The app going to the background and coming back, as SDL sends them (an event watch: at once, before the frame's
+   events are read, as iOS may give the app no more time): from SDL_EVENT_WILL_ENTER_BACKGROUND to
+   SDL_EVENT_DID_ENTER_FOREGROUND nothing is drawn (present), an app's GPU work being refused there */
+static bool ios_app_events(void *data, SDL_Event *event)
+{
+	(void)data;
+	if (event->type == SDL_EVENT_WILL_ENTER_BACKGROUND)
+		ios_background = true;
+	else if (event->type == SDL_EVENT_DID_ENTER_FOREGROUND)
+		ios_background = false;
+	return true;
+}
+
+/* The width of each of the screen's sides the notch or the Dynamic Island takes in landscape (the window's safe
+   area, SDL's: the larger of its left and right), in the renderer's pixels for a screen 'out_width' of them wide:
+   the picture stays between them, and WIDE is chosen for the width between them (present). 0 where none is known */
+static int ios_side_inset(int out_width)
+{
+	SDL_Rect safe;
+	int points = 0, points_high = 0;
+
+	if (!window || !SDL_GetWindowSize(window, &points, &points_high) || points <= 0
+		|| !SDL_GetWindowSafeArea(window, &safe))
+		return 0;
+	return (int)(SDL_max(safe.x, points - (safe.x + safe.w)) * (double)out_width / points + 0.5);
+}
+#endif
+
 #ifdef ORUNNERS_TOUCH
 #define TABLET_SIDE_INCHES 4.0    /* a tablet's screen (an open Fold's too): its short side at least this long */
 
@@ -306,12 +360,20 @@ static bool tablet;               /* the screen is a tablet's: 2 PLAYERS there, 
 /* A tablet's screen, by its pixels and their density */
 static bool tablet_screen(int width, int height)
 {
-	float horizontal = 0.0f, vertical = 0.0f;
-	const int display = window ? SDL_GetWindowDisplayIndex(window) : 0;    /* (before the window, the first one's) */
+#ifdef SDL_PLATFORM_IOS
+	(void)width;
+	(void)height;
+	return SDL_IsTablet();    /* (an iPad) */
+#else
+	/* (Android's density, its dots an inch: SDL 3's content scale is it over 160, and has no SDL_GetDisplayDPI;
+	   before the window, the first display's) */
+	const float dots = 160.0f
+		* SDL_GetDisplayContentScale(window ? SDL_GetDisplayForWindow(window) : SDL_GetPrimaryDisplay());
 
-	if (SDL_GetDisplayDPI(display, NULL, &horizontal, &vertical) != 0 || horizontal <= 0.0f || vertical <= 0.0f)
+	if (dots <= 0.0f)
 		return false;
-	return SDL_min(width / horizontal, height / vertical) >= TABLET_SIDE_INCHES;
+	return SDL_min(width, height) / dots >= TABLET_SIDE_INCHES;
+#endif
 }
 #endif
 
@@ -367,7 +429,8 @@ static void picture_size(int *width, int *height)
 	*height = (screens_stacked() ? 2 : 1) * S32_VIDEO_HEIGHT;
 }
 
-#if defined(ORUNNERS_CONSOLE) && ((defined(ORUNNERS_SCREEN_WIDE) && defined(__ANDROID__)) || defined(ORUNNERS_TOUCH_TEST))
+#if defined(ORUNNERS_CONSOLE) && ((defined(ORUNNERS_SCREEN_WIDE) && (defined(__ANDROID__) || defined(SDL_PLATFORM_IOS))) \
+	|| defined(ORUNNERS_TOUCH_TEST))
 /* WIDE as the screen's shape asks, the window the whole screen: Android's (OPTIONS has no VIDEO there), and the
    touch controls' check on a computer, whose window is the phone's screen. The screen can change its shape
    mid-game, a Fold opened or closed (Sebas): WIDE is chosen again then, the picture's new width from the next
@@ -432,18 +495,18 @@ static void follow_screen(int width, int height)
    the window is on (the monitor's) */
 static void screen_shape(int *width, int *height)
 {
-	SDL_DisplayMode mode;
+	const SDL_DisplayMode *mode;
 
 	*width = *height = 0;
 	if (window && !(SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN)
-		&& SDL_GetDesktopDisplayMode(SDL_GetWindowDisplayIndex(window), &mode) == 0)
+		&& (mode = SDL_GetDesktopDisplayMode(SDL_GetDisplayForWindow(window))) != NULL)
 	{
-		*width = mode.w;
-		*height = mode.h;
+		*width = mode->w;
+		*height = mode->h;
 		return;
 	}
 	if (renderer)
-		SDL_GetRendererOutputSize(renderer, width, height);
+		SDL_GetCurrentRenderOutputSize(renderer, width, height);
 }
 
 /* WIDE AUTO's chosen again where the screen's shape changed (the log says so); the window sized again for it, as
@@ -464,6 +527,15 @@ static void follow_screen(void)
 		console_window_settings.changed = true;
 }
 #endif
+
+/* SDL 3 draws with float rectangles: 'rect' as one, in 'out' (NULL stays NULL: the whole) */
+static const SDL_FRect *float_rect(const SDL_Rect *rect, SDL_FRect *out)
+{
+	if (!rect)
+		return NULL;
+	SDL_RectToFRect(rect, out);
+	return out;
+}
 
 /* ---- the pixels: sharp, smooth ("sharp bilinear": a whole number of times with sharp pixels into 'scaled',
    then that softened the rest of the way, so only the pixels' edges blend), plain bilinear, or CRT (a
@@ -493,7 +565,7 @@ static void make_crt_overlay(int width, int height, int rows)
 	crt_width = width;
 	crt_height = height;
 	crt_rows = rows;
-	if (!crt_overlay || SDL_LockTexture(crt_overlay, NULL, (void **)&pixels, &pitch) != 0)
+	if (!crt_overlay || !SDL_LockTexture(crt_overlay, NULL, (void **)&pixels, &pitch))
 		return;
 	for (int y = 0; y < height; y++)
 	{
@@ -560,6 +632,7 @@ static void present_side_map(const SDL_Rect *room)
 {
 	const double scale = SDL_max((double)room->w / side_map_source.w, (double)room->h / side_map_source.h);
 	SDL_Rect part;
+	SDL_FRect from, to;
 	int car_x, car_y;
 
 	console_side_map_car(&car_x, &car_y);
@@ -567,7 +640,7 @@ static void present_side_map(const SDL_Rect *room)
 	part.h = SDL_min(side_map_source.h, (int)lround(room->h / scale));
 	part.x = side_map_source.x + SDL_clamp(car_x - part.w / 2, 0, side_map_source.w - part.w);
 	part.y = side_map_source.y + SDL_clamp(car_y - SIDE_MAP_CAR_HEIGHT / 2 - part.h / 2, 0, side_map_source.h - part.h);
-	SDL_RenderCopy(renderer, texture, &part, room);
+	SDL_RenderTexture(renderer, texture, float_rect(&part, &from), float_rect(room, &to));
 }
 #endif
 
@@ -589,7 +662,6 @@ static void count_fps(void)
 {
 	static uint64_t start;
 	static int frames;
-	static bool titled;
 	const uint64_t now = SDL_GetPerformanceCounter(), frequency = SDL_GetPerformanceFrequency();
 
 	if (!start)
@@ -600,6 +672,8 @@ static void count_fps(void)
 	start = now;
 	frames = 0;
 #ifndef ORUNNERS_HANDHELD
+	static bool titled;
+
 	if (console_window_settings.fps || titled)
 	{
 		char title[48];
@@ -614,7 +688,7 @@ static void count_fps(void)
 /* The frames a second at the top right of the picture 'shown', its letters the game's pixels, with a shadow */
 static void draw_fps(const SDL_Rect *shown)
 {
-	SDL_Rect cells[2][14 * 15];
+	SDL_FRect cells[2][14 * 15];
 	int count = 0;
 	char text[16];
 	const int pixel = SDL_max(1, shown->h / S32_VIDEO_HEIGHT);
@@ -632,7 +706,8 @@ static void draw_fps(const SDL_Rect *shown)
 			for (int column = 0; column < 3; column++)
 				if (rows[row] & (4 >> column))
 				{
-					cells[1][count] = (SDL_Rect){ x + column * pixel, shown->y + (4 + row) * pixel, pixel, pixel };
+					cells[1][count] = (SDL_FRect){ (float)(x + column * pixel), (float)(shown->y + (4 + row) * pixel),
+						(float)pixel, (float)pixel };
 					cells[0][count] = cells[1][count];
 					cells[0][count].x += pixel;
 					cells[0][count].y += pixel;
@@ -656,11 +731,11 @@ static void apply_vsync(void)
 
 	if (renderer && wanted != vsync_on)
 	{
-		SDL_DisplayMode mode;
+		const SDL_DisplayMode *mode;
 
-		vsync_on = SDL_RenderSetVSync(renderer, wanted ? 1 : 0) == 0 ? wanted : false;
-		if (vsync_on && SDL_GetCurrentDisplayMode(SDL_GetWindowDisplayIndex(window), &mode) == 0)
-			fprintf(stderr, "vsync: on, the screen at %d Hz\n", mode.refresh_rate);
+		vsync_on = SDL_SetRenderVSync(renderer, wanted ? 1 : 0) ? wanted : false;
+		if (vsync_on && (mode = SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(window))) != NULL)
+			fprintf(stderr, "vsync: on, the screen at %.2f Hz\n", mode->refresh_rate);
 	}
 #endif
 }
@@ -686,6 +761,7 @@ static void present(SDL_Rect source)
 {
 	const int kind = pixels_kind();
 	SDL_Rect shown[2], from[2];
+	SDL_FRect a, b;    /* (a rectangle of those as SDL 3 draws with it) */
 	int pictures = 1;
 	int out_width = 0, out_height = 0;
 	double scale;
@@ -694,13 +770,29 @@ static void present(SDL_Rect source)
 	bool map_room_there = false;
 #endif
 
-	SDL_GetRendererOutputSize(renderer, &out_width, &out_height);
-#ifdef WIDE_BY_SCREEN
+#ifdef SDL_PLATFORM_IOS
+	if (ios_background)
+		return;    /* (the app in the background: iOS refuses its GPU work there) */
+#endif
+	SDL_GetCurrentRenderOutputSize(renderer, &out_width, &out_height);
+#if defined(WIDE_BY_SCREEN) && defined(SDL_PLATFORM_IOS)
+	/* (WIDE for the screen between the sides the notch or the Dynamic Island takes) */
+	follow_screen(out_width - 2 * ios_side_inset(out_width), out_height);
+#elif defined(WIDE_BY_SCREEN)
 	follow_screen(out_width, out_height);    /* (a Fold opened or closed: its WIDE, from the next frame) */
 #elif defined(WIDE_AUTO_BY_SCREEN)
 	follow_screen();    /* (the window on another monitor, a Steam Deck docked: WIDE AUTO's, from the next frame) */
 #endif
 	scale = SDL_min((double)out_width / source.w, (double)out_height / source.h);
+#ifdef SDL_PLATFORM_IOS
+	{
+		/* (the picture between the notch's sides: as wide as fits there) */
+		const int room = out_width - 2 * ios_side_inset(out_width);
+
+		if (room > 0)
+			scale = SDL_min(scale, (double)room / source.w);
+	}
+#endif
 	shown[0].w = (int)(source.w * scale);
 	shown[0].h = (int)(source.h * scale);
 	shown[0].x = (out_width - shown[0].w) / 2;
@@ -725,7 +817,7 @@ static void present(SDL_Rect source)
 	}
 	console_side_map_wanted(map_room_there);    /* (and between them the route map, from the game's next frame) */
 #endif
-	SDL_SetTextureScaleMode(texture, kind == 2 ? SDL_ScaleModeLinear : SDL_ScaleModeNearest);
+	SDL_SetTextureScaleMode(texture, kind == 2 ? SDL_SCALEMODE_LINEAR : SDL_SCALEMODE_NEAREST);
 	SDL_RenderClear(renderer);
 	if (kind == 1 || kind == 3)
 	{
@@ -739,13 +831,16 @@ static void present(SDL_Rect source)
 			scaled = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET,
 				2 * S32_VIDEO_MAX_WIDTH * times, 2 * S32_VIDEO_HEIGHT * times);
 			if (scaled)
-				SDL_SetTextureScaleMode(scaled, SDL_ScaleModeLinear);
+			{
+				SDL_SetTextureScaleMode(scaled, SDL_SCALEMODE_LINEAR);
+				SDL_SetTextureBlendMode(scaled, SDL_BLENDMODE_NONE);    /* (the game's pixels have no alpha) */
+			}
 			scaled_times = times;
 		}
 		if (scaled)
 		{
 			SDL_SetRenderTarget(renderer, scaled);
-			SDL_RenderCopy(renderer, texture, &source, &whole);
+			SDL_RenderTexture(renderer, texture, float_rect(&source, &a), float_rect(&whole, &b));
 			SDL_SetRenderTarget(renderer, NULL);
 			SDL_RenderClear(renderer);
 			for (int picture = 0; picture < pictures; picture++)
@@ -753,8 +848,8 @@ static void present(SDL_Rect source)
 				const SDL_Rect part = { (from[picture].x - source.x) * times, (from[picture].y - source.y) * times,
 					from[picture].w * times, from[picture].h * times };
 
-				SDL_RenderCopyEx(renderer, scaled, &part, &shown[picture], picture == 1 ? 180.0 : 0.0, NULL,
-					SDL_FLIP_NONE);
+				SDL_RenderTextureRotated(renderer, scaled, float_rect(&part, &a), float_rect(&shown[picture], &b),
+					picture == 1 ? 180.0 : 0.0, NULL, SDL_FLIP_NONE);
 			}
 		}
 		if (kind == 3)
@@ -762,14 +857,14 @@ static void present(SDL_Rect source)
 			{
 				make_crt_overlay(shown[picture].w, shown[picture].h, from[picture].h);
 				if (crt_overlay)
-					SDL_RenderCopyEx(renderer, crt_overlay, NULL, &shown[picture], picture == 1 ? 180.0 : 0.0, NULL,
-						SDL_FLIP_NONE);
+					SDL_RenderTextureRotated(renderer, crt_overlay, NULL, float_rect(&shown[picture], &b),
+						picture == 1 ? 180.0 : 0.0, NULL, SDL_FLIP_NONE);
 			}
 	}
 	else
 		for (int picture = 0; picture < pictures; picture++)
-			SDL_RenderCopyEx(renderer, texture, &from[picture], &shown[picture], picture == 1 ? 180.0 : 0.0, NULL,
-				SDL_FLIP_NONE);
+			SDL_RenderTextureRotated(renderer, texture, float_rect(&from[picture], &a), float_rect(&shown[picture], &b),
+				picture == 1 ? 180.0 : 0.0, NULL, SDL_FLIP_NONE);
 #ifdef ORUNNERS_TOUCH
 	if (map_room_there && console_side_map_shown())
 		present_side_map(&map_room);
@@ -797,7 +892,7 @@ static void present(SDL_Rect source)
 
 typedef struct
 {
-	int what;      /* an SDL_Scancode or an SDL_GameControllerButton */
+	int what;      /* an SDL_Scancode or an SDL_GamepadButton */
 	uint8_t row, column, tiles;    /* where in the sheet, and how many tiles wide */
 	uint8_t over;  /* a tile of the same row drawn over it (the rest of PlayStation's symbols), or 0 */
 } prompt;
@@ -839,26 +934,26 @@ static const prompt key_prompts[] = {
 };
 
 static const prompt button_prompts[] = {
-	{ SDL_CONTROLLER_BUTTON_A, 0, 4, 1 }, { SDL_CONTROLLER_BUTTON_B, 0, 5, 1 },
-	{ SDL_CONTROLLER_BUTTON_X, 0, 6, 1 }, { SDL_CONTROLLER_BUTTON_Y, 0, 7, 1 },
-	{ SDL_CONTROLLER_BUTTON_DPAD_UP, 1, 1, 1 }, { SDL_CONTROLLER_BUTTON_DPAD_RIGHT, 1, 2, 1 },
-	{ SDL_CONTROLLER_BUTTON_DPAD_DOWN, 1, 3, 1 }, { SDL_CONTROLLER_BUTTON_DPAD_LEFT, 1, 4, 1 },
-	{ SDL_CONTROLLER_BUTTON_BACK, 18, 4, 1 }, { SDL_CONTROLLER_BUTTON_START, 18, 5, 1 },
-	{ SDL_CONTROLLER_BUTTON_LEFTSHOULDER, 18, 7, 1 }, { SDL_CONTROLLER_BUTTON_RIGHTSHOULDER, 18, 8, 1 },
+	{ SDL_GAMEPAD_BUTTON_SOUTH, 0, 4, 1 }, { SDL_GAMEPAD_BUTTON_EAST, 0, 5, 1 },
+	{ SDL_GAMEPAD_BUTTON_WEST, 0, 6, 1 }, { SDL_GAMEPAD_BUTTON_NORTH, 0, 7, 1 },
+	{ SDL_GAMEPAD_BUTTON_DPAD_UP, 1, 1, 1 }, { SDL_GAMEPAD_BUTTON_DPAD_RIGHT, 1, 2, 1 },
+	{ SDL_GAMEPAD_BUTTON_DPAD_DOWN, 1, 3, 1 }, { SDL_GAMEPAD_BUTTON_DPAD_LEFT, 1, 4, 1 },
+	{ SDL_GAMEPAD_BUTTON_BACK, 18, 4, 1 }, { SDL_GAMEPAD_BUTTON_START, 18, 5, 1 },
+	{ SDL_GAMEPAD_BUTTON_LEFT_SHOULDER, 18, 7, 1 }, { SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER, 18, 8, 1 },
 	{ CONTROL_LEFT_TRIGGER, 18, 9, 1 }, { CONTROL_RIGHT_TRIGGER, 18, 10, 1 },
-	{ SDL_CONTROLLER_BUTTON_LEFTSTICK, 12, 16, 1 }, { SDL_CONTROLLER_BUTTON_RIGHTSTICK, 14, 16, 1 },
+	{ SDL_GAMEPAD_BUTTON_LEFT_STICK, 12, 16, 1 }, { SDL_GAMEPAD_BUTTON_RIGHT_STICK, 14, 16, 1 },
 	{ CONTROL_LEFT_STICK_UP, 12, 9, 1 }, { CONTROL_LEFT_STICK_DOWN, 12, 11, 1 },
 	{ CONTROL_RIGHT_STICK_UP, 14, 9, 1 }, { CONTROL_RIGHT_STICK_RIGHT, 14, 10, 1 },
 	{ CONTROL_RIGHT_STICK_DOWN, 14, 11, 1 }, { CONTROL_RIGHT_STICK_LEFT, 14, 12, 1 },
-	{ SDL_CONTROLLER_BUTTON_GUIDE, 18, 2, 1 }, { SDL_CONTROLLER_BUTTON_MISC1, 18, 6, 1 },
+	{ SDL_GAMEPAD_BUTTON_GUIDE, 18, 2, 1 }, { SDL_GAMEPAD_BUTTON_MISC1, 18, 6, 1 },
 };
 
 /* A DualShock's or a DualSense's own, where they differ: cross, circle, square and triangle (each its button and
    the tile with the rest of its symbol, as the sheet has them), L1, R1, L2 and R2 */
 static const prompt playstation_prompts[] = {
-	{ SDL_CONTROLLER_BUTTON_A, 16, 23, 1, 24 }, { SDL_CONTROLLER_BUTTON_B, 16, 19, 1, 20 },
-	{ SDL_CONTROLLER_BUTTON_X, 16, 21, 1, 22 }, { SDL_CONTROLLER_BUTTON_Y, 16, 17, 1, 18 },
-	{ SDL_CONTROLLER_BUTTON_LEFTSHOULDER, 18, 19, 1 }, { SDL_CONTROLLER_BUTTON_RIGHTSHOULDER, 18, 20, 1 },
+	{ SDL_GAMEPAD_BUTTON_SOUTH, 16, 23, 1, 24 }, { SDL_GAMEPAD_BUTTON_EAST, 16, 19, 1, 20 },
+	{ SDL_GAMEPAD_BUTTON_WEST, 16, 21, 1, 22 }, { SDL_GAMEPAD_BUTTON_NORTH, 16, 17, 1, 18 },
+	{ SDL_GAMEPAD_BUTTON_LEFT_SHOULDER, 18, 19, 1 }, { SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER, 18, 20, 1 },
 	{ CONTROL_LEFT_TRIGGER, 18, 17, 1 }, { CONTROL_RIGHT_TRIGGER, 18, 18, 1 },
 };
 
@@ -877,8 +972,8 @@ static void load_prompts(const char *base)
 	loaded = SDL_LoadBMP(path);
 	if (!loaded)
 		return;    /* (CONTROLS then shows the names alone) */
-	prompt_sheet = SDL_ConvertSurfaceFormat(loaded, SDL_PIXELFORMAT_ARGB8888, 0);
-	SDL_FreeSurface(loaded);
+	prompt_sheet = SDL_ConvertSurface(loaded, SDL_PIXELFORMAT_ARGB8888);
+	SDL_DestroySurface(loaded);
 }
 
 static const prompt *find_prompt(const prompt *list, size_t count, int what)
@@ -922,9 +1017,9 @@ static bool playstation_buttons(int player)
 
 	if (player >= 0 && player < PLAYERS && controllers[player])
 	{
-		const SDL_GameControllerType type = SDL_GameControllerGetType(controllers[player]);
+		const SDL_GamepadType type = SDL_GetGamepadType(controllers[player]);
 
-		return type == SDL_CONTROLLER_TYPE_PS3 || type == SDL_CONTROLLER_TYPE_PS4 || type == SDL_CONTROLLER_TYPE_PS5;
+		return type == SDL_GAMEPAD_TYPE_PS3 || type == SDL_GAMEPAD_TYPE_PS4 || type == SDL_GAMEPAD_TYPE_PS5;
 	}
 	return pad && strcmp(pad, "playstation") == 0;
 #else
@@ -1075,9 +1170,16 @@ static void on_frame_shown(void)
 
 static void toggle_full_screen(void)
 {
-	const bool full = (SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN_DESKTOP) == 0;
+	const bool full = (SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN) == 0;
 
-	SDL_SetWindowFullscreen(window, full ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
+#ifdef __SWITCH__
+	/* (the Switch's screen is its window, never full screen: devkitPro's SDL has its desktop's mode at 1920 x 1080
+	   whatever the screen, and the picture would be made for that, its top left corner alone shown; a USB
+	   keyboard's F11 or Alt+Enter leaves it as it is, as TMNT's and The Simpsons' ports found) */
+	(void)full;
+	return;
+#endif
+	SDL_SetWindowFullscreen(window, full);    /* (SDL 3's full screen is the desktop's mode, as SDL 2's FULLSCREEN_DESKTOP) */
 #ifdef ORUNNERS_CONSOLE
 	console_window_settings.full_screen = full;
 	console_window_settings.changed = true;
@@ -1214,18 +1316,18 @@ static void load_window_settings(void)
 static void fix_window_settings(void)
 {
 	console_window_settings.full_screen = true;
-#if defined(ORUNNERS_SCREEN_WIDE) && defined(__ANDROID__)
+#if defined(ORUNNERS_SCREEN_WIDE) && (defined(__ANDROID__) || defined(SDL_PLATFORM_IOS))
 	{
 		/* (the screen as the renderer has it, once there is one; before it, the display's mode) */
-		SDL_DisplayMode mode;
+		const SDL_DisplayMode *mode;
 		int width = 0, height = 0;
 
 		if (renderer)
-			SDL_GetRendererOutputSize(renderer, &width, &height);
-		else if (SDL_GetCurrentDisplayMode(0, &mode) == 0)
+			SDL_GetCurrentRenderOutputSize(renderer, &width, &height);
+		else if ((mode = SDL_GetCurrentDisplayMode(SDL_GetPrimaryDisplay())) != NULL)
 		{
-			width = mode.w;
-			height = mode.h;
+			width = mode->w;
+			height = mode->h;
 		}
 		console_window_settings.wide = width > 0 && height > 0 ? wide_for_screen(width, height) : WIDE_16_9;
 	}
@@ -1250,19 +1352,19 @@ static void apply_window_settings(void)
 	picture_size(&width, &height);
 #else
 	const console_window *settings = &console_window_settings;
-	const bool full = (SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN_DESKTOP) != 0;
+	const bool full = (SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN) != 0;
 
 	picture_size(&width, &height);
 	if (full != settings->full_screen)
-		SDL_SetWindowFullscreen(window, settings->full_screen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
+		SDL_SetWindowFullscreen(window, settings->full_screen);
 #ifndef ORUNNERS_TOUCH_TEST    /* (the touch controls' check: the window is a phone's screen, the shape it is given) */
 	if (!settings->full_screen && (width != window_width || height != window_height || settings->changed))
 	{
 		SDL_Rect usable;
-		const int display = SDL_GetWindowDisplayIndex(window);
+		const SDL_DisplayID display = SDL_GetDisplayForWindow(window);
 		int scale = settings->window_scale;
 
-		if (SDL_GetDisplayUsableBounds(display < 0 ? 0 : display, &usable) == 0)
+		if (SDL_GetDisplayUsableBounds(display ? display : SDL_GetPrimaryDisplay(), &usable))
 			while (scale > 1 && (width * scale > usable.w - 64 || height * scale > usable.h - 64))
 				scale--;
 		SDL_SetWindowSize(window, width * scale, height * scale);
@@ -1283,7 +1385,7 @@ static void apply_window_settings(void)
 static uint32_t actions_held;
 static bool actions_taken;    /* a key or button just bound on CONTROLS: it is no action this frame */
 
-static uint32_t read_actions(const Uint8 *keys)
+static uint32_t read_actions(const bool *keys)
 {
 	uint32_t held = 0;
 
@@ -1314,29 +1416,29 @@ static uint32_t read_actions(const Uint8 *keys)
 #endif
 	for (int player = 0; player < PLAYERS; player++)
 	{
-		SDL_GameController *pad = controllers[player];
+		SDL_Gamepad *pad = controllers[player];
 		int stick_x, stick_y;
 
 		if (!pad)
 			continue;
-		stick_x = SDL_GameControllerGetAxis(pad, SDL_CONTROLLER_AXIS_LEFTX);
-		stick_y = SDL_GameControllerGetAxis(pad, SDL_CONTROLLER_AXIS_LEFTY);
-		if (SDL_GameControllerGetButton(pad, SDL_CONTROLLER_BUTTON_DPAD_UP) || stick_y < -16000)
+		stick_x = SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_LEFTX);
+		stick_y = SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_LEFTY);
+		if (SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_DPAD_UP) || stick_y < -16000)
 			held |= ACTION_BIT(ACTION_UP);
-		if (SDL_GameControllerGetButton(pad, SDL_CONTROLLER_BUTTON_DPAD_DOWN) || stick_y > 16000)
+		if (SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_DPAD_DOWN) || stick_y > 16000)
 			held |= ACTION_BIT(ACTION_DOWN);
-		if (SDL_GameControllerGetButton(pad, SDL_CONTROLLER_BUTTON_DPAD_LEFT) || stick_x < -16000)
+		if (SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_DPAD_LEFT) || stick_x < -16000)
 			held |= ACTION_BIT(ACTION_LEFT);
-		if (SDL_GameControllerGetButton(pad, SDL_CONTROLLER_BUTTON_DPAD_RIGHT) || stick_x > 16000)
+		if (SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_DPAD_RIGHT) || stick_x > 16000)
 			held |= ACTION_BIT(ACTION_RIGHT);
-		if (SDL_GameControllerGetButton(pad, SDL_CONTROLLER_BUTTON_A))
+		if (SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_SOUTH))
 			held |= ACTION_BIT(ACTION_ACCEPT);
-		if (SDL_GameControllerGetButton(pad, SDL_CONTROLLER_BUTTON_B))
+		if (SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_EAST))
 			held |= ACTION_BIT(ACTION_BACK);
-		if (SDL_GameControllerGetButton(pad, SDL_CONTROLLER_BUTTON_START))
+		if (SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_START))
 			held |= ACTION_BIT(ACTION_START) | PAUSE_BIT;
 #ifdef WHEEL_SETUP
-		if (wheel_extras_is_wheel(SDL_JoystickGetGUID(SDL_GameControllerGetJoystick(pad)))
+		if (wheel_extras_is_wheel(SDL_GetJoystickGUID(SDL_GetGamepadJoystick(pad)))
 			&& wheel_extras_button(WHEEL_EXTRA_START))
 			held |= ACTION_BIT(ACTION_START) | PAUSE_BIT;    /* (its START on a device of its own) */
 #endif
@@ -1346,12 +1448,12 @@ static uint32_t read_actions(const Uint8 *keys)
 
 /* The button, trigger or stick's way pressed on game controller 'which' for the control CONTROLS waits for, when it is
    the shown player's */
-static void bind_button(SDL_JoystickID which, SDL_GameControllerButton button)
+static void bind_button(SDL_JoystickID which, SDL_GamepadButton button)
 {
 	const int player = console_controls_player();
 
 	if (player < PLAYERS && controllers[player]
-		&& SDL_JoystickInstanceID(SDL_GameControllerGetJoystick(controllers[player])) == which)
+		&& SDL_GetJoystickID(SDL_GetGamepadJoystick(controllers[player])) == which)
 	{
 		controls_bind_button(player, console_controls_waiting(), button);
 		console_controls_bound();
@@ -1365,7 +1467,7 @@ static void bind_button(SDL_JoystickID which, SDL_GameControllerButton button)
 static int controller_player(SDL_JoystickID id)
 {
 	for (int player = 0; player < PLAYERS; player++)
-		if (controllers[player] && SDL_JoystickInstanceID(SDL_GameControllerGetJoystick(controllers[player])) == id)
+		if (controllers[player] && SDL_GetJoystickID(SDL_GetGamepadJoystick(controllers[player])) == id)
 			return player;
 	return -1;
 }
@@ -1375,7 +1477,7 @@ static int controller_player(SDL_JoystickID id)
 static void wheel_set_up(SDL_JoystickID id)
 {
 	const int player = controller_player(id);
-	SDL_GameController *first = controllers[0];
+	SDL_Gamepad *first = controllers[0];
 
 	if (player == 0)
 		return;
@@ -1385,26 +1487,23 @@ static void wheel_set_up(SDL_JoystickID id)
 		controllers[player] = first;
 		return;
 	}
-	for (int index = 0; index < SDL_NumJoysticks(); index++)
-		if (SDL_JoystickGetDeviceInstanceID(index) == id)
-		{
-			SDL_GameController *wheel = SDL_GameControllerOpen(index);
-			int free_player = 1;
+	{
+		SDL_Gamepad *wheel = SDL_OpenGamepad(id);    /* (SDL 3 opens a device by its id: none there, none opened) */
+		int free_player = 1;
 
-			if (!wheel)
-				return;
-			while (free_player < PLAYERS && controllers[free_player])
-				free_player++;
-			if (free_player < PLAYERS)
-				controllers[free_player] = first;
-			else if (first)
-			{
-				forces_release(first);
-				SDL_GameControllerClose(first);
-			}
-			controllers[0] = wheel;
+		if (!wheel)
 			return;
+		while (free_player < PLAYERS && controllers[free_player])
+			free_player++;
+		if (free_player < PLAYERS)
+			controllers[free_player] = first;
+		else if (first)
+		{
+			forces_release(first);
+			SDL_CloseGamepad(first);
 		}
+		controllers[0] = wheel;
+	}
 }
 #endif
 
@@ -1421,13 +1520,13 @@ static void read_events(void)
 #endif
 		switch (event.type)
 		{
-			case SDL_QUIT:
+			case SDL_EVENT_QUIT:
 				program_stop();    /* (back to main, which saves: the game runs on a task's stack, which a
 				                      longjmp to main's does not leave on Windows) */
 				return;
-#ifdef __ANDROID__
-			case SDL_APP_WILLENTERBACKGROUND:
-				/* (Android may end the game there: what it keeps is written; a race waits, paused) */
+#if defined(__ANDROID__) || defined(SDL_PLATFORM_IOS)
+			case SDL_EVENT_WILL_ENTER_BACKGROUND:
+				/* (Android or iOS may end the game there: what it keeps is written; a race waits, paused) */
 				save_eeprom();
 				save_backup_ram();
 				save_window_settings();
@@ -1436,7 +1535,7 @@ static void read_events(void)
 				break;
 #endif
 #ifdef ORUNNERS_HANDHELD_KEYS
-			case SDL_JOYBUTTONDOWN:
+			case SDL_EVENT_JOYSTICK_BUTTON_DOWN:
 				if (event.jbutton.button == HANDHELD_MENU_BUTTON)
 				{
 					program_stop();    /* (MENU leaves the game, as the firmware's other games) */
@@ -1444,11 +1543,11 @@ static void read_events(void)
 				}
 				break;
 #endif
-			case SDL_KEYDOWN:
+			case SDL_EVENT_KEY_DOWN:
 				if (event.key.repeat)
 					break;
 #ifdef WHEEL_SETUP
-				if (console_wheel_setup_step() >= 0 && event.key.keysym.sym == SDLK_ESCAPE)
+				if (console_wheel_setup_step() >= 0 && event.key.key == SDLK_ESCAPE)
 				{
 					/* SET UP WHEEL watches the devices: Escape leaves it, the layout as it was */
 					console_wheel_setup_cancel();
@@ -1460,73 +1559,73 @@ static void read_events(void)
 				if (console_controls_waiting() >= 0)
 				{
 					/* CONTROLS waits for a key: this one (Escape leaves the control as it was) */
-					if (event.key.keysym.sym != SDLK_ESCAPE)
+					if (event.key.key != SDLK_ESCAPE)
 						controls_bind_key(console_controls_player(), console_controls_waiting(),
-							event.key.keysym.scancode);
+							event.key.scancode);
 					console_controls_bound();
 					actions_taken = true;
 					break;
 				}
 #endif
 #ifndef ORUNNERS_CONSOLE    /* (the console's Escape is the menus' back; its menu's EXIT quits) */
-				if (event.key.keysym.sym == SDLK_ESCAPE)
+				if (event.key.key == SDLK_ESCAPE)
 				{
 					program_stop();
 					return;
 				}
 #endif
 #ifdef ORUNNERS_HANDHELD_KEYS
-				if (event.key.keysym.sym == SDLK_VOLUMEUP || event.key.keysym.sym == SDLK_VOLUMEDOWN)
+				if (event.key.key == SDLK_VOLUMEUP || event.key.key == SDLK_VOLUMEDOWN)
 				{
 					/* the volume keys turn OPTIONS' VOLUME, a step a press, kept when the game ends */
-					const int volume = console_window_settings.volume + (event.key.keysym.sym == SDLK_VOLUMEUP ? 1 : -1);
+					const int volume = console_window_settings.volume + (event.key.key == SDLK_VOLUMEUP ? 1 : -1);
 
 					console_window_settings.volume = volume < 0 ? 0 : (volume > 10 ? 10 : volume);
 					console_window_settings.changed = true;    /* (kept) */
 				}
 #endif
-				if (event.key.keysym.sym == SDLK_F11
-					|| (event.key.keysym.sym == SDLK_RETURN && (event.key.keysym.mod & KMOD_ALT)))
+				if (event.key.key == SDLK_F11
+					|| (event.key.key == SDLK_RETURN && (event.key.mod & SDL_KMOD_ALT)))
 					toggle_full_screen();
-				if (event.key.keysym.sym == SDLK_F3)
+				if (event.key.key == SDLK_F3)
 					toggle_smooth();
 				break;
 #ifdef ORUNNERS_CONSOLE
-			case SDL_CONTROLLERBUTTONDOWN:
+			case SDL_EVENT_GAMEPAD_BUTTON_DOWN:
 				/* ... or a button of the game controller plugged in for that player */
 				if (console_controls_waiting() >= 0)
-					bind_button(event.cbutton.which, (SDL_GameControllerButton)event.cbutton.button);
+					bind_button(event.gbutton.which, (SDL_GamepadButton)event.gbutton.button);
 				break;
-			case SDL_CONTROLLERAXISMOTION:
+			case SDL_EVENT_GAMEPAD_AXIS_MOTION:
 				/* ... or one of its triggers, or a stick's way, pressed halfway */
 				if (console_controls_waiting() >= 0)
 				{
-					const SDL_GameControllerButton moved = controls_axis_button(
-						(SDL_GameControllerAxis)event.caxis.axis, event.caxis.value);
+					const SDL_GamepadButton moved = controls_axis_button(
+						(SDL_GamepadAxis)event.gaxis.axis, event.gaxis.value);
 
-					if (moved != SDL_CONTROLLER_BUTTON_INVALID)
-						bind_button(event.caxis.which, moved);
+					if (moved != SDL_GAMEPAD_BUTTON_INVALID)
+						bind_button(event.gaxis.which, moved);
 				}
 				break;
 #endif
-			case SDL_CONTROLLERDEVICEADDED:
+			case SDL_EVENT_GAMEPAD_ADDED:
 #ifdef WHEEL_SETUP
-				if (controller_player(SDL_JoystickGetDeviceInstanceID(event.cdevice.which)) >= 0)
+				if (controller_player(event.gdevice.which) >= 0)
 					break;    /* (a wheel SET UP WHEEL opened already) */
-				if (wheel_extras_is_part(SDL_JoystickGetDeviceGUID(event.cdevice.which)))
+				if (wheel_extras_is_part(SDL_GetJoystickGUIDForID(event.gdevice.which)))
 					break;    /* (the set up wheel's pedals or shifter: its player's, no player's game controller) */
 #endif
 				for (int player = 0; player < PLAYERS; player++)
 					if (!controllers[player])
 					{
-						controllers[player] = SDL_GameControllerOpen(event.cdevice.which);
+						controllers[player] = SDL_OpenGamepad(event.gdevice.which);
 #ifdef WHEEL_SETUP
 						if (player > 0 && controllers[player]
-							&& wheel_extras_is_wheel(SDL_JoystickGetDeviceGUID(event.cdevice.which)))
+							&& wheel_extras_is_wheel(SDL_GetJoystickGUIDForID(event.gdevice.which)))
 						{
 							/* (the wheel set up with its pedals or shifter apart: player 1's, as SET UP WHEEL
 							   made it, whatever device came first; its forces with it) */
-							SDL_GameController *first = controllers[0];
+							SDL_Gamepad *first = controllers[0];
 
 							controllers[0] = controllers[player];
 							controllers[player] = first;
@@ -1536,22 +1635,22 @@ static void read_events(void)
 					}
 				break;
 #ifdef WHEEL_SETUP
-			case SDL_JOYDEVICEADDED:
+			case SDL_EVENT_JOYSTICK_ADDED:
 				wheel_setup_device_added(event.jdevice.which);
 				wheel_extras_device_added(event.jdevice.which);
 				break;
-			case SDL_JOYDEVICEREMOVED:
+			case SDL_EVENT_JOYSTICK_REMOVED:
 				wheel_setup_device_removed(event.jdevice.which);
 				wheel_extras_device_removed(event.jdevice.which);
 				break;
 #endif
-			case SDL_CONTROLLERDEVICEREMOVED:
+			case SDL_EVENT_GAMEPAD_REMOVED:
 				for (int player = 0; player < PLAYERS; player++)
 					if (controllers[player]
-						&& SDL_JoystickInstanceID(SDL_GameControllerGetJoystick(controllers[player])) == event.cdevice.which)
+						&& SDL_GetJoystickID(SDL_GetGamepadJoystick(controllers[player])) == event.gdevice.which)
 					{
 						forces_release(controllers[player]);
-						SDL_GameControllerClose(controllers[player]);
+						SDL_CloseGamepad(controllers[player]);
 						controllers[player] = NULL;
 					}
 				break;
@@ -1630,7 +1729,7 @@ static int trigger_pedal(int travel)
 #ifdef ORUNNERS_CONSOLE
 /* True while one of the player's keys or controller's buttons for 'control' is held, or a finger on the
    player's touch controls (Android's); the pedals' triggers press them as far as they go (trigger_pedal) */
-static bool holds_buttons(int player, SDL_GameController *pad, int control)
+static bool holds_buttons(int player, SDL_Gamepad *pad, int control)
 {
 #ifdef ORUNNERS_TOUCH
 	if (player < TOUCH_PLAYERS && touch_holds(player, control))
@@ -1640,7 +1739,7 @@ static bool holds_buttons(int player, SDL_GameController *pad, int control)
 }
 
 /* ... or one of the control's triggers or sticks' ways pressed at all */
-static bool holds(int player, SDL_GameController *pad, int control)
+static bool holds(int player, SDL_Gamepad *pad, int control)
 {
 	return holds_buttons(player, pad, control) || controls_axis_travel(player, pad, control) > AXIS_PRESSED;
 }
@@ -1648,7 +1747,7 @@ static bool holds(int player, SDL_GameController *pad, int control)
 
 static void on_controls_update(void)
 {
-	const Uint8 *keys;
+	const bool *keys;
 	s32_inputs *input = &s32_board.input;
 	bool shift_up[PLAYERS] = { false }, shift_down[PLAYERS] = { false };
 	bool music[PLAYERS] = { false }, previous[PLAYERS] = { false }, next[PLAYERS] = { false };
@@ -1666,7 +1765,7 @@ static void on_controls_update(void)
 		/* SET UP WHEEL: the devices watched for the control it waits for; the wheel set up, player 1's */
 		const SDL_JoystickID set_up = wheel_setup_frame();
 
-		if (set_up >= 0)
+		if (set_up != 0)    /* (SDL 3's no joystick is 0) */
 			wheel_set_up(set_up);
 	}
 #endif
@@ -1712,7 +1811,7 @@ static void on_controls_update(void)
 	   fingers on the touch controls too */
 	for (int player = 0; player < PLAYERS; player++)
 	{
-		SDL_GameController *pad = controllers[player];
+		SDL_Gamepad *pad = controllers[player];
 
 		wheel[player] = steer(wheel[player], holds(player, pad, CONTROL_STEER_LEFT),
 			holds(player, pad, CONTROL_STEER_RIGHT));
@@ -1737,7 +1836,7 @@ static void on_controls_update(void)
 #endif
 	for (int player = 0; player < PLAYERS; player++)
 	{
-		SDL_GameController *pad = controllers[player];
+		SDL_Gamepad *pad = controllers[player];
 
 #ifndef ORUNNERS_CONSOLE
 		coin[player] = keys[SDL_SCANCODE_5 + player] != 0;
@@ -1756,13 +1855,13 @@ static void on_controls_update(void)
 		/* the controller's stick and triggers, where they are moved, over the keyboard's (the console's
 		   triggers, the pedals' that CONTROLS gives them) */
 		{
-			const int stick = SDL_GameControllerGetAxis(pad, SDL_CONTROLLER_AXIS_LEFTX);
+			const int stick = SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_LEFTX);
 #ifdef ORUNNERS_CONSOLE
 			const int pad_gas = trigger_pedal(controls_axis_travel(player, pad, CONTROL_GAS));
 			const int pad_brake = trigger_pedal(controls_axis_travel(player, pad, CONTROL_BRAKE));
 #else
-			const int pad_gas = trigger_pedal(SDL_GameControllerGetAxis(pad, SDL_CONTROLLER_AXIS_TRIGGERRIGHT));
-			const int pad_brake = trigger_pedal(SDL_GameControllerGetAxis(pad, SDL_CONTROLLER_AXIS_TRIGGERLEFT));
+			const int pad_gas = trigger_pedal(SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_RIGHT_TRIGGER));
+			const int pad_brake = trigger_pedal(SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_LEFT_TRIGGER));
 #endif
 
 			stick_wheel(stick, &wheels[player]);
@@ -1772,7 +1871,7 @@ static void on_controls_update(void)
 				brakes[player] = pad_brake;
 		}
 #ifdef WHEEL_SETUP
-		if (wheel_extras_is_wheel(SDL_JoystickGetGUID(SDL_GameControllerGetJoystick(pad))))
+		if (wheel_extras_is_wheel(SDL_GetJoystickGUID(SDL_GetGamepadJoystick(pad))))
 		{
 			/* the set up wheel's pedals and shifter on devices of their own (wheel_extras.c), as its own
 			   triggers and buttons would be */
@@ -1789,13 +1888,13 @@ static void on_controls_update(void)
 		}
 #endif
 #ifndef ORUNNERS_CONSOLE    /* (the console's buttons are its bindings') */
-		shift_up[player] |= SDL_GameControllerGetButton(pad, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER) != 0;
-		shift_down[player] |= SDL_GameControllerGetButton(pad, SDL_CONTROLLER_BUTTON_LEFTSHOULDER) != 0;
-		music[player] |= SDL_GameControllerGetButton(pad, SDL_CONTROLLER_BUTTON_Y) != 0;
-		previous[player] |= SDL_GameControllerGetButton(pad, SDL_CONTROLLER_BUTTON_DPAD_LEFT) != 0;
-		next[player] |= SDL_GameControllerGetButton(pad, SDL_CONTROLLER_BUTTON_DPAD_RIGHT) != 0;
-		start[player] |= SDL_GameControllerGetButton(pad, SDL_CONTROLLER_BUTTON_START) != 0;
-		coin[player] |= SDL_GameControllerGetButton(pad, SDL_CONTROLLER_BUTTON_BACK) != 0;
+		shift_up[player] |= SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER) != 0;
+		shift_down[player] |= SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_LEFT_SHOULDER) != 0;
+		music[player] |= SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_NORTH) != 0;
+		previous[player] |= SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_DPAD_LEFT) != 0;
+		next[player] |= SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_DPAD_RIGHT) != 0;
+		start[player] |= SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_START) != 0;
+		coin[player] |= SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_BACK) != 0;
 #endif
 	}
 
@@ -1893,7 +1992,7 @@ static void run_network_wait(void)
 
 	forces_hold();
 	if (audio)
-		SDL_PauseAudioDevice(audio, 1);
+		SDL_PauseAudioStreamDevice(audio);
 	for (int screen = 0; screen < 2; screen++)
 		memcpy(frozen[screen], s32_video_frame(screen, &pause_widths[screen]), sizeof(frozen[screen]));
 	make_words_picture(frozen, list, console_network_wait_sprites(list, sizeof(list)));
@@ -1907,7 +2006,7 @@ static void run_network_wait(void)
 	}
 	pause_shown = false;
 	if (audio)
-		SDL_PauseAudioDevice(audio, 0);
+		SDL_ResumeAudioStreamDevice(audio);
 	next_frame = SDL_GetPerformanceCounter();
 }
 
@@ -1923,7 +2022,7 @@ static void run_pause(void)
 	pause_requested = false;
 	forces_hold();
 	if (audio)
-		SDL_PauseAudioDevice(audio, 1);
+		SDL_PauseAudioStreamDevice(audio);
 	for (int screen = 0; screen < 2; screen++)
 		memcpy(frozen[screen], s32_video_frame(screen, &pause_widths[screen]), sizeof(frozen[screen]));
 	make_pause_picture(frozen, choice);
@@ -1964,7 +2063,7 @@ static void run_pause(void)
 	pause_shown = false;
 	actions_held = held;    /* (the key let go in the race is no action) */
 	if (audio)
-		SDL_PauseAudioDevice(audio, 0);
+		SDL_ResumeAudioStreamDevice(audio);
 	next_frame = SDL_GetPerformanceCounter();
 }
 #endif
@@ -2022,18 +2121,24 @@ static void log_written(void)
 
 static void log_device(void)
 {
-	SDL_version linked;
-	SDL_DisplayMode mode;
+	const int linked = SDL_GetVersion();
+	const SDL_DisplayMode *mode = SDL_GetCurrentDisplayMode(SDL_GetPrimaryDisplay());
+	int count = 0;
+	SDL_JoystickID *joysticks = SDL_GetJoysticks(&count);
 
-	SDL_GetVersion(&linked);
-	fprintf(stderr, "SDL %d.%d.%d, video %s, audio %s\n", linked.major, linked.minor, linked.patch,
-		SDL_GetCurrentVideoDriver() ? SDL_GetCurrentVideoDriver() : "none",
+	fprintf(stderr, "SDL %d.%d.%d, video %s, audio %s\n", SDL_VERSIONNUM_MAJOR(linked), SDL_VERSIONNUM_MINOR(linked),
+		SDL_VERSIONNUM_MICRO(linked), SDL_GetCurrentVideoDriver() ? SDL_GetCurrentVideoDriver() : "none",
 		SDL_GetCurrentAudioDriver() ? SDL_GetCurrentAudioDriver() : "none");
-	if (SDL_GetCurrentDisplayMode(0, &mode) == 0)
-		fprintf(stderr, "screen %dx%d at %d Hz\n", mode.w, mode.h, mode.refresh_rate);
-	for (int joystick = 0; joystick < SDL_NumJoysticks(); joystick++)
-		fprintf(stderr, "controller %d: %s%s\n", joystick, SDL_JoystickNameForIndex(joystick),
-			SDL_IsGameController(joystick) ? "" : " (a joystick: no mapping)");
+	if (mode)
+		fprintf(stderr, "screen %dx%d at %.2f Hz\n", mode->w, mode->h, mode->refresh_rate);
+	for (int joystick = 0; joystick < count; joystick++)
+	{
+		const char *name = SDL_GetJoystickNameForID(joysticks[joystick]);
+
+		fprintf(stderr, "controller %d: %s%s\n", joystick, name ? name : "(no name)",
+			SDL_IsGamepad(joysticks[joystick]) ? "" : " (a joystick: no mapping)");
+	}
+	SDL_free(joysticks);
 	log_written();
 }
 
@@ -2066,7 +2171,7 @@ static void log_pace(bool work_done)
 			(double)pace_video * per_frame, (double)pace_showing * per_frame, 1000.0 * (double)pace_most / (double)frequency);
 #ifdef ORUNNERS_FRAMESKIP
 		fprintf(stderr, "  %u of 300 frames not drawn; sound queued %u bytes\n", frames_skipped,
-			audio ? SDL_GetQueuedAudioSize(audio) : 0);
+			audio ? (unsigned)SDL_GetAudioStreamQueued(audio) : 0u);
 		frames_skipped = 0;
 #endif
 		fflush(stderr);    /* (not to the card at once: a write to it would hold a frame) */
@@ -2118,8 +2223,9 @@ static void on_frame_done(void)
 		mix = loud;
 	}
 #endif
-	if (audio && !fast && SDL_GetQueuedAudioSize(audio) < sound_chips_mix_rate() / S32_FRAME_RATE * 4 * QUEUE_FRAMES_MAX)
-		SDL_QueueAudio(audio, mix, (Uint32)(count * 2 * sizeof(int16_t)));
+	if (audio && !fast
+		&& (unsigned)SDL_GetAudioStreamQueued(audio) < sound_chips_mix_rate() / S32_FRAME_RATE * 4 * QUEUE_FRAMES_MAX)
+		SDL_PutAudioStreamData(audio, mix, (int)(count * 2 * sizeof(int16_t)));
 	if (sound_hashes)
 		fprintf(sound_hashes, "%" PRIu64 " %016" PRIx64 " %016" PRIx64 "\n", frame, sound_chips_frame_hash(),
 			sound_board_state_hash());
@@ -2186,6 +2292,15 @@ static FILE *open_hashes(const char *path)
 	return path ? fopen(path, "w") : NULL;
 }
 
+/* SDL's base path (the executable's folder, an .app's Resources), as a copy the caller frees with SDL_free: SDL 3's
+   own is SDL's, not to be freed */
+static char *base_copy(void)
+{
+	const char *base = SDL_GetBasePath();
+
+	return base ? SDL_strdup(base) : NULL;
+}
+
 #ifndef ORUNNERS_HANDHELD
 static char *saves_folder(void);
 
@@ -2206,7 +2321,7 @@ static int prepare(int argc, char **argv)
 		printf("--prepare takes the ROM set with --game (orunners.zip)\n");
 		return PREPARE_NO_SET;
 	}
-	base = SDL_GetBasePath();
+	base = base_copy();
 	saves = saves_folder();
 	snprintf(folder, sizeof(folder), "%sassets", saves ? saves : (base ? base : ""));
 	printf("progress 0.1 Reading the ROM set\n");
@@ -2240,10 +2355,12 @@ static char *saves_folder(void)
 	return SDL_strdup(SWITCH_FOLDER "/");
 #elif defined(__ANDROID__)
 	return SDL_GetPrefPath("", "OutRunners");    /* (the app's own folder, its internal storage) */
+#elif defined(SDL_PLATFORM_IOS)
+	return ios_documents();    /* (the app's Documents, the Files app's: the player can see and keep them) */
 #elif defined(_WIN32) || defined(ORUNNERS_HANDHELD)
-	return SDL_GetBasePath();    /* (a handheld's: the game's folder on its card) */
+	return base_copy();    /* (a handheld's: the game's folder on its card) */
 #else
-	char *base = SDL_GetBasePath(), beside_app[1024], probe[1100];
+	char *base = base_copy(), beside_app[1024], probe[1100];
 	const char *folder = base && app_folder(base, beside_app, sizeof(beside_app)) ? beside_app : base;
 	FILE *portable;
 
@@ -2323,7 +2440,7 @@ static void read_mappings_file(void)
 
 /* On macOS, the folder the .app is in (the game's base is the .app's Resources folder: where the player sees
    the game is beside the .app); 0 elsewhere */
-#ifndef ORUNNERS_HANDHELD
+#if !defined(ORUNNERS_HANDHELD) || defined(ORUNNERS_IOS)
 /* A folder of assets the first run made for another build of the game (its version.txt; extract_assets.py's
    have none) */
 static bool assets_of_another_version(const char *folder)
@@ -2342,9 +2459,43 @@ static bool assets_of_another_version(const char *folder)
 }
 #endif
 
+#ifdef ORUNNERS_IOS
+/* iOS's assets, which its package does not carry: into 'folder', the app's Documents' assets ('documents' with its
+   separator), those the game took out before (of this version), else taken out now of the player's orunners.zip
+   there, as a computer's first run does, with no window. NULL, or what the player is to do */
+static const char *ios_assets(const char *documents, char *folder, size_t size)
+{
+	static char problem[600];
+	char source[1100], layout[1200];
+	const char *failed;
+	FILE *probe;
+
+	snprintf(folder, size, "%sassets", documents);
+	snprintf(layout, sizeof(layout), "%s/data/layout.json", folder);
+	if ((probe = fopen(layout, "rb")) != NULL)
+	{
+		fclose(probe);
+		if (!assets_of_another_version(folder))
+			return NULL;
+	}
+	snprintf(source, sizeof(source), "%sorunners.zip", documents);
+	if ((probe = fopen(source, "rb")) == NULL)
+		return "No ROM set: put orunners.zip (MAME's orunners set, World) in this game's folder, in the Files app: "
+			"On My iPhone (On My iPad) > OutRunners. From a computer: Finder (or the Apple Devices app on Windows), "
+			"the device, Files, OutRunners. Then start the game again: its first start takes the assets out of it "
+			"(some seconds).";
+	fclose(probe);
+	fprintf(stderr, "The assets out of %s into %s\n", source, folder);
+	if ((failed = game_assets_extract(source, folder)) == NULL)
+		return NULL;
+	snprintf(problem, sizeof(problem), "The assets did not come out of %s: %s", source, failed);
+	return problem;
+}
+#endif
+
 static int app_folder(const char *base, char *folder, size_t size)
 {
-#ifdef __APPLE__
+#ifdef SDL_PLATFORM_APPLE
 	static const char inside[] = ".app/Contents/Resources/";
 	const size_t length = base ? strlen(base) : 0, tail = sizeof(inside) - 1;
 	size_t end;
@@ -2388,7 +2539,7 @@ static void android_multicast_lock(bool wanted)
 	jobject activity, context = NULL, wifi = NULL, lock = NULL, tag = NULL, service = NULL;
 	jclass kind;
 
-	if (wanted == (multicast_lock != NULL) || (env = (JNIEnv *)SDL_AndroidGetJNIEnv()) == NULL)
+	if (wanted == (multicast_lock != NULL) || (env = (JNIEnv *)SDL_GetAndroidJNIEnv()) == NULL)
 		return;
 	if (!wanted)
 	{
@@ -2400,7 +2551,7 @@ static void android_multicast_lock(bool wanted)
 		multicast_lock = NULL;
 		return;
 	}
-	if ((activity = (jobject)SDL_AndroidGetActivity()) == NULL)
+	if ((activity = (jobject)SDL_GetAndroidActivity()) == NULL)
 		return;
 	kind = (*env)->GetObjectClass(env, activity);
 	context = (*env)->CallObjectMethod(env, activity,
@@ -2453,8 +2604,8 @@ static const char android_pack_missing[] = "missing";
    the game runs. NULL, android_pack_missing, or what is wrong with it */
 static const char *load_android_pack(void)
 {
-	SDL_RWops *packed = SDL_RWFromFile(ASSETS_PACK, "rb");
-	const Sint64 size = packed ? SDL_RWsize(packed) : -1;
+	SDL_IOStream *packed = SDL_IOFromFile(ASSETS_PACK, "rb");
+	const Sint64 size = packed ? SDL_GetIOSize(packed) : -1;
 	uint8_t *bytes = size > 0 ? malloc((size_t)size) : NULL;
 	size_t got = 0;
 	const char *problem;
@@ -2464,13 +2615,13 @@ static const char *load_android_pack(void)
 	while (bytes && got < (size_t)size)
 	{
 		/* (its bytes as the asset manager hands them: maybe fewer than asked for at a time) */
-		const size_t now = SDL_RWread(packed, bytes + got, 1, (size_t)size - got);
+		const size_t now = SDL_ReadIO(packed, bytes + got, (size_t)size - got);
 
 		if (now == 0)
 			break;
 		got += now;
 	}
-	SDL_RWclose(packed);
+	SDL_CloseIO(packed);
 	if (!bytes || got != (size_t)size)
 	{
 		free(bytes);
@@ -2509,18 +2660,35 @@ int main(int argc, char **argv)
 #ifdef __ANDROID__
 	/* (what the game says goes to outrunners.log in the app's folder on the storage, Android/data/<the
 	   app>/files: stderr goes nowhere there) */
-	if (SDL_AndroidGetExternalStoragePath())
+	if (SDL_GetAndroidExternalStoragePath())
 	{
 		char log_path[1024];
 
-		snprintf(log_path, sizeof(log_path), "%s/outrunners.log", SDL_AndroidGetExternalStoragePath());
+		snprintf(log_path, sizeof(log_path), "%s/outrunners.log", SDL_GetAndroidExternalStoragePath());
 		freopen(log_path, "w", stderr);
 	}
 	fprintf(stderr, "OutRunners: starting\n");
 	SDL_SetHint(SDL_HINT_ANDROID_TRAP_BACK_BUTTON, "1");    /* (back is the menus' back, never the end) */
 	SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");          /* (fingers are the touch controls, not the mouse) */
-	SDL_SetHint(SDL_HINT_ACCELEROMETER_AS_JOYSTICK, "0");
 	SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
+#endif
+#ifdef SDL_PLATFORM_IOS
+	{
+		/* (an app's standard error reaches no one: the log in its Documents, where the player puts the ROM set and
+		   the Files app shows it) */
+		char *documents = ios_documents();
+		char log_path[1100];
+
+		snprintf(log_path, sizeof(log_path), "%soutrunners.log", documents ? documents : "");
+		if (!freopen(log_path, "w", stderr))
+			log_path[0] = '\0';
+		SDL_free(documents);
+	}
+	fprintf(stderr, "OutRunners: starting\n");
+	SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");          /* (fingers are the touch controls, not the mouse) */
+	SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
+	SDL_SetHint(SDL_HINT_IOS_HIDE_HOME_INDICATOR, "2");     /* (dimmed, and a first swipe from the bottom only shows it) */
+	SDL_SetHint(SDL_HINT_AUDIO_CATEGORY, "playback");       /* (AVAudioSession's playback: heard with the ringer off) */
 #endif
 #ifdef ORUNNERS_TOUCH_TEST
 	SDL_SetHint(SDL_HINT_MOUSE_TOUCH_EVENTS, "1");    /* (a computer's check of the touch controls: the mouse a finger) */
@@ -2530,9 +2698,13 @@ int main(int argc, char **argv)
 #else
 	read_mappings_file();
 #endif
-	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER) != 0)
+	if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD))
 		return fail("SDL could not start.", SDL_GetError());
 	forces_start();    /* (a racing wheel's forces, where the system has SDL's haptic part) */
+#ifdef SDL_PLATFORM_IOS
+	SDL_AddEventWatch(ios_app_events, NULL);    /* (the background, as it comes: nothing drawn there) */
+	SDL_DisableScreenSaver();                   /* (no dimming nor locking while a game controller plays) */
+#endif
 #ifdef ORUNNERS_HANDHELD
 	log_device();
 #endif
@@ -2582,7 +2754,7 @@ int main(int argc, char **argv)
 #elif defined(__ANDROID__)
 	base = SDL_strdup("");           /* (the APK's assets, which SDL's files read by a relative path) */
 #else
-	base = SDL_GetBasePath();
+	base = base_copy();
 #endif
 	saves = saves_folder();
 	snprintf(eeprom_path, sizeof(eeprom_path), "%s" FILE_NAME ".eeprom", saves ? saves : "");
@@ -2700,6 +2872,17 @@ int main(int argc, char **argv)
 #ifdef ORUNNERS_HANDHELD
 		(void)layout;
 		(void)stale;
+#ifdef ORUNNERS_IOS
+		if (!found)
+		{
+			/* (iOS's package carries none: those the game takes out of the player's orunners.zip, ios_assets) */
+			const char *missing = ios_assets(saves ? saves : "", folder, sizeof(folder));
+
+			if (missing)
+				return fail("The game's assets are missing.", missing);
+			found = folder;
+		}
+#endif
 		if (!found)
 			return fail("The game's assets are missing.", ASSETS_PACK);
 #else
@@ -2740,13 +2923,19 @@ int main(int argc, char **argv)
 	SDL_free(saves);
 
 #ifdef __SWITCH__
-	/* (the Switch's screen, 1280 x 720; docked, the system shows it at the TV's size) */
-	window = SDL_CreateWindow(TITLE, 0, 0, 1280, 720, 0);
+	/* (the Switch's screen, 1280 x 720; docked, the system shows it at the TV's size. OPENGL: devkitPro's SDL 3
+	   loads EGL only for a window that asks for it, and its Switch window is an EGL surface always; without it
+	   SDL_CreateWindow fails, "EGL not initialized", as TMNT's port found on SDL 3) */
+	window = SDL_CreateWindow(TITLE, 1280, 720, SDL_WINDOW_OPENGL);
+#elif defined(SDL_PLATFORM_IOS)
+	/* (the whole screen at its own pixels (HIGH_PIXEL_DENSITY), the status bar hidden (BORDERLESS)) */
+	window = SDL_CreateWindow(TITLE, 1280, 720, SDL_WINDOW_FULLSCREEN | SDL_WINDOW_BORDERLESS
+		| SDL_WINDOW_HIGH_PIXEL_DENSITY);
 #elif defined(ORUNNERS_HANDHELD)
-	window = SDL_CreateWindow(TITLE, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 640, 480, SDL_WINDOW_FULLSCREEN_DESKTOP);
+	window = SDL_CreateWindow(TITLE, 640, 480, SDL_WINDOW_FULLSCREEN);    /* (SDL 3's full screen: the desktop's mode) */
 #else
-	window = SDL_CreateWindow(TITLE, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-		screens_shown() * 320 * WINDOW_SCALE, S32_VIDEO_HEIGHT * WINDOW_SCALE, SDL_WINDOW_RESIZABLE);
+	window = SDL_CreateWindow(TITLE, screens_shown() * 320 * WINDOW_SCALE, S32_VIDEO_HEIGHT * WINDOW_SCALE,
+		SDL_WINDOW_RESIZABLE);
 #endif
 #ifdef ORUNNERS_CONSOLE
 #ifdef WIDE_AUTO_BY_SCREEN
@@ -2756,27 +2945,43 @@ int main(int argc, char **argv)
 	if (window)
 		apply_window_settings();
 #endif
-	renderer = window ? SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED) : NULL;
+	renderer = window ? SDL_CreateRenderer(window, NULL) : NULL;    /* (SDL 3's first that works: Direct3D 11 on Windows) */
 	if (window && !renderer)
-		renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
+		renderer = SDL_CreateRenderer(window, SDL_SOFTWARE_RENDERER);
 	texture = renderer ? SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING,
 		2 * S32_VIDEO_MAX_WIDTH, 2 * S32_VIDEO_HEIGHT) : NULL;    /* (room for two screens, either way) */
 	if (!texture)
 		return fail("The window could not be opened.", SDL_GetError());
-	SDL_RenderSetIntegerScale(renderer, SDL_FALSE);
-	SDL_SetTextureScaleMode(texture, SDL_ScaleModeNearest);
+	SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_NEAREST);
+	SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_NONE);    /* (SDL 3 blends a texture with alpha unless told) */
 	apply_vsync();
+#ifndef ORUNNERS_HANDHELD
+	{
+		/* (the log: which SDL, and what it draws the window and plays the sound with) */
+		const int linked = SDL_GetVersion();
+
+		fprintf(stderr, "SDL %d.%d.%d, renderer %s, video %s, audio %s\n", SDL_VERSIONNUM_MAJOR(linked),
+			SDL_VERSIONNUM_MINOR(linked), SDL_VERSIONNUM_MICRO(linked), SDL_GetRendererName(renderer),
+			SDL_GetCurrentVideoDriver() ? SDL_GetCurrentVideoDriver() : "none",
+			SDL_GetCurrentAudioDriver() ? SDL_GetCurrentAudioDriver() : "none");
+	}
+#endif
 #ifdef ORUNNERS_TOUCH
+#ifdef SDL_PLATFORM_IOS
+	touch_open(renderer, SDL_GetBasePath() ? SDL_GetBasePath() : "");    /* (iOS's letters: in the app's bundle) */
+#else
 	touch_open(renderer, "");    /* (their letters come with the game: Android's in the APK's assets) */
 #endif
+#endif
 
-	/* the mix at the YM3438's rate; SDL takes it to the device's */
+	/* the mix at the YM3438's rate into a stream on the default device, which SDL takes to the device's; the
+	   device asked for 1024 samples at a time, as on SDL 2 */
 	SDL_zero(wanted);
 	wanted.freq = (int)sound_chips_mix_rate();
-	wanted.format = AUDIO_S16SYS;
+	wanted.format = SDL_AUDIO_S16;
 	wanted.channels = 2;
-	wanted.samples = 1024;
-	audio = SDL_OpenAudioDevice(NULL, 0, &wanted, NULL, 0);
+	SDL_SetHint(SDL_HINT_AUDIO_DEVICE_SAMPLE_FRAMES, "1024");
+	audio = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &wanted, NULL, NULL);
 #ifdef ORUNNERS_FRAMESKIP
 	if (audio)
 	{
@@ -2784,11 +2989,11 @@ int main(int argc, char **argv)
 		static int16_t silence[2 * 1024 * 4];
 		const Uint32 cushion = sound_chips_mix_rate() / S32_FRAME_RATE * 4 * 3;    /* (3 frames) */
 
-		SDL_QueueAudio(audio, silence, cushion < sizeof(silence) ? cushion : (Uint32)sizeof(silence));
+		SDL_PutAudioStreamData(audio, silence, (int)(cushion < sizeof(silence) ? cushion : (Uint32)sizeof(silence)));
 	}
 #endif
 	if (audio)
-		SDL_PauseAudioDevice(audio, 0);
+		SDL_ResumeAudioStreamDevice(audio);    /* (a stream's device starts paused) */
 
 	/* the board, the video, the sound board and the game, as the headless runs set them up */
 	s32_board.irq_changed = on_irq_changed;
@@ -2833,7 +3038,7 @@ int main(int argc, char **argv)
 	if (sound_hashes)
 		fclose(sound_hashes);
 	if (audio)
-		SDL_CloseAudioDevice(audio);
+		SDL_DestroyAudioStream(audio);    /* (its device with it) */
 	if (vsync_on && program_frames() > 1)
 		fprintf(stderr, "vsync: %u of %" PRIu64 " frames left out, behind the game's pace; %.3f frames a second\n",
 			frames_left_out, program_frames(), (double)(program_frames() - 1) * (double)SDL_GetPerformanceFrequency()

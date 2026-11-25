@@ -158,7 +158,7 @@ static double pill_distance(double x, double y, double width, double height)
 /* A shape in white, its edge smooth: filled, or its ring alone; tinted when it is drawn */
 static SDL_Texture *make_shape(SDL_Renderer *renderer, int width, int height, bool edge_only)
 {
-	SDL_Surface *surface = SDL_CreateRGBSurfaceWithFormat(0, width, height, 32, SDL_PIXELFORMAT_ARGB8888);
+	SDL_Surface *surface = SDL_CreateSurface(width, height, SDL_PIXELFORMAT_ARGB8888);
 	const double edge = EDGE * height;
 	SDL_Texture *texture;
 
@@ -174,11 +174,11 @@ static SDL_Texture *make_shape(SDL_Renderer *renderer, int width, int height, bo
 			((Uint32 *)((Uint8 *)surface->pixels + y * surface->pitch))[x] = cover << 24 | 0xFFFFFFu;
 		}
 	texture = SDL_CreateTextureFromSurface(renderer, surface);
-	SDL_FreeSurface(surface);
+	SDL_DestroySurface(surface);
 	if (texture)
 	{
 		SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_BLEND);
-		SDL_SetTextureScaleMode(texture, SDL_ScaleModeLinear);
+		SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_LINEAR);
 	}
 	return texture;
 }
@@ -193,7 +193,7 @@ void touch_open(SDL_Renderer *renderer, const char *base)
 {
 	const int pill_width = (int)lround(SHAPE_HEIGHT * buttons[BUTTON_START].width / buttons[BUTTON_START].height);
 
-	SDL_GetRendererOutputSize(renderer, &screen_width, &screen_height);
+	SDL_GetCurrentRenderOutputSize(renderer, &screen_width, &screen_height);
 	pads[0].canvas.w = pads[0].area.w = screen_width;
 	pads[0].canvas.h = pads[0].area.h = screen_height;
 	set_unit(&pads[0]);
@@ -205,7 +205,13 @@ void touch_open(SDL_Renderer *renderer, const char *base)
 #ifdef ORUNNERS_TOUCH_TEST
 	shown = true;    /* (a computer's check: no touch screen) */
 #else
-	shown = SDL_GetNumTouchDevices() > 0;
+	{
+		int count = 0;
+		SDL_TouchID *devices = SDL_GetTouchDevices(&count);    /* (SDL 3's: none is an empty list, not NULL) */
+
+		shown = count > 0;
+		SDL_free(devices);
+	}
 #endif
 }
 
@@ -412,32 +418,32 @@ void touch_event(const SDL_Event *event)
 
 	switch (event->type)
 	{
-		case SDL_FINGERDOWN:
+		case SDL_EVENT_FINGER_DOWN:
 			shown = true;
-			finger_down(event->tfinger.fingerId, event->tfinger.x * screen_width, event->tfinger.y * screen_height);
+			finger_down(event->tfinger.fingerID, event->tfinger.x * screen_width, event->tfinger.y * screen_height);
 			break;
-		case SDL_FINGERMOTION:
-			if ((slot = finger_slot(event->tfinger.fingerId, false)) >= 0)
+		case SDL_EVENT_FINGER_MOTION:
+			if ((slot = finger_slot(event->tfinger.fingerID, false)) >= 0)
 				finger_moved(slot, event->tfinger.x * screen_width, event->tfinger.y * screen_height);
 			break;
-		case SDL_FINGERUP:
-			if ((slot = finger_slot(event->tfinger.fingerId, false)) < 0)
+		case SDL_EVENT_FINGER_UP:
+			if ((slot = finger_slot(event->tfinger.fingerID, false)) < 0)
 				break;
 			if (fingers[slot].role == FINGER_WHEEL)
 				pads[fingers[slot].pad].turn_x = pads[fingers[slot].pad].turn_y = 0.0;
 			fingers[slot].role = FINGER_FREE;
 			break;
-		case SDL_KEYDOWN:
+		case SDL_EVENT_KEY_DOWN:
 #ifndef ORUNNERS_TOUCH_TEST    /* (a computer's check: the keyboard drives the game to them) */
-			if (event->key.keysym.scancode != SDL_SCANCODE_AC_BACK)    /* (Android's back: the screen's too) */
+			if (event->key.scancode != SDL_SCANCODE_AC_BACK)    /* (Android's back: the screen's too) */
 				shown = false;
 #endif
 			break;
-		case SDL_CONTROLLERBUTTONDOWN:
+		case SDL_EVENT_GAMEPAD_BUTTON_DOWN:
 			shown = false;
 			break;
-		case SDL_CONTROLLERAXISMOTION:
-			if (abs(event->caxis.value) > TOUCH_WHEEL_FULL / 2)
+		case SDL_EVENT_GAMEPAD_AXIS_MOTION:
+			if (abs(event->gaxis.value) > TOUCH_WHEEL_FULL / 2)
 				shown = false;
 			break;
 		default:
@@ -501,15 +507,16 @@ int touch_wheel(int player)
 static void draw_shape(SDL_Renderer *renderer, const pad *it, SDL_Texture *shape, double x, double y, double width,
 	double height, Uint8 grey, Uint8 alpha)
 {
-	SDL_Rect where;
+	SDL_FRect where;
 
 	if (!shape)
 		return;
 	seen(it, &x, &y);
-	where = (SDL_Rect){ (int)lround(x - width / 2), (int)lround(y - height / 2), (int)lround(width), (int)lround(height) };
+	where = (SDL_FRect){ (float)lround(x - width / 2), (float)lround(y - height / 2), (float)lround(width),
+		(float)lround(height) };    /* (whole pixels, as before SDL 3's float rectangles) */
 	SDL_SetTextureColorMod(shape, grey, grey, grey);
 	SDL_SetTextureAlphaMod(shape, alpha);
-	SDL_RenderCopy(renderer, shape, NULL, &where);
+	SDL_RenderTexture(renderer, shape, NULL, &where);
 }
 
 bool touch_map_room(SDL_Rect *room)

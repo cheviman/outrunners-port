@@ -14,7 +14,7 @@
 #ifndef ORUNNERS_SDL2_LETTERS_H
 #define ORUNNERS_SDL2_LETTERS_H
 
-#include <SDL.h>
+#include "port_sdl.h"
 
 #define LETTERS_CELL 16
 

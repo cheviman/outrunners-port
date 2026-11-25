@@ -59,8 +59,8 @@ OutRunners Anbernic --rom orunners.zip --out E:/Roms
 
 On Windows, Linux or macOS, with [Zig](https://ziglang.org) as the compiler for the handheld: it builds C for
 aarch64 Linux against the exact glibc the firmware has, with nothing else installed. Unpack it in
-`build/downloads/zig/` (or give its path as `-DZIG=`), with SDL2's development package in
-`build/downloads/sdl2/` (for SDL's headers):
+`build/downloads/zig/` (or give its path as `-DZIG=`), with SDL 2's development package in
+`build/downloads/sdl2/` (for SDL 2's headers: the handheld's own SDL is SDL 2):
 
 ```bash
 cmake -S . -B build/anbernic -G Ninja -DCMAKE_TOOLCHAIN_FILE=ports/anbernic/zig_aarch64.cmake -DORUNNERS_ANBERNIC=ON -DCMAKE_BUILD_TYPE=Release -DORUNNERS_REFERENCE_TOOLS=OFF
@@ -86,9 +86,12 @@ cmake --build build/cmake --config Release --target orunners_anbernic_maker
 - The game uses the firmware's SDL2, which knows its screen and GPU: the build links it against
   `sdl2_stub.c`, a library of the same name with the functions the port calls, so the executable asks for
   `libSDL2-2.0.so.0` and takes the firmware's when it starts. A function the port starts to call goes
-  there too (the link says which).
+  there too (the link says which). The port is written for SDL 3, which the firmware has not (its SDL 2.0.12
+  draws through the handheld's Mali GPU): `ORUNNERS_SDL2_LAYER` gives the port SDL 3's names over SDL 2's
+  (`ports/sdl/sdl2_layer.h`), and the build's last step, `check_sdl.py`, fails where the game asks for any SDL
+  function newer than 2.0.12.
 - The handheld's buttons come as a joystick SDL 2.0.12 does not know, "ANBERNIC-keys": the game gives SDL
-  its mapping before SDL starts (`device_mappings` in `ports/sdl2/main.c`), as SegaSonic's port found them
+  its mapping before SDL starts (`device_mappings` in `ports/sdl/main.c`), as SegaSonic's port found them
   on the RG40XX H: A 0, B 1, X 3, Y 2, L1 4, L2 5, R1 10, R2 11, SELECT 6, START 7, MENU 8, L3 9, R3 12, the
   d-pad hat 0, the sticks axes 0 to 3.
 - `maker/`: OutRunners Anbernic. `make_ports.c` writes `PORTS` from the build and the assets pack, which

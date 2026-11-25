@@ -113,7 +113,7 @@ and `zipalign -c -p 4 OutRunners.apk`.
 | `sign.c` | APK Signature Scheme v2: the digests, the signed data, the APK Signing Block |
 | `key.c` | the player's key: made once, kept as PKCS #8 with a self-signed X.509 certificate, read back |
 | `ecdsa.c` | ECDSA on P-256 with SHA-256 (RFC 6979's nonce) and HMAC-SHA256; SHA-256 is OutRunners NSP's (`ports/switch/nsp/crypto.c`) |
-| `window.c` | the window (SDL2, with Kenney Mini's letters, `ports/sdl2/letters.c`, and OutRunners NSP's folder dialog, `ports/switch/nsp/folder_dialog.c`) |
+| `window.c` | the window (SDL2, with Kenney Mini's letters, `ports/sdl/letters.c`, and OutRunners NSP's folder dialog, `ports/switch/nsp/folder_dialog.c`) |
 
 Nothing of the game, the ROM set, the key or the player's own icon is in this repository: the APK is made on
 the player's computer, from the player's files. OutRunners is a trademark of SEGA; this project is

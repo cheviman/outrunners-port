@@ -54,7 +54,7 @@
 
 typedef struct
 {
-	SDL_JoystickID pad;      /* the player's game controller looked at, or -1 */
+	SDL_JoystickID pad;      /* the player's game controller looked at, or 0 (SDL 3's none) */
 	bool looked;             /* its haptic opened (or found to have nothing) */
 	SDL_Haptic *haptic;      /* its haptic, where it has a spring, an autocentre or a sine */
 	unsigned int kinds;      /* the haptic's effects (SDL_HAPTIC_*) */
@@ -82,7 +82,7 @@ static struct
 
 static void forget(player_forces *forces)
 {
-	forces->pad = -1;
+	forces->pad = 0;
 	forces->looked = false;
 	forces->haptic = NULL;
 	forces->kinds = 0;
@@ -100,7 +100,7 @@ void forces_start(void)
 {
 	for (int player = 0; player < FORCES_PLAYERS; player++)
 		forget(&players[player]);
-	haptics = SDL_InitSubSystem(SDL_INIT_HAPTIC) == 0;
+	haptics = SDL_InitSubSystem(SDL_INIT_HAPTIC);
 }
 
 /* The effects' direction: along the wheel's axis */
@@ -146,23 +146,23 @@ static void look(player_forces *forces, SDL_Joystick *joystick)
 	unsigned int kinds;
 
 	forces->looked = true;
-	if (!haptics || SDL_JoystickIsHaptic(joystick) != 1)
+	if (!haptics || !SDL_IsJoystickHaptic(joystick))
 		return;
-	haptic = SDL_HapticOpenFromJoystick(joystick);
+	haptic = SDL_OpenHapticFromJoystick(joystick);
 	if (!haptic)
 	{
-		fprintf(stderr, "forces: %s: %s\n", SDL_JoystickName(joystick), SDL_GetError());
+		fprintf(stderr, "forces: %s: %s\n", SDL_GetJoystickName(joystick), SDL_GetError());
 		return;
 	}
-	kinds = SDL_HapticQuery(haptic);
+	kinds = SDL_GetHapticFeatures(haptic);
 	if (!(kinds & (SDL_HAPTIC_SPRING | SDL_HAPTIC_AUTOCENTER | SDL_HAPTIC_SINE)))
 	{
-		SDL_HapticClose(haptic);
+		SDL_CloseHaptic(haptic);
 		return;
 	}
 	forces->haptic = haptic;
 	forces->kinds = kinds;
-	fprintf(stderr, "forces: %s:%s%s%s\n", SDL_JoystickName(joystick),
+	fprintf(stderr, "forces: %s:%s%s%s\n", SDL_GetJoystickName(joystick),
 		(kinds & SDL_HAPTIC_SPRING) ? " spring" : ((kinds & SDL_HAPTIC_AUTOCENTER) ? " autocentre" : ""),
 		(kinds & SDL_HAPTIC_SINE) ? " sine" : "", (kinds & SDL_HAPTIC_GAIN) ? " gain" : "");
 }
@@ -180,23 +180,23 @@ static void centre(player_forces *forces, int centring)
 		if (centring == 0)
 		{
 			if (forces->spring >= 0)
-				SDL_HapticDestroyEffect(forces->haptic, forces->spring);
+				SDL_DestroyHapticEffect(forces->haptic, forces->spring);
 			forces->spring = -1;
 			return;
 		}
 		make_spring(&effect, centring);
 		if (forces->spring >= 0)
 		{
-			SDL_HapticUpdateEffect(forces->haptic, forces->spring, &effect);
+			SDL_UpdateHapticEffect(forces->haptic, forces->spring, &effect);
 			return;
 		}
-		forces->spring = SDL_HapticNewEffect(forces->haptic, &effect);
+		forces->spring = SDL_CreateHapticEffect(forces->haptic, &effect);
 		forces->spring_frames = 0;
-		if (forces->spring < 0 || SDL_HapticRunEffect(forces->haptic, forces->spring, SDL_HAPTIC_INFINITY) != 0)
+		if (forces->spring < 0 || !SDL_RunHapticEffect(forces->haptic, forces->spring, SDL_HAPTIC_INFINITY))
 			fprintf(stderr, "forces: the spring: %s\n", SDL_GetError());
 	}
 	else if (forces->kinds & SDL_HAPTIC_AUTOCENTER)
-		SDL_HapticSetAutocenter(forces->haptic, centring);
+		SDL_SetHapticAutocenter(forces->haptic, centring);
 }
 
 /* The spring kept running (an effect's length ends on Windows and on macOS, above): run again where the device
@@ -212,8 +212,8 @@ static void keep_spring(player_forces *forces)
 	{
 		if (forces->spring_frames % SPRING_WATCH != 0 || !(forces->kinds & SDL_HAPTIC_STATUS))
 			return;
-		if (SDL_HapticGetEffectStatus(forces->haptic, forces->spring) != 0)
-			return;    /* (playing, or the device would not say) */
+		if (SDL_GetHapticEffectStatus(forces->haptic, forces->spring))
+			return;    /* (playing; SDL 3's false is either not playing or the device not saying: run again) */
 		ended = true;
 	}
 	if (ended && !forces->spring_ended)
@@ -222,7 +222,7 @@ static void keep_spring(player_forces *forces)
 		forces->spring_ended = true;
 	}
 	forces->spring_frames = 0;
-	if (SDL_HapticRunEffect(forces->haptic, forces->spring, SDL_HAPTIC_INFINITY) != 0 && ended)
+	if (!SDL_RunHapticEffect(forces->haptic, forces->spring, SDL_HAPTIC_INFINITY) && ended)
 		fprintf(stderr, "forces: the spring: %s\n", SDL_GetError());
 }
 
@@ -234,7 +234,7 @@ static void shake_wheel(player_forces *forces, int shake, bool on)
 	if (!on)
 	{
 		if (forces->shaking)
-			SDL_HapticStopEffect(forces->haptic, forces->sine);
+			SDL_StopHapticEffect(forces->haptic, forces->sine);
 		forces->shaking = false;
 		return;
 	}
@@ -242,47 +242,47 @@ static void shake_wheel(player_forces *forces, int shake, bool on)
 	{
 		make_sine(&effect, shake);
 		if (forces->sine < 0)
-			forces->sine = SDL_HapticNewEffect(forces->haptic, &effect);
+			forces->sine = SDL_CreateHapticEffect(forces->haptic, &effect);
 		else
-			SDL_HapticUpdateEffect(forces->haptic, forces->sine, &effect);
+			SDL_UpdateHapticEffect(forces->haptic, forces->sine, &effect);
 		forces->shake = shake;
 		if (forces->sine < 0)
 			fprintf(stderr, "forces: the shake: %s\n", SDL_GetError());
 	}
 	if (forces->sine >= 0 && !forces->shaking)
-		forces->shaking = SDL_HapticRunEffect(forces->haptic, forces->sine, SDL_HAPTIC_INFINITY) == 0;
+		forces->shaking = SDL_RunHapticEffect(forces->haptic, forces->sine, SDL_HAPTIC_INFINITY);
 }
 
 /* A game controller's rumble at 'shake' percent while 'on' (each frame, to last past the next), stopped
    otherwise */
-static void rumble(player_forces *forces, SDL_GameController *pad, int shake, bool on)
+static void rumble(player_forces *forces, SDL_Gamepad *pad, int shake, bool on)
 {
 	const Uint16 low = (Uint16)(0xffff * shake / 100);
 
 	if (on)
-		forces->rumbling = SDL_GameControllerRumble(pad, low, low / 2, RUMBLE_SPAN) == 0;
+		forces->rumbling = SDL_RumbleGamepad(pad, low, low / 2, RUMBLE_SPAN);
 	else if (forces->rumbling)
 	{
-		SDL_GameControllerRumble(pad, 0, 0, 0);
+		SDL_RumbleGamepad(pad, 0, 0, 0);
 		forces->rumbling = false;
 	}
 }
 
 /* The player's haptic closed (its effects with it), their rumble stopped */
-static void let_go(player_forces *forces, SDL_GameController *pad)
+static void let_go(player_forces *forces, SDL_Gamepad *pad)
 {
 	if (forces->haptic)
-		SDL_HapticClose(forces->haptic);
+		SDL_CloseHaptic(forces->haptic);
 	if (forces->rumbling && pad)
-		SDL_GameControllerRumble(pad, 0, 0, 0);
+		SDL_RumbleGamepad(pad, 0, 0, 0);
 	forget(forces);
 }
 
-void forces_frame(int player, SDL_GameController *pad, int centring, int shake, bool motor)
+void forces_frame(int player, SDL_Gamepad *pad, int centring, int shake, bool motor)
 {
 	player_forces *forces;
-	SDL_Joystick *joystick = pad ? SDL_GameControllerGetJoystick(pad) : NULL;
-	const SDL_JoystickID id = joystick ? SDL_JoystickInstanceID(joystick) : -1;
+	SDL_Joystick *joystick = pad ? SDL_GetGamepadJoystick(pad) : NULL;
+	const SDL_JoystickID id = joystick ? SDL_GetJoystickID(joystick) : 0;
 
 	if (player < 0 || player >= FORCES_PLAYERS)
 		return;
@@ -293,7 +293,7 @@ void forces_frame(int player, SDL_GameController *pad, int centring, int shake, 
 		let_go(forces, NULL);
 		forces->pad = id;
 	}
-	if (id < 0)
+	if (id == 0)
 		return;
 	if (centring == 0 && shake == 0)
 	{
@@ -321,29 +321,33 @@ void forces_frame(int player, SDL_GameController *pad, int centring, int shake, 
 /* The device's own vibrator, looked for once: a haptic of SDL's named VIBRATOR_NAME, able to rumble */
 static void look_for_vibrator(void)
 {
+	int count = 0;
+	SDL_HapticID *ids = haptics ? SDL_GetHaptics(&count) : NULL;    /* (SDL 3's haptics by their ids) */
+
 	vibrator.looked = true;
-	for (int index = 0; haptics && index < SDL_NumHaptics(); index++)
+	for (int index = 0; index < count; index++)
 	{
-		const char *name = SDL_HapticName(index);
+		const char *name = SDL_GetHapticNameForID(ids[index]);
 
 		if (!name || strcmp(name, VIBRATOR_NAME) != 0)
 			continue;
-		vibrator.haptic = SDL_HapticOpen(index);
-		if (vibrator.haptic && SDL_HapticRumbleInit(vibrator.haptic) != 0)
+		vibrator.haptic = SDL_OpenHaptic(ids[index]);
+		if (vibrator.haptic && !SDL_InitHapticRumble(vibrator.haptic))
 		{
-			SDL_HapticClose(vibrator.haptic);
+			SDL_CloseHaptic(vibrator.haptic);
 			vibrator.haptic = NULL;
 		}
 		if (vibrator.haptic)
 			fprintf(stderr, "forces: the device's vibrator\n");
-		return;
+		break;
 	}
+	SDL_free(ids);
 }
 
 static void stop_vibrator(void)
 {
 	if (vibrator.vibrating)
-		SDL_HapticRumbleStop(vibrator.haptic);
+		SDL_StopHapticRumble(vibrator.haptic);
 	vibrator.vibrating = false;
 }
 
@@ -360,7 +364,7 @@ void forces_device(int shake, bool motor)
 	}
 	if (!vibrator.vibrating || ++vibrator.frames >= VIBRATOR_RENEW)
 	{
-		vibrator.vibrating = SDL_HapticRumblePlay(vibrator.haptic, (float)shake / 100.0f, VIBRATOR_SPAN) == 0;
+		vibrator.vibrating = SDL_PlayHapticRumble(vibrator.haptic, (float)shake / 100.0f, VIBRATOR_SPAN);
 		vibrator.frames = 0;
 	}
 }
@@ -381,13 +385,13 @@ void forces_hold(void)
 		stop_vibrator();
 }
 
-void forces_release(SDL_GameController *pad)
+void forces_release(SDL_Gamepad *pad)
 {
-	SDL_Joystick *joystick = pad ? SDL_GameControllerGetJoystick(pad) : NULL;
-	const SDL_JoystickID id = joystick ? SDL_JoystickInstanceID(joystick) : -1;
+	SDL_Joystick *joystick = pad ? SDL_GetGamepadJoystick(pad) : NULL;
+	const SDL_JoystickID id = joystick ? SDL_GetJoystickID(joystick) : 0;
 
 	for (int player = 0; player < FORCES_PLAYERS; player++)
-		if (id >= 0 && players[player].pad == id)
+		if (id != 0 && players[player].pad == id)
 			let_go(&players[player], pad);
 }
 
@@ -398,7 +402,7 @@ void forces_stop(void)
 	if (vibrator.haptic)
 	{
 		stop_vibrator();
-		SDL_HapticClose(vibrator.haptic);
+		SDL_CloseHaptic(vibrator.haptic);
 		vibrator.haptic = NULL;
 	}
 }

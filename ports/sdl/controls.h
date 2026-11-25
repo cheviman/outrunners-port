@@ -12,7 +12,7 @@
 
 #include "console.h"
 
-#include <SDL.h>
+#include "port_sdl.h"
 #include <stdbool.h>
 
 #define CONTROL_KEYS     2
@@ -21,14 +21,14 @@
 /* The triggers and the sticks' ways as buttons of the bindings, past SDL's own (its game controller has them
    as axes): the axes' buttons. The left stick's left and right are the wheel's already (issue 42: the right
    stick's up and down as the pedals) */
-#define CONTROL_LEFT_TRIGGER       ((SDL_GameControllerButton)SDL_CONTROLLER_BUTTON_MAX)
-#define CONTROL_RIGHT_TRIGGER      ((SDL_GameControllerButton)(SDL_CONTROLLER_BUTTON_MAX + 1))
-#define CONTROL_LEFT_STICK_UP      ((SDL_GameControllerButton)(SDL_CONTROLLER_BUTTON_MAX + 2))
-#define CONTROL_LEFT_STICK_DOWN    ((SDL_GameControllerButton)(SDL_CONTROLLER_BUTTON_MAX + 3))
-#define CONTROL_RIGHT_STICK_UP     ((SDL_GameControllerButton)(SDL_CONTROLLER_BUTTON_MAX + 4))
-#define CONTROL_RIGHT_STICK_DOWN   ((SDL_GameControllerButton)(SDL_CONTROLLER_BUTTON_MAX + 5))
-#define CONTROL_RIGHT_STICK_LEFT   ((SDL_GameControllerButton)(SDL_CONTROLLER_BUTTON_MAX + 6))
-#define CONTROL_RIGHT_STICK_RIGHT  ((SDL_GameControllerButton)(SDL_CONTROLLER_BUTTON_MAX + 7))
+#define CONTROL_LEFT_TRIGGER       ((SDL_GamepadButton)SDL_GAMEPAD_BUTTON_COUNT)
+#define CONTROL_RIGHT_TRIGGER      ((SDL_GamepadButton)(SDL_GAMEPAD_BUTTON_COUNT + 1))
+#define CONTROL_LEFT_STICK_UP      ((SDL_GamepadButton)(SDL_GAMEPAD_BUTTON_COUNT + 2))
+#define CONTROL_LEFT_STICK_DOWN    ((SDL_GamepadButton)(SDL_GAMEPAD_BUTTON_COUNT + 3))
+#define CONTROL_RIGHT_STICK_UP     ((SDL_GamepadButton)(SDL_GAMEPAD_BUTTON_COUNT + 4))
+#define CONTROL_RIGHT_STICK_DOWN   ((SDL_GamepadButton)(SDL_GAMEPAD_BUTTON_COUNT + 5))
+#define CONTROL_RIGHT_STICK_LEFT   ((SDL_GamepadButton)(SDL_GAMEPAD_BUTTON_COUNT + 6))
+#define CONTROL_RIGHT_STICK_RIGHT  ((SDL_GamepadButton)(SDL_GAMEPAD_BUTTON_COUNT + 7))
 
 /* An axis's button holds its control from any travel past its rest's wobble (of 32767) */
 #define AXIS_PRESSED  1024
@@ -37,7 +37,7 @@ typedef struct
 {
 	const char *name;                                   /* as the settings file says it */
 	SDL_Scancode keys[CONTROL_KEYS];                    /* SDL_SCANCODE_UNKNOWN: none */
-	SDL_GameControllerButton buttons[CONTROL_BUTTONS];  /* SDL_CONTROLLER_BUTTON_INVALID: none; or a trigger */
+	SDL_GamepadButton buttons[CONTROL_BUTTONS];  /* SDL_GAMEPAD_BUTTON_INVALID: none; or a trigger */
 } control_binding;
 
 /* Each seat's: their keys, and the buttons of their own game controller (the first one plugged in is
@@ -53,18 +53,18 @@ void controls_defaults(int player);    /* (and saved) */
    now (the ones it had before let go of it: issue 56), and no longer any other control's of the player's
    (and saved) */
 void controls_bind_key(int player, int control, SDL_Scancode key);
-void controls_bind_button(int player, int control, SDL_GameControllerButton button);
+void controls_bind_button(int player, int control, SDL_GamepadButton button);
 
 /* The axis's button an axis moved to 'value' takes CONTROLS' control with, from halfway: a trigger, or a
-   stick's way; SDL_CONTROLLER_BUTTON_INVALID short of that, or for the left stick's left and right */
-SDL_GameControllerButton controls_axis_button(SDL_GameControllerAxis axis, int value);
+   stick's way; SDL_GAMEPAD_BUTTON_INVALID short of that, or for the left stick's left and right */
+SDL_GamepadButton controls_axis_button(SDL_GamepadAxis axis, int value);
 
 /* True while one of the player's keys or their game controller's buttons for 'control' is held, its axes'
    apart */
-bool controls_holds(int player, SDL_GameController *pad, int control);
+bool controls_holds(int player, SDL_Gamepad *pad, int control);
 
 /* How far the player's game controller's axes' buttons for 'control' are pressed, the furthest: 0 to 32767
    (a stick's from past its rest's wobble) */
-int controls_axis_travel(int player, SDL_GameController *pad, int control);
+int controls_axis_travel(int player, SDL_Gamepad *pad, int control);
 
 #endif

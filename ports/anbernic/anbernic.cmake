@@ -3,7 +3,7 @@
 #              game alone, as Roms/PORTS' OutRunners.sh and its folder outrunners/
 # Version:     0.1.1
 # Created:     30-10-2026
-# Modified:    06-11-2026
+# Modified:    25-11-2026
 # Author:      Sebastian Toyos
 #
 # Included by CMakeLists.txt with ORUNNERS_ANBERNIC (and the toolchain zig_aarch64.cmake: aarch64, glibc 2.35),
@@ -11,7 +11,10 @@
 # whole screen, the game's 4:3 picture, the video on the four cores; no VIDEO, no 2 PLAYERS), CONTROLS for its
 # own buttons (ORUNNERS_CONTROLS_PAGE), the handheld's MENU and volume keys (ORUNNERS_HANDHELD_KEYS), and with
 # the firmware's SDL2: the executable is linked against a stand-in of its name (sdl2_stub.c) and SDL's headers
-# (ORUNNERS_SDL2_INCLUDE, by default the development package in build/downloads/sdl2). The build is PORTS's
+# (ORUNNERS_SDL2_INCLUDE, by default the development package in build/downloads/sdl2). The window port is written
+# for SDL 3, which no handheld of these has (their firmware's own SDL 2.0.12, drawing through its Mali GPU; ArkOS's
+# on the R36S): ORUNNERS_SDL2_LAYER gives the port SDL 3's names over SDL 2's (ports/sdl/sdl2_layer.h), and its
+# build's last step says whether the game asks for any function newer than SDL 2.0.12 (check_sdl.py). The build is PORTS's
 # files without the assets, in build/bin/anbernic: the handheld makes nothing from the ROM set, and
 # OutRunners Anbernic (ports/anbernic/maker), on the player's computer, writes PORTS from them and the
 # player's ROM set.
@@ -52,8 +55,9 @@ set_target_properties(SDL2_device PROPERTIES OUTPUT_NAME SDL2-2.0 SUFFIX ".so.0"
 target_link_options(SDL2_device PRIVATE -Wl,-soname,libSDL2-2.0.so.0)
 
 set(ORUNNERS_ANBERNIC_OUT ${ORUNNERS_BIN_DIR}/${ORUNNERS_HANDHELD_OUT_NAME})    # (PORTS's files, beside OutRunners Anbernic)
-add_executable(OutRunners ports/sdl2/main.c ports/sdl2/forces.c ports/sdl2/controls.c)
+add_executable(OutRunners ports/sdl/main.c ports/sdl/forces.c ports/sdl/controls.c)
 target_include_directories(OutRunners PRIVATE ${ORUNNERS_SDL2_INCLUDE})
+target_compile_definitions(OutRunners PRIVATE ORUNNERS_SDL2_LAYER)
 target_link_libraries(OutRunners PRIVATE orunners_game_console orunners_sound SDL2_device m)
 set_target_properties(OutRunners PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ORUNNERS_ANBERNIC_OUT}/outrunners
 	SKIP_BUILD_RPATH ON)    # (no path of this computer's in it: the handheld's loader finds its SDL2)
@@ -65,6 +69,16 @@ endforeach()
 # OutRunners Anbernic's, made from the player's ROM set with the rest of PORTS
 add_custom_command(TARGET OutRunners POST_BUILD
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different ${ORUNNERS_HANDHELD_LAUNCHER} ${ORUNNERS_ANBERNIC_OUT}
-	COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_SOURCE_DIR}/ports/sdl2/prompts/input_prompts.bmp
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_SOURCE_DIR}/ports/sdl/prompts/input_prompts.bmp
 		${ORUNNERS_ANBERNIC_OUT}/outrunners
 	VERBATIM)
+
+# The game asks the handheld's SDL for nothing newer than it has (the firmware's 2.0.12): a function of a later SDL 2
+# would stop it as it starts, on the handheld alone. With the game, where there is a Python to run it
+if(Python3_FOUND)
+	add_custom_command(TARGET OutRunners POST_BUILD
+		COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/ports/anbernic/check_sdl.py --headers ${ORUNNERS_SDL2_INCLUDE}
+			--most 2.0.12 $<TARGET_FILE:OutRunners>
+		COMMENT "The game's SDL functions: none newer than SDL 2.0.12"
+		VERBATIM)
+endif()

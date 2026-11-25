@@ -7,7 +7,7 @@ APK, as SegaSonic's port is. It is the same game as on a computer, with what a p
   height: 20:9 (496 pixels) where the screen is twice as wide as high or more, else 16:9 (416, 398 shown),
   chosen again when the screen changes its shape mid-game (a Fold opened or closed), as the touch controls'
   places are. OPTIONS has no VIDEO page, and the title's menu no 2 PLAYERS.
-- **Touch controls**, as few as the race needs, drawn over the picture (`ports/sdl2/touch.c`): the wheel where
+- **Touch controls**, as few as the race needs, drawn over the picture (`ports/sdl/touch.c`): the wheel where
   your left thumb lands on the screen's left half (it turns as far as your thumb goes across, and moves the
   menus' cursor), **GAS** (the menus' accept) and **BRAKE** on the right, **START** at the top right (start,
   and the race's pause), **UP** and **DOWN** for the gears in a race with the manual transmission alone (none
@@ -57,8 +57,9 @@ cmake -S . -B build/android -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAI
 cmake --build build/android --target orunners_apk --parallel 6
 ```
 
-`CMakeLists.txt` sees the NDK's toolchain and builds the game alone (`android.cmake`): SDL2 from its source
-(2.32.10, `FETCHCONTENT_SOURCE_DIR_SDL2` picks a copy already on the computer), the game as `libmain.so`, and
+`CMakeLists.txt` sees the NDK's toolchain and builds the game alone (`android.cmake`): SDL 3 from its source
+(3.4.20, the computers' own; `FETCHCONTENT_SOURCE_DIR_SDL3` picks a copy already on the computer), the game as
+`libmain.so`, and
 two APKs around them, put together by the SDK's own tools, without Gradle:
 
 - `build/bin/android/outrunners-base.apk`: the game without an assets pack or a signature, which OutRunners
@@ -70,7 +71,7 @@ two APKs around them, put together by the SDK's own tools, without Gradle:
 |---|---|---|
 | SDL's Java (`org.libsdl.app.SDLActivity`, from SDL's source) | `javac`, `d8` | `classes.dex` |
 | The manifest, the icon, the assets (the pack stored, read in place) | `aapt2` | the APK's base |
-| `libmain.so` and `libSDL2.so` (without their symbols), `classes.dex` | `llvm-strip`, `aapt` | the APK |
+| `libmain.so` and `libSDL3.so` (without their symbols), `classes.dex` | `llvm-strip`, `aapt` | the APK |
 | | `zipalign` (and `apksigner`, this computer's) | the APKs, aligned (and signed) |
 
 To give this computer's APK an icon of your own on the launcher, a square JPEG or PNG:
@@ -80,13 +81,13 @@ default it has the project's wheel (`res/`, `tools/make_icon.py`: an adaptive ic
 
 | File | |
 |---|---|
-| `android.cmake` | the Android build: SDL2, `libmain.so`, the APKs |
+| `android.cmake` | the Android build: SDL 3, `libmain.so`, the APKs |
 | `AndroidManifest.xml` | the app: SDL's activity, landscape, full screen |
 | `res/` | the launcher's icon (`tools/make_icon.py`), and `ic_launcher_own.xml` and `ic_launcher_art.png` for a player's own picture |
 | `apk/` | OutRunners APK, the tool that makes a player's APK on their computer ([apk/README.md](apk/README.md)) |
 
-The game's own changes for Android are in `ports/sdl2/main.c` (`__ANDROID__`: the pack in the APK, the app's
-folders, back and the background), `ports/sdl2/touch.c` (`ORUNNERS_TOUCH`), `console/menu.c`
+The game's own changes for Android are in `ports/sdl/main.c` (`__ANDROID__`: the pack in the APK, the app's
+folders, back and the background), `ports/sdl/touch.c` (`ORUNNERS_TOUCH`), `console/menu.c`
 (`ORUNNERS_HANDHELD`: OPTIONS without VIDEO and CONTROLS; `ORUNNERS_SYSTEM_EXIT`: no EXIT on the title),
 `console/console.c` (`console_manual_gears`: the car's transmission) and `runtime/src/tasks.c` (the game's two
 tasks without ucontext, which Android's C library has not).

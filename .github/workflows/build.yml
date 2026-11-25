@@ -1,19 +1,21 @@
 # Name:        build.yml
 # Description: builds the game on clean machines with no ROM set (Linux with GCC, macOS with Clang,
-#              Windows with MSVC), SDL2 inside the executables, and packs what a player runs: the window
+#              Windows with MSVC), SDL 3 inside the executables, and packs what a player runs: the window
 #              ports, OutRunners Arcade and OutRunners, which take their assets out of the player's ROM set
 #              on their first run; the Nintendo Switch's .nsp pieces with devkitPro's toolchain, Android's game
 #              without a pack with the NDK and Anbernic's handhelds' game and the R36S's (ArkOS) with Zig, each in
 #              a package of its own (Sebas, 09-11-2026: not inside the computers' packages) beside the tool that
-#              makes the player's .nsp, APK, PORTS or ports of it, for the three computers; with their licenses.
-#              A tag v* makes a release of those seven packages. It runs on main, its pull requests and the
+#              makes the player's .nsp, APK, PORTS or ports of it, for the three computers; the Raspberry Pi's
+#              games (arm64, Debian 12's) in a package of their own; iOS's and iPadOS's app (Xcode), an
+#              unsigned .ipa in a package of its own; with their licenses. A tag v* makes a release of those
+#              nine packages. It runs on main, its pull requests and the
 #              tags v* alone (Sebas, 30-10-2026: not on the other branches); by hand on any branch. And on the
-#              newest Ubuntu, as the README builds there (its GCC, Python and SDL2). The computers' packages
+#              newest Ubuntu, as the README builds there (its GCC, Python and SDL 3). The computers' packages
 #              carry recomplauncher.json beside the games: RecompLauncher sets the game up from it (the ROM set,
 #              its settings)
-# Version:     0.4.0
+# Version:     0.5.0
 # Created:     27-10-2026
-# Modified:    15-11-2026
+# Modified:    25-11-2026
 # Author:      Sebastian Toyos
 name: build
 
@@ -50,15 +52,17 @@ jobs:
         with:
           submodules: true
 
-      # SDL2 is built from its source (ORUNNERS_STATIC_SDL2): on Linux it needs the headers of what it talks
-      # to (it loads the libraries themselves when the game runs)
+      # SDL 3 is built from its source (ORUNNERS_STATIC_SDL): on Linux it needs the headers of what it talks
+      # to (it loads the libraries themselves when the game runs), and where one is missing it stops at its
+      # configure rather than leave that part out, as SDL 2 did
       - name: Tools (Linux)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y ninja-build libasound2-dev libpulse-dev libx11-dev libxext-dev \
-            libxrandr-dev libxcursor-dev libxi-dev libxinerama-dev libxss-dev libxkbcommon-dev \
-            libwayland-dev wayland-protocols libegl1-mesa-dev libgl1-mesa-dev libudev-dev libdbus-1-dev
+            libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxinerama-dev libxss-dev libxtst-dev \
+            libxkbcommon-dev libwayland-dev wayland-protocols libdecor-0-dev libpipewire-0.3-dev \
+            libdrm-dev libgbm-dev libegl1-mesa-dev libgles2-mesa-dev libgl1-mesa-dev libudev-dev libdbus-1-dev
 
       - name: Tools (macOS)
         if: runner.os == 'macOS'
@@ -66,22 +70,22 @@ jobs:
 
       - name: Configure (Linux)
         if: runner.os == 'Linux'
-        run: cmake -S . -B build/cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DORUNNERS_REFERENCE_TOOLS=OFF -DORUNNERS_STATIC_SDL2=ON
+        run: cmake -S . -B build/cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DORUNNERS_REFERENCE_TOOLS=OFF -DORUNNERS_STATIC_SDL=ON
 
       - name: Configure (macOS, Apple silicon and Intel)
         if: runner.os == 'macOS'
-        run: cmake -S . -B build/cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DORUNNERS_REFERENCE_TOOLS=OFF -DORUNNERS_STATIC_SDL2=ON "-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64" -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
+        run: cmake -S . -B build/cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DORUNNERS_REFERENCE_TOOLS=OFF -DORUNNERS_STATIC_SDL=ON "-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64" -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
 
       - name: Configure (Windows)
         if: runner.os == 'Windows'
-        run: cmake -S . -B build/cmake -DORUNNERS_REFERENCE_TOOLS=OFF -DORUNNERS_STATIC_SDL2=ON
+        run: cmake -S . -B build/cmake -DORUNNERS_REFERENCE_TOOLS=OFF -DORUNNERS_STATIC_SDL=ON
 
       - name: Build
         run: cmake --build build/cmake --config Release --parallel
 
       # what a player runs (no headless runs, no build leftovers), in an archive of our own: the artifacts'
       # zip loses the executables' permissions. With it, the terms the executables come with: the project's,
-      # MAME's and ymfm's (BSD-3: the board's libraries follow their behavior and tables), SDL2's (zlib) and
+      # MAME's and ymfm's (BSD-3: the board's libraries follow their behavior and tables), SDL's (zlib) and
       # Kenney's (CC0: the letters of the windows, the controls' pictures), and the package's README.
       # The .apps are signed ad hoc (no certificate): macOS then offers to open them anyway, where a bundle
       # signed in part is "damaged". The devices' tools (OutRunners NSP, APK, Anbernic, R36S) go to the kit, with
@@ -102,10 +106,10 @@ jobs:
           cp recomplauncher.json dist/outrunners/    # (RecompLauncher sets the game up from it: beside the games)
           cp tools/core/system32/reference/mame/LICENSE dist/outrunners/licenses/MAME.txt
           cp tools/core/system32/reference/ymfm/LICENSE dist/outrunners/licenses/ymfm.txt
-          cp build/cmake/_deps/sdl2-src/LICENSE.txt dist/outrunners/licenses/SDL2.txt
+          cp build/cmake/_deps/sdl3-src/LICENSE.txt dist/outrunners/licenses/SDL3.txt
           cp lan/LICENSE dist/outrunners/licenses/arcade-lan.txt
-          cp ports/sdl2/font/License.txt dist/outrunners/licenses/Kenney-Mini.txt
-          cp ports/sdl2/prompts/License.txt dist/outrunners/licenses/Kenney-Input-Prompts.txt
+          cp ports/sdl/font/License.txt dist/outrunners/licenses/Kenney-Mini.txt
+          cp ports/sdl/prompts/License.txt dist/outrunners/licenses/Kenney-Input-Prompts.txt
           if [ "$RUNNER_OS" = macOS ]; then
             for app in dist/outrunners/*.app; do
               codesign --force --deep --sign - "$app"
@@ -114,7 +118,7 @@ jobs:
           fi
           cp -R dist/outrunners/licenses dist/kit/
           cp LICENSE dist/kit/LICENSE.txt
-          cp ports/sdl2/font/font.bmp dist/kit/    # (on macOS it is inside the .apps alone)
+          cp ports/sdl/font/font.bmp dist/kit/    # (on macOS it is inside the .apps alone)
           ls -la dist/outrunners dist/outrunners/licenses dist/kit
           cd dist
           case "$RUNNER_OS" in
@@ -190,7 +194,8 @@ jobs:
           path: build/bin/android/outrunners-base.apk    # (the game alone: not the runner's own APK beside it)
 
   # Anbernic's H700 handhelds: PORTS's files without the assets (build/bin/anbernic), built with Zig for the
-  # stock firmware's glibc and against its SDL2 (SDL's headers from its source; ports/anbernic/anbernic.cmake);
+  # stock firmware's glibc and against its SDL2 (SDL 2's headers from its source, the port's SDL 3 names over
+  # them: ports/sdl/sdl2_layer.h; ports/anbernic/anbernic.cmake);
   # and the same for the R36S on ArkOS (build/bin/r36s: its glibc 2.30, PortMaster's launcher; ports/r36s)
   anbernic:
     strategy:
@@ -233,13 +238,143 @@ jobs:
           name: outrunners-${{ matrix.name }}
           path: build/bin/${{ matrix.name }}/
 
+  # The Raspberry Pi (3 and later, with the 64-bit Raspberry Pi OS): OutRunners Arcade and OutRunners for arm64,
+  # built by Debian 12's own compiler and libraries (Raspberry Pi OS Legacy's base, glibc 2.36: the games run on
+  # it and on what follows it) in its image on an arm64 runner, SDL 3 inside them. ports/raspberrypi/build.sh
+  # builds and packs them, outrunners-VERSION-raspberrypi-arm64.tar.gz: the script a PC runs in the same system
+  # under QEMU (ports/raspberrypi/wsl.sh)
+  raspberrypi:
+    name: raspberrypi-arm64
+    runs-on: ubuntu-24.04-arm
+    container: debian:bookworm
+    steps:
+      # (git before the checkout: without it the action takes the repository's archive, which has no submodules)
+      - name: Tools
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates git
+
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+
+      - name: Build and pack
+        run: sh ports/raspberrypi/build.sh --tools
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: outrunners-raspberrypi-arm64
+          path: dist/outrunners-${{ env.VERSION }}-raspberrypi-arm64.tar.gz
+
+  # iOS and iPadOS: OutRunners' app for an iPhone or an iPad (arm64), with Xcode through CMake's Xcode generator and
+  # SDL 3 from its source (ports/ios/ios.cmake; the icon the repository's), not signed (no key nor team: the player's
+  # sideloading tool signs it), an .ipa with no assets (build/bin/ios), which takes the assets out of the player's
+  # orunners.zip in its Documents folder at its first start. The check reads them back: the Info.plist's keys, the
+  # executable arm64 for iOS, the bundle's resources, the .ipa's entries
+  ios:
+    name: ios
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+
+      - name: Configure
+        run: |
+          xcodebuild -version
+          cmake -S . -B build/ios -G Xcode -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0 -DORUNNERS_REFERENCE_TOOLS=OFF
+
+      - name: Build
+        run: cmake --build build/ios --config Release --target orunners_ios_games -- CODE_SIGNING_ALLOWED=NO
+
+      - name: Check
+        run: |
+          app="build/bin/ios/OutRunners.app"
+          plist="$app/Info.plist"
+          plutil -lint "$plist"
+          plutil -p "$plist"
+          for key in CFBundleIdentifier CFBundleExecutable MinimumOSVersion UIDeviceFamily UIFileSharingEnabled \
+            LSSupportsOpeningDocumentsInPlace UISupportedInterfaceOrientations UILaunchStoryboardName \
+            UIRequiresFullScreen GCSupportedGameControllers CFBundleIcons; do
+            plutil -extract "$key" xml1 -o - "$plist" > /dev/null || { echo "OutRunners: no $key in Info.plist"; exit 1; }
+          done
+          lipo -info "$app/OutRunners"
+          otool -l "$app/OutRunners" | grep -A4 LC_BUILD_VERSION
+          otool -l "$app/OutRunners" | grep -A2 LC_BUILD_VERSION | grep -Eq "platform (2|IOS)$" || { echo "OutRunners: not iOS's"; exit 1; }
+          for resource in font.bmp LaunchScreen.storyboardc Assets.car; do
+            [ -e "$app/$resource" ] || { echo "OutRunners: no $resource in the app"; exit 1; }
+          done
+          ls -la "$app"
+          unzip -l "build/bin/ios/OutRunners.ipa"
+          unzip -l "build/bin/ios/OutRunners.ipa" | grep -q "Payload/OutRunners.app/OutRunners$" || { echo "OutRunners.ipa: no app"; exit 1; }
+          if unzip -l "build/bin/ios/OutRunners.ipa" | grep -E '\.assets$|\.zip$'; then echo "OutRunners.ipa: assets in it"; exit 1; fi
+          plutil -extract CFBundleIdentifier raw -o - "build/bin/ios/OutRunners.app/Info.plist" | grep -qx io.github.cheviman.outrunners
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: outrunners-ios
+          path: build/bin/ios/*.ipa
+
+  # The iOS app built for the Simulator (arm64, its own build folder) and started there, with no ROM set: it must start,
+  # write its log in its Documents folder and say there where to put orunners.zip. A screenshot of it (its message) in
+  # the artifact outrunners-ios-simulator-screens. A check: the release does not wait for it
+  ios-simulator:
+    name: ios-simulator
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+
+      - name: Configure
+        run: |
+          cmake -S . -B build/ios-simulator -G Xcode -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_SYSROOT=iphonesimulator \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0 -DORUNNERS_REFERENCE_TOOLS=OFF \
+            -DORUNNERS_BIN_DIR="$PWD/build/bin-ios-simulator"
+
+      - name: Build
+        run: cmake --build build/ios-simulator --config Release --target orunners_ios_games -- CODE_SIGNING_ALLOWED=NO
+
+      - name: Start in the Simulator
+        run: |
+          device=$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          runtimes = json.load(sys.stdin)["devices"]
+          phones = [device["udid"] for runtime in sorted(runtimes, reverse=True) if ".iOS-" in runtime
+                    for device in runtimes[runtime] if device["name"].startswith("iPhone")]
+          print(phones[0])')
+          echo "Simulator: $device"
+          xcrun simctl boot "$device"
+          xcrun simctl bootstatus "$device" -b
+          mkdir -p screens
+          xcrun simctl install "$device" "build/bin-ios-simulator/ios/OutRunners.app"
+          xcrun simctl launch "$device" "io.github.cheviman.outrunners"
+          data=$(xcrun simctl get_app_container "$device" "io.github.cheviman.outrunners" data)
+          for second in $(seq 90); do
+            grep -q "orunners.zip" "$data/Documents/outrunners.log" 2>/dev/null && break
+            sleep 1
+          done
+          sleep 3
+          xcrun simctl io "$device" screenshot "screens/outrunners.png"
+          cat "$data/Documents/outrunners.log"
+          grep -q "orunners.zip" "$data/Documents/outrunners.log" || { echo "OutRunners: no message in its log"; exit 1; }
+          xcrun simctl terminate "$device" "io.github.cheviman.outrunners" || true
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: outrunners-ios-simulator-screens
+          path: screens/
+          if-no-files-found: ignore
+
   # The devices' packages (ports/pack_devices.py): outrunners-VERSION-switch.zip, -android.zip, -anbernic.zip
   # and -r36s.zip, each the device's game beside its tool for Windows, macOS and Linux (the
   # computers' kits), font.bmp, the licenses and its README (docs/package)
   devices:
     name: devices
     runs-on: ubuntu-24.04
-    needs: [build, switch, android, anbernic]    # (anbernic: the Anbernic's game and the R36S's)
+    needs: [build, switch, android, anbernic, ios]    # (anbernic: the Anbernic's game and the R36S's)
     steps:
       - uses: actions/checkout@v7
 
@@ -265,6 +400,11 @@ jobs:
 
       - uses: actions/download-artifact@v8
         with:
+          name: outrunners-ios
+          path: devices/ios
+
+      - uses: actions/download-artifact@v8
+        with:
           name: outrunners-windows-x64
           path: computers/windows-x64
 
@@ -285,14 +425,14 @@ jobs:
             tar xzf "computers/$computer/outrunners-$computer-kit.tar.gz" -C "kits/$computer"
           done
           python3 ports/pack_devices.py --kits kits --switch devices/switch --android devices/android \
-            --anbernic devices/anbernic --r36s devices/r36s --version "$VERSION" --out dist
+            --anbernic devices/anbernic --r36s devices/r36s --ios devices/ios --version "$VERSION" --out dist
 
       - uses: actions/upload-artifact@v7
         with:
           name: outrunners-devices
           path: dist/outrunners-*.zip
 
-  # The newest Ubuntu (ubuntu:rolling) with its own GCC, Python and SDL2, built as the README says: the
+  # The newest Ubuntu (ubuntu:rolling) with its own GCC, Python and SDL 3, built as the README says: the
   # games and the reference tools on MAME's code too, which a newer GCC breaks first (issue 6), and the
   # tools' Python compiled with its warnings as errors. No ROM set: nothing runs, and no release waits on it
   linux-newest:
@@ -306,7 +446,7 @@ jobs:
       - name: Tools
         run: |
           apt-get update
-          apt-get install -y --no-install-recommends ca-certificates git build-essential cmake python3 libsdl2-dev
+          apt-get install -y --no-install-recommends ca-certificates git build-essential cmake python3 libsdl3-dev
           gcc --version | head -1
           python3 --version
 
@@ -326,7 +466,7 @@ jobs:
   # A tag v*: the packages as a GitHub release, its notes from docs/releases/TAG.md
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [build, devices]
+    needs: [build, raspberrypi, devices]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -355,4 +495,5 @@ jobs:
             "dist/outrunners-$VERSION-windows-x64.zip" "dist/outrunners-$VERSION-linux-x64.tar.gz" \
             "dist/outrunners-$VERSION-macos-universal.zip" "dist/outrunners-$VERSION-switch.zip" \
             "dist/outrunners-$VERSION-android.zip" "dist/outrunners-$VERSION-anbernic.zip" \
-            "dist/outrunners-$VERSION-r36s.zip"
+            "dist/outrunners-$VERSION-r36s.zip" "dist/outrunners-$VERSION-ios.zip" \
+            "dist/outrunners-$VERSION-raspberrypi-arm64.tar.gz"

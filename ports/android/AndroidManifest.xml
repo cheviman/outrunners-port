@@ -25,9 +25,9 @@
 	<!-- NETWORK: the rooms' datagrams on the local network (arcade-lan, lan/) -->
 	<uses-permission android:name="android.permission.INTERNET" />
 	<!-- and Wi-Fi's multicast lock while it is open, without which some phones drop the rooms' beacons
-	     (ports/sdl2/main.c, android_multicast_lock) -->
+	     (ports/sdl/main.c, android_multicast_lock) -->
 	<uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
-	<!-- STEERING's PHONE VIBRATION: the phone vibrates with the cabinet's wheel motor (ports/sdl2/forces.c,
+	<!-- STEERING's PHONE VIBRATION: the phone vibrates with the cabinet's wheel motor (ports/sdl/forces.c,
 	     SDL's Vibrator; without it vibrating throws) -->
 	<uses-permission android:name="android.permission.VIBRATE" />
 

@@ -10,7 +10,7 @@
 #ifndef ORUNNERS_PORT_WHEEL_EXTRAS_H
 #define ORUNNERS_PORT_WHEEL_EXTRAS_H
 
-#include <SDL.h>
+#include "port_sdl.h"
 #include <stdbool.h>
 
 /* The controls SET UP WHEEL asks for after the wheel, as they may be on another device */
@@ -30,7 +30,7 @@ enum
 typedef struct
 {
 	bool used;
-	SDL_JoystickGUID device;
+	SDL_GUID device;
 	int index;
 	bool axis;       /* a button's: 'index' is an axis */
 	int half;        /* an axis': 0 the whole axis, 1 or -1 its half that way */
@@ -43,16 +43,16 @@ void wheel_extras_open(const char *path);
 /* SET UP WHEEL done: the wheel's (its GUID) controls on other devices, kept in the file and used from now
    on; none, where every control is the wheel's own (the file then empty: the game controller alone, as
    before) */
-void wheel_extras_save(SDL_JoystickGUID wheel, const wheel_extra extras[WHEEL_EXTRAS]);
+void wheel_extras_save(SDL_GUID wheel, const wheel_extra extras[WHEEL_EXTRAS]);
 
-/* SDL_JOYDEVICEADDED, SDL_JOYDEVICEREMOVED: the extras' devices opened as they come */
-void wheel_extras_device_added(int device_index);
+/* SDL_EVENT_JOYSTICK_ADDED, SDL_EVENT_JOYSTICK_REMOVED: the extras' devices opened as they come */
+void wheel_extras_device_added(SDL_JoystickID which);
 void wheel_extras_device_removed(SDL_JoystickID which);
 
 /* True for the wheel set up with controls on other devices; for one of those devices (not the wheel's: no
    player's game controller, its pedals and buttons the wheel's player's) */
-bool wheel_extras_is_wheel(SDL_JoystickGUID guid);
-bool wheel_extras_is_part(SDL_JoystickGUID guid);
+bool wheel_extras_is_wheel(SDL_GUID guid);
+bool wheel_extras_is_part(SDL_GUID guid);
 
 /* A pedal on another device: how far it is pressed, 0 to 32767 (a game controller's trigger's); 0 where
    there is none or its device is not here */

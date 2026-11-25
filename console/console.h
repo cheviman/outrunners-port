@@ -199,7 +199,7 @@ enum
 #define WHEEL_ROTATIONS     7
 extern const int console_wheel_rotations[WHEEL_ROTATIONS];    /* WHEEL_ROTATION_GAME up to 1080 */
 
-/* OPTIONS > STEERING's CENTRING and VIBRATION (ports/sdl2/forces.c): the spring that brings a racing wheel
+/* OPTIONS > STEERING's CENTRING and VIBRATION (ports/sdl/forces.c): the spring that brings a racing wheel
    with force feedback back to the centre, as the cabinet's did (a computer's), and how hard a wheel shakes or
    a game controller rumbles while the cabinet's wheel motor runs (in a crash, off the road); in percent of
    the device's strongest, in steps of FORCE_STEP, 0 none */

@@ -24,7 +24,7 @@
  *      controller's right and left shoulders and START, CONTROLS' own for them. Or an axis no step took,
  *      pulled and let go as a pedal is (a handbrake, a lever): the button held past the middle of its travel.
  *    The device's other buttons are the game controller's others in turn (A, B, X, Y...: CONTROLS binds them),
- *    its first hat the pad. The layout, SDL's line for the device, is added to SDL (SDL_GameControllerAddMapping:
+ *    its first hat the pad. The layout, SDL's line for the device, is added to SDL (SDL_AddGamepadMapping:
  *    the device a game controller from then on) and to the file, in place of the device's line before; the
  *    file's other lines (a layout made elsewhere, SDL's community's) stay as they were. A pedal or a button on
  *    another device (pedals, a shifter of their own: issue 28) is not in the layout: wheel_extras keeps it and
@@ -76,34 +76,34 @@ static struct
 
 /* the game controller's buttons the device's others are, in turn: those CONTROLS binds first, the pad's
    where the device has no hat (GUIDE left out: SDL holds its presses back) */
-static const SDL_GameControllerButton other_buttons[] = {
-	SDL_CONTROLLER_BUTTON_A, SDL_CONTROLLER_BUTTON_B, SDL_CONTROLLER_BUTTON_X, SDL_CONTROLLER_BUTTON_Y,
-	SDL_CONTROLLER_BUTTON_DPAD_UP, SDL_CONTROLLER_BUTTON_DPAD_DOWN, SDL_CONTROLLER_BUTTON_DPAD_LEFT,
-	SDL_CONTROLLER_BUTTON_DPAD_RIGHT, SDL_CONTROLLER_BUTTON_BACK, SDL_CONTROLLER_BUTTON_LEFTSTICK,
-	SDL_CONTROLLER_BUTTON_RIGHTSTICK, SDL_CONTROLLER_BUTTON_MISC1, SDL_CONTROLLER_BUTTON_PADDLE1,
-	SDL_CONTROLLER_BUTTON_PADDLE2, SDL_CONTROLLER_BUTTON_PADDLE3, SDL_CONTROLLER_BUTTON_PADDLE4,
-	SDL_CONTROLLER_BUTTON_TOUCHPAD,
+static const SDL_GamepadButton other_buttons[] = {
+	SDL_GAMEPAD_BUTTON_SOUTH, SDL_GAMEPAD_BUTTON_EAST, SDL_GAMEPAD_BUTTON_WEST, SDL_GAMEPAD_BUTTON_NORTH,
+	SDL_GAMEPAD_BUTTON_DPAD_UP, SDL_GAMEPAD_BUTTON_DPAD_DOWN, SDL_GAMEPAD_BUTTON_DPAD_LEFT,
+	SDL_GAMEPAD_BUTTON_DPAD_RIGHT, SDL_GAMEPAD_BUTTON_BACK, SDL_GAMEPAD_BUTTON_LEFT_STICK,
+	SDL_GAMEPAD_BUTTON_RIGHT_STICK, SDL_GAMEPAD_BUTTON_MISC1, SDL_GAMEPAD_BUTTON_RIGHT_PADDLE1,
+	SDL_GAMEPAD_BUTTON_LEFT_PADDLE1, SDL_GAMEPAD_BUTTON_RIGHT_PADDLE2, SDL_GAMEPAD_BUTTON_LEFT_PADDLE2,
+	SDL_GAMEPAD_BUTTON_TOUCHPAD,
 };
-static const SDL_GameControllerButton chosen_buttons[3] = { SDL_CONTROLLER_BUTTON_RIGHTSHOULDER,
-	SDL_CONTROLLER_BUTTON_LEFTSHOULDER, SDL_CONTROLLER_BUTTON_START };
+static const SDL_GamepadButton chosen_buttons[3] = { SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER,
+	SDL_GAMEPAD_BUTTON_LEFT_SHOULDER, SDL_GAMEPAD_BUTTON_START };
 
 static int axes_of(SDL_Joystick *joystick)
 {
-	const int count = SDL_JoystickNumAxes(joystick);
+	const int count = SDL_GetNumJoystickAxes(joystick);
 
 	return count < 0 ? 0 : (count > AXES ? AXES : count);
 }
 
 static int buttons_of(SDL_Joystick *joystick)
 {
-	const int count = SDL_JoystickNumButtons(joystick);
+	const int count = SDL_GetNumJoystickButtons(joystick);
 
 	return count < 0 ? 0 : (count > BUTTONS ? BUTTONS : count);
 }
 
-static bool is_pad(SDL_GameControllerButton button)
+static bool is_pad(SDL_GamepadButton button)
 {
-	return button >= SDL_CONTROLLER_BUTTON_DPAD_UP && button <= SDL_CONTROLLER_BUTTON_DPAD_RIGHT;
+	return button >= SDL_GAMEPAD_BUTTON_DPAD_UP && button <= SDL_GAMEPAD_BUTTON_DPAD_RIGHT;
 }
 
 void wheel_setup_open(const char *path)
@@ -111,33 +111,32 @@ void wheel_setup_open(const char *path)
 	SDL_strlcpy(file_path, path, sizeof(file_path));
 }
 
-void wheel_setup_device_added(int device_index)
+void wheel_setup_device_added(SDL_JoystickID id)
 {
-	const SDL_JoystickID id = SDL_JoystickGetDeviceInstanceID(device_index);
 	int free_slot = -1;
 
 	for (int slot = 0; slot < DEVICES; slot++)
 	{
-		if (devices[slot] && SDL_JoystickInstanceID(devices[slot]) == id)
+		if (devices[slot] && SDL_GetJoystickID(devices[slot]) == id)
 			return;    /* (open already) */
 		if (!devices[slot] && free_slot < 0)
 			free_slot = slot;
 	}
 	if (free_slot >= 0)
-		devices[free_slot] = SDL_JoystickOpen(device_index);
+		devices[free_slot] = SDL_OpenJoystick(id);
 }
 
 void wheel_setup_device_removed(SDL_JoystickID which)
 {
 	for (int slot = 0; slot < DEVICES; slot++)
-		if (devices[slot] && SDL_JoystickInstanceID(devices[slot]) == which)
+		if (devices[slot] && SDL_GetJoystickID(devices[slot]) == which)
 		{
 			if (slot == setup.device)
 			{
 				setup.device = -1;
 				console_wheel_setup_cancel();    /* (the wheel being set up unplugged) */
 			}
-			SDL_JoystickClose(devices[slot]);
+			SDL_CloseJoystick(devices[slot]);
 			devices[slot] = NULL;
 		}
 }
@@ -150,12 +149,12 @@ static void start_step(int step)
 		setup.device = -1;
 	for (int slot = 0; slot < DEVICES; slot++)
 		for (int axis = 0; devices[slot] && axis < axes_of(devices[slot]); axis++)
-			setup.rest[slot][axis] = SDL_JoystickGetAxis(devices[slot], axis);
+			setup.rest[slot][axis] = SDL_GetJoystickAxis(devices[slot], axis);
 	memset(setup.pressed, 0, sizeof(setup.pressed));
 	memset(setup.held, 0, sizeof(setup.held));
 	for (int slot = 0; slot < DEVICES; slot++)
 		for (int button = 0; devices[slot] && button < buttons_of(devices[slot]); button++)
-			setup.held[slot][button] = SDL_JoystickGetButton(devices[slot], button);
+			setup.held[slot][button] = SDL_GetJoystickButton(devices[slot], button);
 }
 
 /* TURN: the axis turned furthest of any device's, of those resting near their middle */
@@ -167,7 +166,7 @@ static bool take_wheel(void)
 		for (int axis = 0; devices[slot] && axis < axes_of(devices[slot]); axis++)
 		{
 			const int rest = setup.rest[slot][axis];
-			const int moved = SDL_JoystickGetAxis(devices[slot], axis) - rest;
+			const int moved = SDL_GetJoystickAxis(devices[slot], axis) - rest;
 
 			if (abs(rest) < CENTRED && abs(moved) > abs(best_moved))
 			{
@@ -199,7 +198,7 @@ static bool take_pedal(int pedal)
 
 			if ((slot == setup.device && axis == setup.wheel_axis) || (gas_axis && setup.pedal_half[0] == 0))
 				continue;
-			moved = SDL_JoystickGetAxis(devices[slot], axis) - setup.rest[slot][axis];
+			moved = SDL_GetJoystickAxis(devices[slot], axis) - setup.rest[slot][axis];
 			if (gas_axis && (moved > 0 ? 1 : -1) == setup.pedal_half[0])
 				moved = 0;    /* (the gas' half) */
 			if (abs(moved) > abs(setup.pressed[slot][axis]))
@@ -213,7 +212,7 @@ static bool take_pedal(int pedal)
 	if (best < 0 || abs(setup.pressed[best_slot][best]) < PRESSED)
 		return false;
 	rest = setup.rest[best_slot][best];
-	value = SDL_JoystickGetAxis(devices[best_slot], best);
+	value = SDL_GetJoystickAxis(devices[best_slot], best);
 	if (abs(value - rest) > abs(setup.pressed[best_slot][best]) / 4)
 		return false;    /* (still pressed) */
 	setup.pedal_device[pedal] = best_slot;
@@ -252,7 +251,7 @@ static bool take_axis_button(int which)
 			if (axis_taken(slot, axis, which))
 				continue;
 			rest = setup.rest[slot][axis];
-			moved = SDL_JoystickGetAxis(devices[slot], axis) - rest;
+			moved = SDL_GetJoystickAxis(devices[slot], axis) - rest;
 			if (abs(rest) >= CENTRED && (moved > 0) == (rest > 0))
 				moved = 0;    /* (resting at an end: pulled toward the other) */
 			if (abs(moved) > abs(setup.pressed[slot][axis]))
@@ -266,7 +265,7 @@ static bool take_axis_button(int which)
 	if (best < 0 || abs(setup.pressed[best_slot][best]) < PRESSED)
 		return false;
 	rest = setup.rest[best_slot][best];
-	if (abs(SDL_JoystickGetAxis(devices[best_slot], best) - rest) > abs(setup.pressed[best_slot][best]) / 4)
+	if (abs(SDL_GetJoystickAxis(devices[best_slot], best) - rest) > abs(setup.pressed[best_slot][best]) / 4)
 		return false;    /* (still pulled) */
 	setup.button_device[which] = best_slot;
 	setup.buttons[which] = best;
@@ -283,7 +282,7 @@ static bool take_button(int which)
 	for (int slot = 0; slot < DEVICES; slot++)
 		for (int button = 0; devices[slot] && button < buttons_of(devices[slot]); button++)
 		{
-			const Uint8 down = SDL_JoystickGetButton(devices[slot], button);
+			const Uint8 down = SDL_GetJoystickButton(devices[slot], button);
 			const bool fresh = down && !setup.held[slot][button];
 			bool taken = false;
 
@@ -321,9 +320,9 @@ static void append(char *mapping, const char *format, ...)
 	va_end(arguments);
 }
 
-static void append_pedal(char *mapping, SDL_GameControllerAxis trigger, int pedal)
+static void append_pedal(char *mapping, SDL_GamepadAxis trigger, int pedal)
 {
-	const char *name = SDL_GameControllerGetStringForAxis(trigger);
+	const char *name = SDL_GetGamepadStringForAxis(trigger);
 
 	if (setup.pedal_device[pedal] != setup.device)
 		return;    /* (on its own device: wheel_extras') */
@@ -336,21 +335,21 @@ static void append_pedal(char *mapping, SDL_GameControllerAxis trigger, int peda
 /* The device's line: its GUID, its name (no commas), what the steps took on it, its other buttons and its hat */
 static void make_mapping(SDL_Joystick *device, char *mapping, char *guid, size_t guid_size)
 {
-	const char *name = SDL_JoystickName(device);
-	const bool hat = SDL_JoystickNumHats(device) > 0;
+	const char *name = SDL_GetJoystickName(device);
+	const bool hat = SDL_GetNumJoystickHats(device) > 0;
 	size_t other = 0;
 
-	SDL_JoystickGetGUIDString(SDL_JoystickGetGUID(device), guid, (int)guid_size);
+	SDL_GUIDToString(SDL_GetJoystickGUID(device), guid, (int)guid_size);
 	snprintf(mapping, MAPPING_SIZE, "%s,", guid);
 	for (const char *letter = name ? name : "Racing wheel"; *letter; letter++)
 		append(mapping, "%c", *letter == ',' ? ' ' : *letter);
-	append(mapping, ",%s:a%d%s,", SDL_GameControllerGetStringForAxis(SDL_CONTROLLER_AXIS_LEFTX), setup.wheel_axis,
+	append(mapping, ",%s:a%d%s,", SDL_GetGamepadStringForAxis(SDL_GAMEPAD_AXIS_LEFTX), setup.wheel_axis,
 		setup.wheel_inverted ? "~" : "");
-	append_pedal(mapping, SDL_CONTROLLER_AXIS_TRIGGERRIGHT, 0);
-	append_pedal(mapping, SDL_CONTROLLER_AXIS_TRIGGERLEFT, 1);
+	append_pedal(mapping, SDL_GAMEPAD_AXIS_RIGHT_TRIGGER, 0);
+	append_pedal(mapping, SDL_GAMEPAD_AXIS_LEFT_TRIGGER, 1);
 	for (int which = 0; which < 3; which++)
 	{
-		const char *button = SDL_GameControllerGetStringForButton(chosen_buttons[which]);
+		const char *button = SDL_GetGamepadStringForButton(chosen_buttons[which]);
 
 		if (setup.button_device[which] != setup.device)
 			continue;    /* (on its own device: wheel_extras') */
@@ -369,7 +368,7 @@ static void make_mapping(SDL_Joystick *device, char *mapping, char *guid, size_t
 			other++;
 		if (other == SDL_arraysize(other_buttons))
 			break;
-		append(mapping, "%s:b%d,", SDL_GameControllerGetStringForButton(other_buttons[other++]), button);
+		append(mapping, "%s:b%d,", SDL_GetGamepadStringForButton(other_buttons[other++]), button);
 	}
 	if (hat)
 		append(mapping, "dpup:h0.1,dpright:h0.2,dpdown:h0.4,dpleft:h0.8,");
@@ -450,7 +449,7 @@ static void make_extras(wheel_extra extras[WHEEL_EXTRAS])
 		if (setup.pedal_device[pedal] != setup.device && devices[setup.pedal_device[pedal]])
 		{
 			extras[WHEEL_EXTRA_GAS + pedal].used = true;
-			extras[WHEEL_EXTRA_GAS + pedal].device = SDL_JoystickGetGUID(devices[setup.pedal_device[pedal]]);
+			extras[WHEEL_EXTRA_GAS + pedal].device = SDL_GetJoystickGUID(devices[setup.pedal_device[pedal]]);
 			extras[WHEEL_EXTRA_GAS + pedal].index = setup.pedal_axis[pedal];
 			extras[WHEEL_EXTRA_GAS + pedal].half = setup.pedal_half[pedal];
 			extras[WHEEL_EXTRA_GAS + pedal].inverted = setup.pedal_inverted[pedal];
@@ -459,7 +458,7 @@ static void make_extras(wheel_extra extras[WHEEL_EXTRAS])
 		if (setup.button_device[which] != setup.device && devices[setup.button_device[which]])
 		{
 			extras[WHEEL_EXTRA_SHIFT_UP + which].used = true;
-			extras[WHEEL_EXTRA_SHIFT_UP + which].device = SDL_JoystickGetGUID(devices[setup.button_device[which]]);
+			extras[WHEEL_EXTRA_SHIFT_UP + which].device = SDL_GetJoystickGUID(devices[setup.button_device[which]]);
 			extras[WHEEL_EXTRA_SHIFT_UP + which].index = setup.buttons[which];
 			extras[WHEEL_EXTRA_SHIFT_UP + which].axis = setup.button_axis[which];
 			extras[WHEEL_EXTRA_SHIFT_UP + which].half = setup.button_half[which];
@@ -477,37 +476,37 @@ static SDL_JoystickID finish(void)
 
 	make_mapping(device, mapping, guid, sizeof(guid));
 	fprintf(stderr, "SET UP WHEEL: %s\n", mapping);
-	if (SDL_GameControllerAddMapping(mapping) < 0)
+	if (!SDL_AddGamepadMapping(mapping))
 	{
 		fprintf(stderr, "SET UP WHEEL: SDL takes no layout: %s\n", SDL_GetError());
-		return -1;
+		return 0;
 	}
 	write_mapping(mapping, guid);
 	make_extras(extras);
-	wheel_extras_save(SDL_JoystickGetGUID(device), extras);
-	return SDL_JoystickInstanceID(device);
+	wheel_extras_save(SDL_GetJoystickGUID(device), extras);
+	return SDL_GetJoystickID(device);
 }
 
 SDL_JoystickID wheel_setup_frame(void)
 {
 	const int step = console_wheel_setup_step();
-	SDL_JoystickID done = -1;
+	SDL_JoystickID done = 0;    /* (SDL 3's no joystick) */
 	bool took;
 
 	if (step < 0)
 	{
 		setup.step = -1;
-		return -1;
+		return 0;
 	}
 	if (step != setup.step)
 	{
 		start_step(step);
-		return -1;
+		return 0;
 	}
 	if (step != WHEEL_SETUP_TURN && (setup.device < 0 || !devices[setup.device]))
 	{
 		console_wheel_setup_cancel();
-		return -1;
+		return 0;
 	}
 	switch (step)
 	{
@@ -523,7 +522,7 @@ SDL_JoystickID wheel_setup_frame(void)
 			break;
 	}
 	if (!took)
-		return -1;
+		return 0;
 	if (step == WHEEL_SETUP_STEPS - 1)
 		done = finish();
 	console_wheel_setup_took();

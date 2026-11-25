@@ -1,12 +1,12 @@
 """
     Name:        pack_devices.py
     Description: the release's packages of the devices, one each (Sebas, 09-11-2026: not inside the
-                 computers' packages): outrunners-VERSION-switch.zip, -android.zip, -anbernic.zip and
-                 -r36s.zip, each the device's game without assets beside the tool that makes the player's game
-                 of it, for Windows, macOS and Linux
-    Version:     0.2.0
+                 computers' packages): outrunners-VERSION-switch.zip, -android.zip, -anbernic.zip,
+                 -r36s.zip and -ios.zip, each the device's game without assets beside the tool that makes the
+                 player's game of it, for Windows, macOS and Linux (iOS has no tool)
+    Version:     0.3.0
     Created:     09-11-2026
-    Modified:    15-11-2026
+    Modified:    25-11-2026
     Author:      Sebastian Toyos
 
     license:BSD-3-Clause
@@ -19,8 +19,11 @@
     entries), so that the macOS and Linux tools run as they are unpacked there. The zip's name carries the
     release's version (--version: v1.3.2, the CI's "dev" else), the folder in it does not.
 
+    iOS has no tool: outrunners-ios.zip holds the unsigned .ipa (--ios, the CI's ios job: ports/ios/ios.cmake),
+    which the player's sideloading tool signs as it installs it, with its README and the licenses.
+
     python3 ports/pack_devices.py --kits DIR --switch DIR --android DIR --anbernic DIR --r36s DIR [--version V]
-        --out DIR
+        [--ios DIR] --out DIR
 """
 import argparse
 import os
@@ -96,6 +99,26 @@ def pack(device, tool, readme, game, kits, out, version):
         print("   " + name)
 
 
+def pack_ios(ipas, kits, out, version):
+    """outrunners-ios.zip: the README, the licenses and the .ipa"""
+    top = "outrunners-ios"
+    target = os.path.join(out, "outrunners-%s-ios.zip" % version if version else top + ".zip")
+    shared = os.path.join(kits, "linux-x64", "kit")    # (the licenses: the same in every kit)
+    found = sorted(name for name in os.listdir(need(ipas)) if name.endswith(".ipa"))
+    if found != ["OutRunners.ipa"]:
+        sys.exit("pack_devices: %s has %s, not OutRunners.ipa" % (ipas, found))
+    with zipfile.ZipFile(target, "w") as archive:
+        add(archive, need(os.path.join(DOCS, "README-ios.txt")), top + "/README.txt", FILE)
+        add(archive, need(os.path.join(shared, "LICENSE.txt")), top + "/LICENSE.txt", FILE)
+        add_folder(archive, need(os.path.join(shared, "licenses")), top + "/licenses")
+        add(archive, os.path.join(ipas, "OutRunners.ipa"), top + "/OutRunners.ipa", FILE)
+    with zipfile.ZipFile(target) as archive:
+        names = archive.namelist()
+    print("%s: %d files, %d bytes" % (target, len(names), os.path.getsize(target)))
+    for name in names:
+        print("   " + name)
+
+
 def main():
     parser = argparse.ArgumentParser(description="The devices' packages of a release")
     parser.add_argument("--kits", required=True, help="the computers' kits: windows-x64, macos-universal, linux-x64")
@@ -104,6 +127,7 @@ def main():
     parser.add_argument("--anbernic", required=True, help="Anbernic's game: OutRunners.sh and outrunners/")
     parser.add_argument("--r36s", required=True, help="the R36S's game: OutRunners.sh and outrunners/")
     parser.add_argument("--version", default="", help="the release's version in the zips' names (v1.3.2)")
+    parser.add_argument("--ios", help="iOS's game: OutRunners.ipa (none: no iOS package)")
     parser.add_argument("--out", required=True, help="where the zips go")
     arguments = parser.parse_args()
     os.makedirs(arguments.out, exist_ok=True)
@@ -111,6 +135,8 @@ def main():
              "r36s": arguments.r36s}
     for device, tool, readme in DEVICES:
         pack(device, tool, readme, games[device], arguments.kits, arguments.out, arguments.version)
+    if arguments.ios:
+        pack_ios(arguments.ios, arguments.kits, arguments.out, arguments.version)
 
 
 if __name__ == "__main__":

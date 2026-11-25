@@ -33,17 +33,17 @@ static struct
 {
 	char path[1024];
 	bool used;                     /* a wheel with controls on other devices */
-	SDL_JoystickGUID wheel;
+	SDL_GUID wheel;
 	wheel_extra extras[WHEEL_EXTRAS];
 	SDL_Joystick *parts[PARTS];    /* those devices, open */
 } kept;
 
-static bool same(SDL_JoystickGUID one, SDL_JoystickGUID other)
+static bool same(SDL_GUID one, SDL_GUID other)
 {
 	return memcmp(one.data, other.data, sizeof(one.data)) == 0;
 }
 
-static bool is_wanted(SDL_JoystickGUID guid)
+static bool is_wanted(SDL_GUID guid)
 {
 	for (int which = 0; kept.used && which < WHEEL_EXTRAS; which++)
 		if (kept.extras[which].used && same(kept.extras[which].device, guid))
@@ -54,8 +54,12 @@ static bool is_wanted(SDL_JoystickGUID guid)
 /* (every device here that has one of the controls, opened) */
 static void open_parts(void)
 {
-	for (int index = 0; index < SDL_NumJoysticks(); index++)
-		wheel_extras_device_added(index);
+	int count = 0;
+	SDL_JoystickID *ids = SDL_GetJoysticks(&count);    /* (SDL 3's joysticks by their ids) */
+
+	for (int index = 0; index < count; index++)
+		wheel_extras_device_added(ids[index]);
+	SDL_free(ids);
 }
 
 static void close_parts(void)
@@ -63,7 +67,7 @@ static void close_parts(void)
 	for (int slot = 0; slot < PARTS; slot++)
 		if (kept.parts[slot])
 		{
-			SDL_JoystickClose(kept.parts[slot]);
+			SDL_CloseJoystick(kept.parts[slot]);
 			kept.parts[slot] = NULL;
 		}
 }
@@ -90,7 +94,7 @@ void wheel_extras_open(const char *path)
 			continue;
 		if (strcmp(name, "wheel") == 0)
 		{
-			kept.wheel = SDL_JoystickGetGUIDFromString(guid);
+			kept.wheel = SDL_StringToGUID(guid);
 			kept.used = true;
 			continue;
 		}
@@ -98,7 +102,7 @@ void wheel_extras_open(const char *path)
 			if (strcmp(name, names[which]) == 0)
 			{
 				kept.extras[which].used = true;
-				kept.extras[which].device = SDL_JoystickGetGUIDFromString(guid);
+				kept.extras[which].device = SDL_StringToGUID(guid);
 				kept.extras[which].index = index;
 				kept.extras[which].axis = axis && which > WHEEL_EXTRA_BRAKE;
 				kept.extras[which].half = half;
@@ -108,7 +112,7 @@ void wheel_extras_open(const char *path)
 	fclose(file);
 }
 
-void wheel_extras_save(SDL_JoystickGUID wheel, const wheel_extra extras[WHEEL_EXTRAS])
+void wheel_extras_save(SDL_GUID wheel, const wheel_extra extras[WHEEL_EXTRAS])
 {
 	FILE *file;
 	char guid[64];
@@ -130,14 +134,14 @@ void wheel_extras_save(SDL_JoystickGUID wheel, const wheel_extra extras[WHEEL_EX
 		file);
 	if (any)
 	{
-		SDL_JoystickGetGUIDString(wheel, guid, sizeof(guid));
+		SDL_GUIDToString(wheel, guid, sizeof(guid));
 		fprintf(file, "wheel %s\n", guid);
 	}
 	for (int which = 0; any && which < WHEEL_EXTRAS; which++)
 	{
 		if (!extras[which].used)
 			continue;
-		SDL_JoystickGetGUIDString(extras[which].device, guid, sizeof(guid));
+		SDL_GUIDToString(extras[which].device, guid, sizeof(guid));
 		if (which <= WHEEL_EXTRA_BRAKE)
 			fprintf(file, "%s %s %d %d %d\n", names[which], guid, extras[which].index, extras[which].half,
 				extras[which].inverted ? 1 : 0);
@@ -151,40 +155,39 @@ void wheel_extras_save(SDL_JoystickGUID wheel, const wheel_extra extras[WHEEL_EX
 	open_parts();
 }
 
-void wheel_extras_device_added(int device_index)
+void wheel_extras_device_added(SDL_JoystickID id)
 {
-	const SDL_JoystickID id = SDL_JoystickGetDeviceInstanceID(device_index);
 	int free_slot = -1;
 
-	if (!is_wanted(SDL_JoystickGetDeviceGUID(device_index)))
+	if (!is_wanted(SDL_GetJoystickGUIDForID(id)))
 		return;
 	for (int slot = 0; slot < PARTS; slot++)
 	{
-		if (kept.parts[slot] && SDL_JoystickInstanceID(kept.parts[slot]) == id)
+		if (kept.parts[slot] && SDL_GetJoystickID(kept.parts[slot]) == id)
 			return;    /* (open already) */
 		if (!kept.parts[slot] && free_slot < 0)
 			free_slot = slot;
 	}
 	if (free_slot >= 0)
-		kept.parts[free_slot] = SDL_JoystickOpen(device_index);
+		kept.parts[free_slot] = SDL_OpenJoystick(id);
 }
 
 void wheel_extras_device_removed(SDL_JoystickID which)
 {
 	for (int slot = 0; slot < PARTS; slot++)
-		if (kept.parts[slot] && SDL_JoystickInstanceID(kept.parts[slot]) == which)
+		if (kept.parts[slot] && SDL_GetJoystickID(kept.parts[slot]) == which)
 		{
-			SDL_JoystickClose(kept.parts[slot]);
+			SDL_CloseJoystick(kept.parts[slot]);
 			kept.parts[slot] = NULL;
 		}
 }
 
-bool wheel_extras_is_wheel(SDL_JoystickGUID guid)
+bool wheel_extras_is_wheel(SDL_GUID guid)
 {
 	return kept.used && same(kept.wheel, guid);
 }
 
-bool wheel_extras_is_part(SDL_JoystickGUID guid)
+bool wheel_extras_is_part(SDL_GUID guid)
 {
 	return is_wanted(guid) && !wheel_extras_is_wheel(guid);
 }
@@ -195,7 +198,7 @@ static SDL_Joystick *part_of(int which)
 	if (!kept.used || which < 0 || which >= WHEEL_EXTRAS || !kept.extras[which].used)
 		return NULL;
 	for (int slot = 0; slot < PARTS; slot++)
-		if (kept.parts[slot] && same(SDL_JoystickGetGUID(kept.parts[slot]), kept.extras[which].device))
+		if (kept.parts[slot] && same(SDL_GetJoystickGUID(kept.parts[slot]), kept.extras[which].device))
 			return kept.parts[slot];
 	return NULL;
 }
@@ -203,7 +206,7 @@ static SDL_Joystick *part_of(int which)
 /* An axis' travel, 0 to 32767 */
 static int travel_of(SDL_Joystick *part, const wheel_extra *extra)
 {
-	const int value = SDL_JoystickGetAxis(part, extra->index);
+	const int value = SDL_GetJoystickAxis(part, extra->index);
 	int travel;
 
 	if (extra->half != 0)
@@ -228,5 +231,5 @@ bool wheel_extras_button(int which)
 		return false;
 	if (kept.extras[which].axis)
 		return travel_of(part, &kept.extras[which]) >= 16384;    /* (past its middle, as SDL's button on an axis) */
-	return SDL_JoystickGetButton(part, kept.extras[which].index) != 0;
+	return SDL_GetJoystickButton(part, kept.extras[which].index);
 }

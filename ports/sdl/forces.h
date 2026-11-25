@@ -10,7 +10,7 @@
 #ifndef ORUNNERS_PORT_FORCES_H
 #define ORUNNERS_PORT_FORCES_H
 
-#include <SDL.h>
+#include "port_sdl.h"
 
 #include <stdbool.h>
 
@@ -21,7 +21,7 @@ void forces_start(void);
 /* Once a frame, for each player: their game controller (or NULL), the spring that centres a racing wheel
    ('centring', percent of the wheel's strongest: 0 none), and how hard it shakes or rumbles ('shake', percent:
    0 never) while the cabinet's wheel motor runs ('motor': its seat's output port D bit 4) */
-void forces_frame(int player, SDL_GameController *pad, int centring, int shake, bool motor);
+void forces_frame(int player, SDL_Gamepad *pad, int centring, int shake, bool motor);
 
 /* Once a frame: the device's own vibrator (a phone's), for the players with no game controller (the touch
    controls): it vibrates at 'shake' percent while 'motor' (one of those players' seats' wheel motor) runs */
@@ -31,7 +31,7 @@ void forces_device(int shake, bool motor);
 void forces_hold(void);
 
 /* Before a game controller is closed: its forces stopped and its haptic closed */
-void forces_release(SDL_GameController *pad);
+void forces_release(SDL_Gamepad *pad);
 
 /* As the game ends: every force stopped and every haptic closed */
 void forces_stop(void);
