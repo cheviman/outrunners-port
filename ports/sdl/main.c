@@ -70,6 +70,7 @@
 #include "s32/script.h"
 #include "s32/video.h"
 #include "sound/chips.h"
+#include "s32/multipcm.h"    /* (MULTIPCM_CATEGORIES: SOUND's gains) */
 #include "game/assets.h"
 #ifndef ORUNNERS_HANDHELD    /* (a device makes nothing from the ROM set: its pack comes with the game) */
 #include "first_run.h"
@@ -1218,10 +1219,12 @@ static void save_window_settings(void)
 	if (!output)
 		return;
 	fprintf(output, "window_scale=%d\nfull_screen=%d\npixels=%s\nwide=%d\nvsync=%d\ntwo_players=%s\nvolume=%d\n"
+		"music_volume=%d\neffects_volume=%d\nvoice_volume=%d\n"
 		"name=%s\nfps=%d\ndead_zone=%d\nsensitivity=%d\nwheel_rotation=%d\nsteering_speed=%d\ncentring=%d\n"
 		"vibration=%d\nphone_vibration=%d\nboth_radios=%d\n",
 		settings->window_scale, settings->full_screen, pixel_names[settings->pixels], settings->wide, settings->vsync,
-		settings->vertical ? "vertical" : "horizontal", settings->volume, settings->name, settings->fps,
+		settings->vertical ? "vertical" : "horizontal", settings->volume, settings->music_volume,
+		settings->effects_volume, settings->voice_volume, settings->name, settings->fps,
 		settings->dead_zone, settings->sensitivity, settings->wheel_rotation, settings->steering_speed,
 		settings->centring, settings->vibration, settings->phone_vibration, settings->both_radios);
 	fclose(output);
@@ -1267,6 +1270,12 @@ static void load_window_settings(void)
 			settings->vsync = number != 0;
 		else if (sscanf(line, "volume=%d", &number) == 1 && number >= 0 && number <= 10)
 			settings->volume = number;
+		else if (sscanf(line, "music_volume=%d", &number) == 1 && number >= 0 && number <= 10)
+			settings->music_volume = number;
+		else if (sscanf(line, "effects_volume=%d", &number) == 1 && number >= 0 && number <= 10)
+			settings->effects_volume = number;
+		else if (sscanf(line, "voice_volume=%d", &number) == 1 && number >= 0 && number <= 10)
+			settings->voice_volume = number;
 		else if (sscanf(line, "fps=%d", &number) == 1)
 			settings->fps = number != 0;
 		else if (sscanf(line, "both_radios=%d", &number) == 1)
@@ -1755,6 +1764,16 @@ static void on_controls_update(void)
 	int wheels[PLAYERS], gases[PLAYERS], brakes[PLAYERS];
 
 	read_events();
+#ifdef ORUNNERS_CONSOLE
+	{
+		/* OPTIONS > SOUND's MUSIC, EFFECTS and VOICE as they are now (issue 57) */
+		double fm;
+		int32_t pcm[MULTIPCM_CATEGORIES];
+
+		console_sound_gains(&fm, pcm);
+		sound_chips_set_gains(fm, pcm);
+	}
+#endif
 	if (script)
 	{
 		s32_script_apply(script, s32_board.frame);
@@ -3011,6 +3030,7 @@ int main(int argc, char **argv)
 	sound_cpu_attach();
 #ifdef ORUNNERS_CONSOLE
 	sound_chips_join_sides(true);
+	sound_chips_set_categories(console_sample_category);    /* (SOUND's MUSIC, EFFECTS and VOICE) */
 	console_attach();
 #endif
 	if (!script)

@@ -13,6 +13,18 @@
 #include <stddef.h>
 #include <stdint.h>
 
+/* The MultiPCM's samples by what they are (console/pcm_categories.c, made by tools/pcm_categories.py from
+   pcm_samples.txt), for SOUND's MUSIC, EFFECTS and VOICE (issue 57) */
+enum { PCM_MUSIC, PCM_EFFECTS, PCM_VOICE };
+typedef struct
+{
+	uint32_t offset;     /* in the pcm region */
+	uint32_t length;
+	uint8_t category;    /* PCM_* */
+} console_pcm_sample;
+extern const console_pcm_sample console_pcm_samples[];
+extern const size_t console_pcm_sample_count;
+
 #define LEFT_SEAT                   0u    /* screen index: the left seat's screen (screen 1); the right one's is 1 */
 
 /* The game modes (screen game_mode) */

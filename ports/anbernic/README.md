@@ -12,7 +12,7 @@ is the same game as on a computer, with what a handheld asks for:
   another button, and its DEFAULTS brings these back (a `controls.ini` kept from an earlier version keeps the
   buttons it has until then).
 - **MENU leaves the game**, as it leaves the firmware's other games; the volume keys turn the game's volume
-  (OPTIONS' VOLUME).
+  (OPTIONS > SOUND's VOLUME).
 - **The board's video on the four cores** (`runtime/src/workers.c`), the left screen alone in a one player
   game (`s32_video_show_screens`).
 - **No first run on the handheld**: the game's graphics, sound and data come in its folder, taken out of

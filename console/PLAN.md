@@ -808,6 +808,33 @@ merged here; this repository adds console/, the ports and their documents.
   real pixels, its letters whole and sharp; OutRunners' title in WIDE 16:9 (796 x 448) and OutRunners Arcade's two
   screens (1280 x 448), the pictures right (the blend mode above).
 
+- The northern lights of stage 26 and the close-up route map's half-rate picture see-through (issue 32): the game
+  draws them every other frame, two of the screen's frames on and two off, which blinks as Niagara's spray did.
+  aurora_update and route_map_landmark_update in console/replaced.txt (src/ written again: their four lines; a
+  line of src/race/race_cars.c the decompiler wrote otherwise on this tree, perspective_scales[depth] read as the
+  crash text's fields, kept as the decompilation has it: to look at there), the console's in console.c: their
+  counts left as they are, as they also time the animations (animation_advance counts its frame down each call),
+  the frames the game leaves out draw the same picture again (draw_object), and every frame's sprites are a
+  ghost's (sprites_see_through, which backdrop_translucent_update takes too). Checked on the console's headless
+  game, FULL's race (116,000 frames): the sound the same, the picture different from frame 92,073 to 108,324
+  alone (stage 26), the state from 92,069 on (the sprite list's words); frames 95,001 and 95,002, two of the
+  game's frames off: the lights there now, faint. The arcade build blinks as the cabinet does. Not seen: the
+  route map's picture (in ARCADE's close-up route map), a screen.
+- OPTIONS > SOUND (issue 57, a player's: the DJ over the radio's songs, the engine and the tyres): VOLUME's line is
+  SOUND's page, VOLUME (the whole sound), MUSIC (the YM3438 and the songs' samples, the drums and the
+  instruments), EFFECTS (the engines, the tyres, the crashes, the scenery) and VOICE (the DJ and the other
+  voices), 0 to 10 each, 5 the game's own, kept in outrunners.ini (music_volume, effects_volume, voice_volume).
+  The MultiPCM's samples by what they are: console/pcm_categories.c, made by tools/pcm_categories.py from
+  pcm_samples.txt (241 samples: 142 MUSIC, 51 EFFECTS, 48 VOICE, by the folder of their names); a voice takes its
+  sample's category as its key goes on (multipcm's category_of, through the banks' pages as they are then:
+  s32_pcm_region_address; console_sample_category), each category its gain (multipcm's category_gain, 256 as it
+  is) and the YM3438 its own in the mix (sound_chips_set_gains, console_sound_gains: the setting over 5). The
+  console headless's --sound-mix MUSIC,EFFECTS,VOICE. Checked: ARCADE's race to Niagara (16,001 frames) at
+  5,5,5 the same as before, state and sound; with VOICE 0 the sound different in 1,220 frames alone, the
+  voices' (SEGA's at 2 s, the menus' and the car select's, Go! at 61 s, the checkpoint at 181 s), the state the
+  same; with MUSIC 0 in 15,306; the windows' runs at 5 each the same as before, state, picture and sound. Not
+  heard yet: the mix by ear.
+
 ## To do
 
 - 32:9 (issue 44): for one player it would need each stage's scenery drawn further out than the game places
@@ -817,10 +844,6 @@ merged here; this repository adds console/, the ports and their documents.
 - Issue 25's last report, a split second of something wrong from the results to the title: not seen
   pressing START on the route map or the ranking after ARCADE's race (the fades smooth, frame by frame);
   the player to say which screen.
-
-- The northern lights of stage 26 are drawn every other frame too (aurora_update, by the count that also
-  times their animations), and one of the route map's landmarks: see-through as the spray, if they blink as
-  much.
 
 - FULL's and REVERSE's background changes where the view turns the other way than the background's pages
   were drawn for (the fork's branch road the player takes): the turn's set keeps the swaps out of sight

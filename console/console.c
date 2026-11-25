@@ -147,23 +147,64 @@ void network_check_stand_alone(void)
 
 /* ---- the picture ---- */
 
-/* The sprites on the background that the game draws every other frame so that they look faint (the spray of
-   Niagara's falls, the pyramids of stages 13 and 20): two of the screen's frames on and two off, which shows
-   as a blink (a player's report). Here they are drawn every frame and see-through: the count kept odd for the
-   game's handler, which draws when its next is even, and the sprites it puts in the list marked as a ghost's
-   (S32_SPRITE_GHOST: half their colour, half the colour under them), what the frames on and off add up to */
-void backdrop_translucent_update(void)
+/* The sprites put in the list from 'first' on (the object's, this frame) marked as a ghost's (S32_SPRITE_GHOST:
+   half their colour, half the colour under them), on both screens' lists */
+static void sprites_see_through(uint32_t first)
 {
-	const uint32_t first = screen->sprite_list_last + 0x10u;
-
-	current_object->backdrop_translucent.frame_count |= 1u;
-	original_backdrop_translucent_update();
 	for (uint32_t sprite = first; sprite <= screen->sprite_list_last; sprite += 0x10u)
 		if ((SPRITE_WORDS(sprite)[0] >> 14) == 0u)    /* (a sprite, not the group's jump) */
 		{
 			SPRITE_WORDS(sprite)[7] |= S32_SPRITE_GHOST;
 			SPRITE_WORDS(sprite + 0x3000u)[7] |= S32_SPRITE_GHOST;
 		}
+}
+
+/* The sprites on the background that the game draws every other frame so that they look faint (the spray of
+   Niagara's falls, the pyramids of stages 13 and 20): two of the screen's frames on and two off, which shows
+   as a blink (a player's report). Here they are drawn every frame and see-through: the count kept odd for the
+   game's handler, which draws when its next is even, and the sprites it puts in the list marked as a ghost's,
+   what the frames on and off add up to */
+void backdrop_translucent_update(void)
+{
+	const uint32_t first = screen->sprite_list_last + 0x10u;
+
+	current_object->backdrop_translucent.frame_count |= 1u;
+	original_backdrop_translucent_update();
+	sprites_see_through(first);
+}
+
+/* The northern lights over stage 26 (issue 32), drawn by the game every other frame (when their countdown is odd)
+   so that they look faint, which blinks as the spray did. Their countdown also times their animations, so it is
+   left as it is: the frames the game leaves out draw the same picture again (draw_object, no animation_advance:
+   their animation at its own pace), and every frame's sprites are see-through, as the spray's */
+void aurora_update(void)
+{
+	const uint32_t first = screen->sprite_list_last + 0x10u;
+
+	original_aurora_update();
+	if ((current_object->aurora.countdown & 1u) == 0u)
+		draw_object(0u);    /* (a frame the game leaves out: the same picture) */
+	sprites_see_through(first);
+}
+
+/* The close-up route map's one picture at half its rate (its record's half_rate, issue 32): the game steps its
+   animation and draws it every other frame (toggle), which blinks; here the frames it leaves out draw the same
+   picture again (its animation at half its rate still), and every frame's sprites are see-through, as the
+   spray's. The others, and the frame it ends at, as the game's */
+void route_map_landmark_update(void)
+{
+	const uint32_t first = screen->sprite_list_last + 0x10u;
+	const bool half_rate = current_object->state == 1u && current_object->route_map_landmark.index_then_half_rate != 0u;
+
+	original_route_map_landmark_update();
+	if (!half_rate || current_object->flags == 0u)
+		return;
+	if (current_object->route_map_landmark.toggle != 0u)
+	{
+		map_depth_from_y();
+		draw_object(0u);    /* (a frame the game leaves out: the same picture) */
+	}
+	sprites_see_through(first);
 }
 
 /* WIDE's sides as the game's edges read them (support.h's SCREEN_MORE_LEFT and SCREEN_MORE_RIGHT): where the

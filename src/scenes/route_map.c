@@ -3,7 +3,7 @@
  *    Description: the route map after the race: the car, the signs, the landmarks, the legs of the route, the stage results and the GAME OVER banner
  *    Version:     0.1.0
  *    Created:     12-10-2026
- *    Modified:    24-11-2026
+ *    Modified:    25-11-2026
  *    Author:      Sebastian Toyos
  *
  *    OutRunners (arcade, Sega System Multi 32): the game's V70 program decompiled into C by
@@ -860,7 +860,7 @@ void route_map_sign_update(void)
    follows the map (its x and y plus the offsets), animation_advance and draw_object, with field 9 set
    only when toggle comes round; ends when the map zooms out (screen route_map_signals bit 4). Its depth
    layer follows its y (map_depth_from_y). */
-void route_map_landmark_update(void)
+void CONSOLE_ORIGINAL(route_map_landmark_update)(void)
 {
 	uint32_t animation = 0;
 	const struct route_map_landmark_record *landmark = NULL;

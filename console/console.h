@@ -216,6 +216,9 @@ typedef struct
 	bool vsync;            /* VIDEO's VSYNC: each frame shown at the screen's refresh (a computer's) */
 	bool vertical;         /* 2 PLAYERS: one screen over the other (false: side by side) */
 	int volume;            /* 0-10: 5 is the game's own */
+	int music_volume;      /* SOUND's MUSIC, EFFECTS and VOICE (issue 57): 0-10, 5 the game's own */
+	int effects_volume;
+	int voice_volume;
 	char name[CONSOLE_NAME_LENGTH + 1];    /* the player's, as the network's rooms show it */
 	bool both_radios;      /* OPTIONS > 2P MUSIC: the right seat's radio heard too, as the cabinets' (false: the left one's alone) */
 	bool fps;              /* OPTIONS > FPS: the frames a second at the picture's top right, and in a window's title */
@@ -230,6 +233,12 @@ typedef struct
 } console_window;
 
 extern console_window console_window_settings;
+
+/* OPTIONS > SOUND's MUSIC, EFFECTS and VOICE (issue 57, sound_mix.c): a MultiPCM sample's category by its address as
+   the chip has it (for sound_chips_set_categories), and the gains the settings give the sound chips now (for
+   sound_chips_set_gains: 'pcm' of MULTIPCM_CATEGORIES); 5 each, the board's sound to the bit */
+uint8_t console_sample_category(uint32_t address);
+void console_sound_gains(double *fm, int32_t *pcm);
 
 /* WIDE draws the frames wider (s32_video_set_wide_side): the columns more at each side, or 0 (WIDE off, or
    2 PLAYERS, whose screens are both the board's) */

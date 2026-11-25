@@ -59,7 +59,8 @@ What a tool makes has the game's data in it: it is yours alone, never share it.
   FULL (all 31 courses in one race), REVERSE (from a goal back to the start).
 - **OPTIONS**: controls, difficulty, time, video (window, full screen, sharp, smooth or CRT pixels, a wider
   picture: AUTO, the screen's shape, as a Steam Deck's in its hands, a TV's or an ultrawide monitor's, or
-  16:10, 16:9, 20:9 or 21:9; VSYNC), volume, sound test, steering, FPS.
+  16:10, 16:9, 20:9 or 21:9; VSYNC), sound (the volume, and the music, the effects and the voices apart),
+  sound test, steering, FPS.
 - **The radio**: << and >> go round its ten songs and Jingle Bell, the hidden one, between Last Wave and
   Magical Sound Shower.
 - **The pause** in a race: CONTINUE, RESTART, QUIT GAME.

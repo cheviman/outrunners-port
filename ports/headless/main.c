@@ -41,6 +41,7 @@
 #include "s32/workers.h"
 #include "s32/video.h"
 #include "sound/chips.h"
+#include "s32/multipcm.h"    /* (MULTIPCM_CATEGORIES: SOUND's gains) */
 #ifdef ORUNNERS_CONSOLE
 #include "console.h"
 #endif
@@ -71,7 +72,7 @@
 	" [--write-pack PACK.assets] [--workers N] [--screens 1|2] [--sound-wav FILE]" \
 	" (orunners_console_headless: [--actions FILE] [--wide | --wide-20-9 | --wide-21-9 | --wide-16-10] [--board-edges] [--autopilot]" \
 	" [--ghost-folder DIR] [--pause-dump N] [--side-map] [--real-time] [--name NAME] [--network-log FRAMES]" \
-	" [--restart N] [--quit N])\n"
+	" [--restart N] [--quit N] [--sound-mix MUSIC,EFFECTS,VOICE])\n"
 #define MAX_VIDEO_DUMPS 64
 #define CENSUS_SLOTS (1u << 22)     /* open addressing for the censuses' hashes */
 #define TILE_CENSUS_EVERY 30        /* the tilemaps are looked at every this many frames */
@@ -595,6 +596,16 @@ int main(int argc, char **argv)
 			board_edges = true;
 		else if (strcmp(argv[index], "--both-radios") == 0)
 			console_window_settings.both_radios = true;    /* (OPTIONS > 2P MUSIC: ARCADE) */
+		else if (strcmp(argv[index], "--sound-mix") == 0 && index + 1 < argc)
+		{
+			/* (OPTIONS > SOUND's MUSIC, EFFECTS and VOICE: three numbers, 0-10, 5 the game's own) */
+			if (sscanf(argv[++index], "%d,%d,%d", &console_window_settings.music_volume,
+				&console_window_settings.effects_volume, &console_window_settings.voice_volume) != 3)
+			{
+				fprintf(stderr, USAGE);
+				return 1;
+			}
+		}
 		else if (strcmp(argv[index], "--restart") == 0 && index + 1 < argc)
 			restart_frame = strtoull(argv[++index], NULL, 10);
 		else if (strcmp(argv[index], "--quit") == 0 && index + 1 < argc)
@@ -739,6 +750,14 @@ int main(int argc, char **argv)
 	}
 #ifdef ORUNNERS_CONSOLE
 	sound_chips_join_sides(true);
+	sound_chips_set_categories(console_sample_category);    /* (OPTIONS > SOUND's MUSIC, EFFECTS and VOICE) */
+	{
+		double fm;
+		int32_t pcm[MULTIPCM_CATEGORIES];
+
+		console_sound_gains(&fm, pcm);
+		sound_chips_set_gains(fm, pcm);
+	}
 	console_attach();
 #endif
 	program_reset();

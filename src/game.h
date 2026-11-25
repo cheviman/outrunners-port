@@ -3,7 +3,7 @@
  *    Description: prototypes of the game's functions and the addresses of the code it keeps in memory slots
  *    Version:     0.1.0
  *    Created:     12-10-2026
- *    Modified:    24-11-2026
+ *    Modified:    25-11-2026
  *    Author:      Sebastian Toyos
  *
  *    OutRunners (arcade, Sega System Multi 32): the game's V70 program decompiled into C by
@@ -426,6 +426,7 @@ void flashing_scenery_update(void);
 void scenery_pair_update(void);
 void overhead_scenery_update(void);
 void aurora_update(void);
+void CONSOLE_ORIGINAL(aurora_update)(void);
 void aurora_count_down(void);
 void aurora_next_animation(void);
 void fork_sign_update(void);
@@ -772,6 +773,7 @@ void CONSOLE_ORIGINAL(route_map_update)(void);
 void route_map_car_update(void);
 void route_map_sign_update(void);
 void route_map_landmark_update(void);
+void CONSOLE_ORIGINAL(route_map_landmark_update)(void);
 void map_depth_from_y(void);
 void stage_result_line_draw(void);
 void route_map_leg_show(void);
