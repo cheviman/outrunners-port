@@ -89,7 +89,7 @@ static struct
 
 static const struct route_map_registers *map_registers(void)
 {
-	return ROUTE_MAP_REGISTERS(route_map_register_sets_ADDRESS + ((uint32_t)screen->index << 6));
+	return &route_map_register_sets[screen->index];
 }
 
 /* ---- the drive ---- */

@@ -57,7 +57,7 @@ void load_settings(uint32_t checksum)
 	if (game->eeprom.settings.free_play != 0u)
 		return;
 	for (setting = 0; setting < COIN_SETTINGS - 1u; setting++)
-		if ((int8_t)COIN_SETTING_RECORD(coin_setting_records_ADDRESS + setting * 4u)->coins < 0)
+		if ((int8_t)coin_setting_records[setting].coins < 0)
 			break;
 	game->eeprom.settings.coin_setting = (uint8_t)setting;
 	game->eeprom.settings.coins_per_credit = 1u;
