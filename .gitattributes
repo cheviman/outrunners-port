@@ -5,3 +5,7 @@
 *.cmd text eol=crlf
 *.bat text eol=crlf
 *.sh text eol=lf
+
+# The Hakchi game for the NES and SNES Classic is read on the console: LF
+ports/classicmini/clvg/* text eol=lf
+ports/classicmini/*.sh text eol=lf
