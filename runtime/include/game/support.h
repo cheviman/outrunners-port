@@ -20,6 +20,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 
 #include "game/assets.h"
 #include "s32/bus.h"
@@ -41,6 +42,15 @@ extern "C" {
    reaches it, and the board's memories as s32/machine.h says. */
 struct game;
 extern struct game *game;
+/* the game's variables the code reaches only by name, in the host's memory (ram.h's struct world): cleared
+   with the work RAM, put into it at their places for the state's hash and the routines that reach memory by
+   its address (world_project), and taken back (world_unproject) */
+void world_clear(void);
+void world_project(void);
+void world_unproject(void);
+/* (runtime/src/game.c) while code reaches memory by its address: the variables in the work RAM */
+void world_ram_begin(void);
+void world_ram_end(void);
 /* Functions that stop the game: the C compiler knows they do not come back */
 #if defined(_MSC_VER)
 #define GAME_NORETURN __declspec(noreturn)
@@ -313,6 +323,11 @@ extern const size_t game_code_count;
 void game_entry(void);                          /* the code at the reset vector */
 
 void call_code(uint32_t address);
+/* ... and through slots that hold a function's number (a game with memory.CODE_FIELDS): game_functions[number],
+   0 and past the table refused */
+extern void (*const game_functions[])(void);    /* written by tools/decompile.py (table.c) */
+extern const size_t game_function_count;
+void call_function(uint32_t number);
 GAME_NORETURN void unknown_code(uint32_t address);    /* a jump or call to an address no code was found at */
 /* Code the program does not have, at addresses a port's console build gives its own (its objects' handlers):
    call_code runs it there, true once run; NULL elsewhere */

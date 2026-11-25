@@ -276,7 +276,7 @@ static void hold_title(bool opening)
 		screen->mode_timer = TITLE_TIME;
 	if (opening)
 	{
-		const uint32_t title = console_find_object(title_screen_update_ADDRESS, 0u);
+		const uint32_t title = console_find_object(FUNCTION_title_screen_update, 0u);
 
 		if (title && OBJECT(title)->state == 1u)
 			OBJECT(title)->title_screen.frames = (uint16_t)((OBJECT(title)->title_screen.frames & 0xFF00u) | TITLE_HELD);
@@ -286,7 +286,7 @@ static void hold_title(bool opening)
 /* True while the title shows its opening (the title object before its logo) */
 static bool title_opening(void)
 {
-	const uint32_t title = console_find_object(title_screen_update_ADDRESS, 0u);
+	const uint32_t title = console_find_object(FUNCTION_title_screen_update, 0u);
 
 	return title && OBJECT(title)->state <= 1u;
 }
@@ -382,7 +382,7 @@ static void options_frame(uint32_t pressed)
 
 	if (by && item == OPTIONS_DIFFICULTY)
 	{
-		game->game_difficulty = (uint8_t)step(game->game_difficulty, by, 0, DIFFICULTIES - 1);
+		game->eeprom.settings.game_difficulty = (uint8_t)step(game->eeprom.settings.game_difficulty, by, 0, DIFFICULTIES - 1);
 		menu.settings_changed = true;
 	}
 	if (by && item == OPTIONS_VOLUME)
@@ -437,7 +437,7 @@ static void options_frame(uint32_t pressed)
 
 		if (options_lines[index] == OPTIONS_DIFFICULTY)
 		{
-			snprintf(value, sizeof(value), "< %s >", difficulties[game->game_difficulty & (DIFFICULTIES - 1)]);
+			snprintf(value, sizeof(value), "< %s >", difficulties[game->eeprom.settings.game_difficulty & (DIFFICULTIES - 1)]);
 			shown = value;
 		}
 		else if (options_lines[index] == OPTIONS_VOLUME)
@@ -464,7 +464,7 @@ static void time_frame(uint32_t pressed)
 
 	if (by && menu.choice < TIME_STAGES)
 	{
-		game->time_difficulty[menu.choice] = (int8_t)step(game->time_difficulty[menu.choice], by, -TIME_RANGE, TIME_RANGE);
+		game->eeprom.settings.time_difficulty[menu.choice] = (int8_t)step(game->eeprom.settings.time_difficulty[menu.choice], by, -TIME_RANGE, TIME_RANGE);
 		menu.settings_changed = true;
 	}
 	if ((pressed & ACTION_BIT(ACTION_ACCEPT)) && menu.choice == TIME_STAGES)
@@ -475,7 +475,7 @@ static void time_frame(uint32_t pressed)
 	page_heading("TIME");
 	for (int index = 0; index < TIME_STAGES; index++)
 	{
-		snprintf(value, sizeof(value), "< %+d >", game->time_difficulty[index]);
+		snprintf(value, sizeof(value), "< %+d >", game->eeprom.settings.time_difficulty[index]);
 		line(index, time_stages[index], value);
 	}
 	line(TIME_STAGES, "BACK", NULL);
@@ -1118,8 +1118,8 @@ static bool options_page(int page)
    which the version's corner is: Sebas) */
 static void draw_signature(void)
 {
-	for (uint32_t picture = console_find_object(title_picture_draw_ADDRESS, 0u); picture;
-		picture = console_find_object(title_picture_draw_ADDRESS, picture))
+	for (uint32_t picture = console_find_object(FUNCTION_title_picture_draw, 0u); picture;
+		picture = console_find_object(FUNCTION_title_picture_draw, picture))
 		if (OBJECT(picture)->title_picture.index == COPYRIGHT_PICTURE && OBJECT(picture)->state != 0u)
 		{
 			console_text((int16_t)OBJECT(picture)->x - console_text_width(SIGNATURE, 1) / 2,

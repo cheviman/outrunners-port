@@ -661,6 +661,21 @@ merged here; this repository adds console/, the ports and their documents.
   moving the same frame by frame, and at the same time after the goal (REVERSE's 22000-22500 against
   ARCADE's 146 before) every sprite's pixel the same; the background, the road's colours and the HUD the
   pre-stage's. The pair 02E1A6 is the one at 256 either side, the same in both.
+- The decompilation merged up to 3dc97bf (the game's variables in the host's memory, its state as typed
+  structures, the objects' handlers as functions' numbers, the tables and lists of code out of the ROM; the
+  core console-original 2f6dba3 on arcade-decomp 3dc3c5a). What the console follows: the race record's fields
+  in its state (race->state; the car's model and choice one halfword, RACE_MODEL and RACE_SET_MODEL), the
+  settings in eeprom.settings, the route's progress in screen->progress, FUNCTION_ for the functions'
+  addresses. The six variables struct world keeps that the console sets (player_count, link_off, link_failed,
+  car_numbers, send_video_registers, wheel_motor) are set in both world and the work RAM's copy: the copy
+  alone compiles and does nothing (the race crashed at its eighth frame, no players). The ghost's and the
+  start line's own handlers are called by number; the start line's objects of the console's streams get the
+  console's handler after the game's stream reads them (it now takes CONSOLE_CODE_START_LINE, no function's
+  address, as NO_FUNCTION); call_function (runtime/src/game.c) hands a number past the table to
+  call_code_elsewhere, the console's objects. Checked on Windows: every target with no warnings, the arcade's
+  16 scenarios identical, tests/console's eight identical to the build before in state, picture and sound
+  (TIME ATTACK with an empty ghost folder each: a ghost left by one run changes the next). A start line
+  object whose record START_LINE_KINDS (16) leaves out does nothing in REVERSE, as before.
 
 ## To do
 

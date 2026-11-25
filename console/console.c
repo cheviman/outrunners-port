@@ -4,7 +4,7 @@
  *                 what it tells the port
  *    Version:     0.1.5
  *    Created:     29-10-2026
- *    Modified:    19-11-2026
+ *    Modified:    24-11-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
@@ -54,17 +54,17 @@ void load_settings(uint32_t checksum)
 	uint32_t setting;
 
 	original_load_settings(checksum);
-	if (game->free_play != 0u)
+	if (game->eeprom.settings.free_play != 0u)
 		return;
 	for (setting = 0; setting < COIN_SETTINGS - 1u; setting++)
 		if ((int8_t)COIN_SETTING_RECORD(coin_setting_records_ADDRESS + setting * 4u)->coins < 0)
 			break;
-	game->coin_setting = (uint8_t)setting;
-	game->coins_per_credit = 1u;
-	game->bonus_adder = 0xFFu;
-	game->first_chute_multiplier = 1u;
-	game->second_chute_multiplier = 1u;
-	game->free_play = 0xFFu;
+	game->eeprom.settings.coin_setting = (uint8_t)setting;
+	game->eeprom.settings.coins_per_credit = 1u;
+	game->eeprom.settings.bonus_adder = 0xFFu;
+	game->eeprom.settings.first_chute_multiplier = 1u;
+	game->eeprom.settings.second_chute_multiplier = 1u;
+	game->eeprom.settings.free_play = 0xFFu;
 	eeprom_write_settings();
 }
 
@@ -98,21 +98,21 @@ void console_settings_to_race(void)
 {
 	const uint32_t race = RACE_1;
 
-	RACE(race)->master_game_difficulty = game->game_difficulty;
-	memcpy(RACE(race)->master_time_difficulty, game->time_difficulty, sizeof(RACE(race)->master_time_difficulty));
+	RACE(race)->master_game_difficulty = game->eeprom.settings.game_difficulty;
+	memcpy(RACE(race)->master_time_difficulty, game->eeprom.settings.time_difficulty, sizeof(RACE(race)->master_time_difficulty));
 }
 
 void console_master_settings(void)
 {
 	const uint32_t race = RACE_1;
 
-	RACE(race)->master_advertise_sound = game->advertise_sound;
-	RACE(race)->master_steering_wheel_reaction = game->steering_wheel_reaction;
-	RACE(race)->master_coins_per_credit = game->coins_per_credit;
-	RACE(race)->master_first_chute_multiplier = game->first_chute_multiplier;
-	RACE(race)->master_bonus_adder = game->bonus_adder;
-	RACE(race)->master_coin_setting = game->coin_setting;
-	RACE(race)->master_free_play = game->free_play;
+	RACE(race)->master_advertise_sound = game->eeprom.settings.advertise_sound;
+	RACE(race)->master_steering_wheel_reaction = game->eeprom.settings.steering_wheel_reaction;
+	RACE(race)->master_coins_per_credit = game->eeprom.settings.coins_per_credit;
+	RACE(race)->master_first_chute_multiplier = game->eeprom.settings.first_chute_multiplier;
+	RACE(race)->master_bonus_adder = game->eeprom.settings.bonus_adder;
+	RACE(race)->master_coin_setting = game->eeprom.settings.coin_setting;
+	RACE(race)->master_free_play = game->eeprom.settings.free_play;
 	console_settings_to_race();
 }
 
@@ -123,8 +123,8 @@ void network_check_stand_alone(void)
 {
 	const uint32_t race = RACE_1;
 
-	game->link_off = 1u;
-	game->player_count = 2u;
+	world->link_off = game->link_off = 1u;
+	world->player_count = game->player_count = 2u;
 	game->machine_count = 1u;
 	SCREEN(SCREEN_1)->car_number = 0u;
 	RACE(RACE_1)->car_number = 0u;
@@ -282,7 +282,7 @@ uint32_t check_game_start(uint32_t mode, uint32_t seat_credits)
 		console.quit_seats &= (uint8_t)~(1u << screen->index);
 		if (mode == GAME_MODE_PLAY)
 		{
-			game->wheel_motor[screen->index] = 0u;
+			world->wheel_motor[screen->index] = game->wheel_motor[screen->index] = 0u;
 			reset_screen_sound();
 			AS32(screen->game_mode) = GAME_MODE_RESTART;
 			return GAME_MODE_RESTART;
@@ -324,7 +324,7 @@ uint32_t check_game_start(uint32_t mode, uint32_t seat_credits)
 		   end's); over with the game */
 		if (mode == GAME_MODE_PLAY)
 		{
-			RACE(screen->race)->time_left = TIME_ATTACK_TIME_LEFT;
+			RACE(screen->race)->state.time_left = TIME_ATTACK_TIME_LEFT;
 			console_ghost_frame();
 		}
 		else
@@ -390,22 +390,22 @@ void console_classic_time(uint8_t passes)
 
 	if (!console.classic || screen->is_host == 0u)
 		return;
-	if (!console.classic_start && screen->race_started == 0u && RACE(race)->time_left == start_time)
+	if (!console.classic_start && screen->race_started == 0u && RACE(race)->state.time_left == start_time)
 	{
-		RACE(race)->time_left += CLASSIC_EXTRA * 0x1Eu;
+		RACE(race)->state.time_left += CLASSIC_EXTRA * 0x1Eu;
 		for (uint32_t seat = SCREEN_1; seat <= SCREEN_2; seat += SCREEN_2 - SCREEN_1)
 		{
 			if (SCREEN(seat)->in_game == 0u || SCREEN(seat)->host_record == 0u)
 				continue;
-			if (RACE(SCREEN(seat)->host_record)->time_left == start_time)
-				RACE(SCREEN(seat)->host_record)->time_left += CLASSIC_EXTRA * 0x1Eu;    /* (the copy it reads) */
+			if (RACE(SCREEN(seat)->host_record)->state.time_left == start_time)
+				RACE(SCREEN(seat)->host_record)->state.time_left += CLASSIC_EXTRA * 0x1Eu;    /* (the copy it reads) */
 			if (CAR(seat + SCREEN_CAR)->time_left == start_time)
 				CAR(seat + SCREEN_CAR)->time_left += CLASSIC_EXTRA * 0x1Eu;
 		}
 		console.classic_start = true;
 	}
-	if (RACE(race)->pass_count != passes && RACE(race)->pass_order == 0u && RACE(race)->pass_checkpoint != 5u)
-		RACE(race)->time_left += CLASSIC_EXTRA * 0x1Eu;
+	if (RACE(race)->state.pass_count != passes && RACE(race)->state.pass_order == 0u && RACE(race)->state.pass_checkpoint != 5u)
+		RACE(race)->state.time_left += CLASSIC_EXTRA * 0x1Eu;
 }
 
 /* The car select's WAITING FOR CHALLENGERS! (then JUST A MOMENT PLEASE) once the player's choices are made,
@@ -512,7 +512,7 @@ bool console_both_screens(void)
 int console_test_autopilot(void)
 {
 	/* the wheel back toward the middle of the road, by the left seat's place across it (race road_x) */
-	const int across = (int16_t)RACE(RACE_1)->road_x;
+	const int across = (int16_t)RACE(RACE_1)->state.road_x;
 	const int wheel = 0x80 - across / 6;
 
 	return wheel < 0x10 ? 0x10 : (wheel > 0xF0 ? 0xF0 : wheel);
