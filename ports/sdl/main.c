@@ -2323,6 +2323,7 @@ static int fail(const char *what, const char *detail)
 
 	snprintf(message, sizeof(message), "%s\n%s", what, detail);
 	fprintf(stderr, "%s\n", message);
+	fflush(stderr);    /* (in the log before the window, which waits for its OK) */
 	SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, TITLE, message, NULL);
 	return 1;
 }
@@ -2722,6 +2723,8 @@ int main(int argc, char **argv)
 		snprintf(log_path, sizeof(log_path), "%soutrunners.log", documents ? documents : "");
 		if (!freopen(log_path, "w", stderr))
 			log_path[0] = '\0';
+		else
+			setvbuf(stderr, NULL, _IONBF, 0);    /* (all of it, a failure's message too, before its window waits) */
 		SDL_free(documents);
 	}
 	fprintf(stderr, "OutRunners: starting\n");
