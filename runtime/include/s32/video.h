@@ -2,9 +2,9 @@
  *    Name:        video.h
  *    Description: Sega System Multi 32 video: draws each frame of the board's two screens from its memories,
  *                 as the hardware does
- *    Version:     0.1.2
+ *    Version:     0.1.3
  *    Created:     13-10-2026
- *    Modified:    19-11-2026
+ *    Modified:    26-11-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
@@ -95,6 +95,13 @@ void s32_video_extra_colour(int screen, uint32_t index, uint16_t colour);
    S32_SPRITE_GHOST set, a bit the board does not read, are drawn see-through: each pixel half its own colour
    and half the colour of what is under it */
 #define S32_SPRITE_GHOST 0x8000
+
+/* A tilemap's look faded out (a port's console build: a route's change of background, where no page of the
+   game's joins the two): tilemap 'number' (NBG0 or NBG1) as 'screen' shows it now, its pages, its tile bank
+   and the screen's palette, drawn at the tilemap's scroll under what it shows on the next 'frames' frames
+   and weighed out from frames / (frames + 1) of each pixel's colour down. One at a time: a new one takes the
+   place of one going on. The arcade never calls it */
+void s32_video_fade_tilemap(int screen, int number, int frames);
 
 /* A port's own sprites over the frame shown (the console's pause, in the game's letters): 'list' is entries
    as sprite RAM holds them (16 bytes each, 16-bit words in its order, an end command last), drawn over the

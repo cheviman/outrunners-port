@@ -3,9 +3,9 @@
  *    Description: Sega System Multi 32 video: the tilemaps, text, bitmap and backdrop layers, the sprite
  *                 frame buffers and the two mixers, drawing each frame of both screens from the board's
  *                 memories
- *    Version:     0.1.0
+ *    Version:     0.1.1
  *    Created:     13-10-2026
- *    Modified:    06-11-2026
+ *    Modified:    26-11-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
@@ -133,6 +133,17 @@ static struct
 	int shown_sprites;
 	uint32_t frame[S32_SCREENS][HEIGHT][WIDTH];
 	clip_runs runs;
+	struct
+	{
+		int left;                               /* frames of it still to show, 0: none */
+		int frames;                             /* its length */
+		int screen;
+		int number;                             /* the tilemap: NBG0 or NBG1 */
+		int pages[4];                           /* its look before: its pages, tile bank and screen's palette */
+		int bank;
+		uint16_t palette[S32_PALETTE_ENTRIES];
+		layer drawn;                            /* that look this frame, at the tilemap's scroll now */
+	} fade;                                     /* s32_video_fade_tilemap */
 } video;
 
 static const uint16_t transparent_row[WIDTH] = { 0 };
@@ -484,7 +495,7 @@ static uint16_t zoomed_pixel(const void *source, int x)
 /* What a zoomed tilemap draws with, the same on every row (its rows on the workers' bands) */
 typedef struct zoomed_layer
 {
-	int number;
+	layer *into;
 	int pages[4];
 	int bank;
 	bool first_drawn;
@@ -507,19 +518,18 @@ static void draw_zoomed_rows(void *context, int first, int last)
 			zoomed->x_start, zoomed->x_step
 		};
 
-		draw_row(&video.layers[LAYER_NBG0 + zoomed->number], y, video.runs.lists[video.runs.list_of_row[y]],
-			zoomed->first_drawn, zoomed_pixel, &row);
+		draw_row(zoomed->into, y, video.runs.lists[video.runs.list_of_row[y]], zoomed->first_drawn, zoomed_pixel,
+			&row);
 	}
 }
 
 /* NBG0 and NBG1: scrolled (with a fraction) and zoomed about a center. The steps are screen pixels per
-   source pixel (0x200 = 1); the source moves by their reciprocal, in 12.20. */
-static void draw_zoomed(int number)
+   source pixel (0x200 = 1); the source moves by their reciprocal, in 12.20. With the pages and tile bank
+   'pages' and 'bank', into 'into': the tilemap's own, or a fade's look before (s32_video_fade_tilemap) */
+static void draw_zoomed_pages(int number, const int *pages, int bank, layer *into)
 {
 	const uint32_t scroll = 0x10 + 8 * (uint32_t)number;
 	const uint32_t center = 0x30 + 4 * (uint32_t)number;
-	int pages[4];
-	const int bank = pages_of(number, pages);
 	bool flip_x;
 	bool flip_y;
 	int x_zoom = video_register(0x50 + 4 * (uint32_t)number) & 0xfff;
@@ -561,11 +571,19 @@ static void draw_zoomed(int number)
 
 	{
 		const zoomed_layer zoomed = {
-			number, { pages[0], pages[1], pages[2], pages[3] }, bank, first_drawn, x_start, x_step, source_y, y_step
+			into, { pages[0], pages[1], pages[2], pages[3] }, bank, first_drawn, x_start, x_step, source_y, y_step
 		};
 
 		s32_workers_rows(draw_zoomed_rows, (void *)&zoomed, video.visible.top, video.visible.bottom);
 	}
+}
+
+static void draw_zoomed(int number)
+{
+	int pages[4];
+	const int bank = pages_of(number, pages);
+
+	draw_zoomed_pages(number, pages, bank, &video.layers[LAYER_NBG0 + number]);
 }
 
 typedef struct scrolled_row
@@ -1269,9 +1287,14 @@ static const mix_layer *top_layer(const mix_layer *entry, const uint16_t *const 
 	}
 }
 
+static uint16_t palette_color_in(const uint16_t *palette, const mix_layer *entry, int pixel)
+{
+	return palette[(entry->palette_base + ((pixel >> entry->shift) & 0xfff0) + (pixel & 0x0f)) & 0x3fff];
+}
+
 static uint16_t palette_color(int screen, const mix_layer *entry, int pixel)
 {
-	return s32_board.palette[screen][(entry->palette_base + ((pixel >> entry->shift) & 0xfff0) + (pixel & 0x0f)) & 0x3fff];
+	return palette_color_in(s32_board.palette[screen], entry, pixel);
 }
 
 uint16_t s32_video_tile_pen_color(int screen, int tilemap, uint16_t color, int pen)
@@ -1309,6 +1332,9 @@ typedef struct mixing
 	uint8_t sprite_flips;
 	int offsets[3][3];
 	mix_layer orders[16][8];
+	int fade_index;     /* the faded tilemap's layer (s32_video_fade_tilemap), or -1 */
+	int fade_weight;    /* its look before: this many parts of fade_parts */
+	int fade_parts;
 } mixing;
 
 static void mix_rows(void *context, int first_row, int last_row);
@@ -1407,6 +1433,13 @@ static void mix(int screen, int drawn)
 	setup.sprite_bits = sprite_bits;
 	setup.shadow_pen = shadow_pen;
 	setup.sprite_flips = sprite_flips;
+	setup.fade_index = -1;
+	if (video.fade.left > 0 && video.fade.screen == screen && bit((uint32_t)drawn, LAYER_NBG0 + video.fade.number))
+	{
+		setup.fade_index = LAYER_NBG0 + video.fade.number;
+		setup.fade_weight = video.fade.left;
+		setup.fade_parts = video.fade.frames + 1;
+	}
 	s32_workers_rows(mix_rows, &setup, video.visible.top, video.visible.bottom);
 }
 
@@ -1422,6 +1455,7 @@ static void mix_rows(void *context, int first_row, int last_row)
 	const uint8_t sprite_flips = setup->sprite_flips;
 	const int (*const offsets)[3] = setup->offsets;
 	const mix_layer (*const orders)[8] = setup->orders;
+	const int fade_index = setup->fade_index;
 
 	/* the sprite buffer is scanned flipped as the sprite controls say */
 	for (int y = first_row; y <= last_row; y++)
@@ -1435,6 +1469,14 @@ static void mix_rows(void *context, int first_row, int last_row)
 			rows[index] = video.layers[index].empty[y] ? transparent_row : video.layers[index].pixels[y];
 		rows[LAYER_SPRITES] = video.sprites[screen][video.shown_sprites][sprite_y];
 		rows[LAYER_BACKDROP] = video.layers[LAYER_BACKDROP].pixels[y];
+
+		/* (the faded tilemap's look before in its place) */
+		const uint16_t *old_rows[LAYERS];
+
+		for (int index = 0; index < LAYERS; index++)
+			old_rows[index] = rows[index];
+		if (fade_index >= 0)
+			old_rows[fade_index] = video.fade.drawn.empty[y] ? transparent_row : video.fade.drawn.pixels[y];
 
 		for (int x = video.visible.left; x <= video.visible.right; x++, sprite_x += sprite_dx)
 		{
@@ -1460,6 +1502,29 @@ static void mix_rows(void *context, int first_row, int last_row)
 			int green = ((color >> 5) & 0x1f) + offsets[first->offsets][1];
 			int blue = ((color >> 10) & 0x1f) + offsets[first->offsets][2];
 
+			if (fade_index >= 0)
+			{
+				/* the pixel as it was with the faded tilemap's look before (its pixels and palette then), weighed
+				   against this one */
+				int old_pixel;
+				int old_shadow = 0;
+				const mix_layer *old = top_layer(orders[group], old_rows, x, sprite_pixel, shadow_mask, sprite_bits,
+					shadow_pen, &old_pixel, &old_shadow);
+
+				if (old->index == fade_index || first->index == fade_index)
+				{
+					const uint16_t old_color = old->index == fade_index
+						? palette_color_in(video.fade.palette, old, old_pixel) : palette_color(screen, old, old_pixel);
+					const int weight = setup->fade_weight;
+					const int parts = setup->fade_parts;
+
+					red = (red * (parts - weight) + ((old_color & 0x1f) + offsets[old->offsets][0]) * weight) / parts;
+					green = (green * (parts - weight) + (((old_color >> 5) & 0x1f) + offsets[old->offsets][1]) * weight)
+						/ parts;
+					blue = (blue * (parts - weight) + (((old_color >> 10) & 0x1f) + offsets[old->offsets][2]) * weight)
+						/ parts;
+				}
+			}
 			if (first->blend != 0)
 			{
 				int below;
@@ -1537,7 +1602,11 @@ void s32_video_draw_frame(void)
 		}
 		if (drawn < 0)
 			drawn = draw_layers(wanted);
+		if (video.fade.left > 0 && video.fade.screen == screen && bit((uint32_t)drawn, LAYER_NBG0 + video.fade.number))
+			draw_zoomed_pages(video.fade.number, video.fade.pages, video.fade.bank, &video.fade.drawn);
 		mix(screen, drawn);
+		if (video.fade.left > 0 && video.fade.screen == screen)
+			video.fade.left--;
 	}
 }
 
@@ -1624,6 +1693,16 @@ void s32_video_extra_colour(int screen, uint32_t index, uint16_t colour)
 {
 	video.extra_palette[screen & 1][index & 0x3fff] = colour;
 	video.extra_set[screen & 1][index & 0x3fff] = true;
+}
+
+void s32_video_fade_tilemap(int screen, int number, int frames)
+{
+	video.fade.screen = screen & 1;
+	video.fade.number = number & 1;
+	video.fade.bank = pages_of(video.fade.number, video.fade.pages);
+	memcpy(video.fade.palette, s32_board.palette[video.fade.screen], sizeof(video.fade.palette));
+	video.fade.frames = frames > 0 ? frames : 0;
+	video.fade.left = video.fade.frames;
 }
 
 void s32_video_set_wide_side(int side)

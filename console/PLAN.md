@@ -862,6 +862,36 @@ merged here; this repository adds console/, the ports and their documents.
   Windows, Android and iOS.
 - 1.4.0: the version (CMakeLists.txt; the examples of the packages' names), docs/releases/v1.4.0.md.
 
+## Done (26-11-2026)
+
+- FULL's and REVERSE's background changes without a cut (issue 30): a route's change at a fork goes to the new
+  background's own pages, whole, from its first step, and the old background fades out under them in 24 frames
+  (Sebas: a short fade over the cut). The game's change is four page words, a step of the view's turn away and
+  back each: the background left (the first four of the nine pages), then a page that joins the two in the
+  column out of sight, then the new one's. A route takes the change of the game's way to its stage, whose
+  first pages are another stage's (FULL's 1 to 2 is the game's 0 to 2), at the step the game puts the new
+  palette: the canyon and its purple sky went in a frame (frame 6795 of tests/console/full.txt; every change
+  of REVERSE, which comes to each stage from the other end). And where the view turned the other way than the
+  set was drawn for, the joining page sat in the column it was not drawn for: the view came back over its
+  edges (the desert cut against the hills at 7040) and its last swap was in sight (San Francisco's skyline
+  gone at 7087). No page in the ROM joins two stages the game never joins: route_background_pages puts the
+  set's last page word after each of the game's steps, and route_background_fade asks the runtime, before
+  the first, for s32_video_fade_tilemap (runtime/src/video.c, the port's own, as WIDE and the extra palette):
+  the tilemap's pages, tile bank and the screen's palette as they are, drawn again each frame at the
+  tilemap's scroll and weighed out of each pixel's colour, 24/25 down to 1/25. The new background's colours
+  are right from that step (the game's palette there is for all nine pages). turn_background_pages (31-10:
+  the columns swapped in the order the view's turn takes them) and WIDE's case for it are gone: a route's
+  change at a fork swaps no column; within a stage (road events 4 and 5) the course's own set is the turn's.
+  Checked: FULL's and REVERSE's changes frame by frame, 4:3 and WIDE (the canyon into San Francisco's bay at
+  6795, no edge at 7040 nor 7086, REVERSE's Uluru into Egypt at 5917); the arcade's 16 scenarios identical,
+  picture and sound, and the static analysis' 16103 addresses found; the console's headless game on
+  tests/console the same as before in menu, controls, CLASSIC, TIME ATTACK, 2 PLAYERS and ARCADE (state,
+  picture and sound), in FULL and REVERSE the same sound (their state differs where the changes' page words
+  do, and after the turned ones till the next change: next_page_words in the other set). Every target built
+  with MSVC with no warnings, video.c and routes.c with clang for arm64 (-Wall -Wextra). A fade costs a draw
+  of the tilemap and a second look down the layers at each pixel: CLASSIC with one on all the time, 6.5% more
+  time a frame on one thread, 4% on four.
+
 ## To do
 
 - 32:9 (issue 44): for one player it would need each stage's scenery drawn further out than the game places
@@ -872,16 +902,6 @@ merged here; this repository adds console/, the ports and their documents.
   pressing START on the route map or the ranking after ARCADE's race (the fades smooth, frame by frame);
   the player to say which screen.
 
-- FULL's and REVERSE's background changes where the view turns the other way than the background's pages
-  were drawn for (the fork's branch road the player takes): the turn's set keeps the swaps out of sight
-  (31-10), but the page that joins the two backgrounds is drawn for the other column, so the view comes back
-  over a cut and the game's last swap changes the picture in sight (FULL's stage 1 at frame 7087 of
-  tests/console/full.txt: San Francisco's skyline gone in a frame, 4:3 and WIDE). Without the joining page
-  there (the column out of sight straight to the new one's) one edge would cross the view instead. The cut
-  at 7087 is also the change's first step: a route's change from a stage to one the game never comes to
-  from it (FULL's 1 to 2) takes the background of the game's way there (0 to 2), whose first pages are
-  another stage's, not the one left. No page in the ROM joins the two; keeping the old pages in sight
-  instead would show them in the new background's colours.
 - The network on a network shared with strangers: a room's code to join it (today a device on the same local
   network can fill a room with JOINs or speak for a member it overhears).
 - The network: checked between devices (Android's multicast lock on a phone that dropped the beacons; the
