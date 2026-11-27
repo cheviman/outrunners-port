@@ -17,7 +17,7 @@
     computer's kit (the CI's build job: dist/kit, packed as outrunners-OS-kit.tar.gz), given as a folder each
     under --kits: windows-x64, macos-universal and linux-x64. The zip keeps the programs' permissions (Unix
     entries), so that the macOS and Linux tools run as they are unpacked there. The zip's name carries the
-    release's version (--version: v1.4.1, the CI's "dev" else), the folder in it does not.
+    release's version (--version: v1.4.2, the CI's "dev" else), the folder in it does not.
 
     iOS has no tool: outrunners-ios.zip holds the unsigned .ipa (--ios, the CI's ios job: ports/ios/ios.cmake),
     which the player's sideloading tool signs as it installs it, with its README and the licenses.
@@ -126,7 +126,7 @@ def main():
     parser.add_argument("--android", required=True, help="Android's game: outrunners-base.apk")
     parser.add_argument("--anbernic", required=True, help="Anbernic's game: OutRunners.sh and outrunners/")
     parser.add_argument("--r36s", required=True, help="the R36S's game: OutRunners.sh and outrunners/")
-    parser.add_argument("--version", default="", help="the release's version in the zips' names (v1.4.1)")
+    parser.add_argument("--version", default="", help="the release's version in the zips' names (v1.4.2)")
     parser.add_argument("--ios", help="iOS's game: OutRunners.ipa (none: no iOS package)")
     parser.add_argument("--out", required=True, help="where the zips go")
     arguments = parser.parse_args()

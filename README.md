@@ -34,7 +34,7 @@ rest (`recomplauncher.json`, in each package).
 
 Each device has a package of its own: the game without its assets, and the tool (for Windows, macOS and Linux)
 that makes it on your computer with your ROM set. Each package's name carries the release's version
-(`outrunners-v1.4.1-windows-x64.zip`):
+(`outrunners-v1.4.2-windows-x64.zip`):
 
 - **Nintendo Switch** (`outrunners-VERSION-switch.zip`): OutRunners NSP makes `OutRunners.nsp`, for a console
   with Atmosphere ([ports/switch](ports/switch/README.md)).

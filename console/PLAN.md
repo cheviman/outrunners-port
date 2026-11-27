@@ -935,6 +935,9 @@ merged here; this repository adds console/, the ports and their documents.
   slide's and back to 20%; TYRE SLIP 0 changing nothing; the controller's rumble at 20% and stopped after the
   hold; nothing at all opened with every force at 0 (the same test fails with no hold and with no easing); the
   STEERING page with its line; every target with no warnings. Not tried: a racing wheel or a controller.
+- 1.4.2: the version (CMakeLists.txt; the examples of the packages' names), docs/releases/v1.4.2.md: issue 48 and
+  the computers' icon. The assets are 1.4.0's (the extraction's layout unchanged): the devices' games of 1.4.0 and
+  1.4.1 are taken.
 
 ## To do
 
