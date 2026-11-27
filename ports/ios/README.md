@@ -11,7 +11,7 @@ never on the App Store (the game is Sega's, the player brings the ROM set).
 
 ## Installing
 
-The release's package, `outrunners-VERSION-ios.zip` (VERSION the tag, v1.4.0; "dev" elsewhere), holds
+The release's package, `outrunners-VERSION-ios.zip` (VERSION the tag, v1.4.1; "dev" elsewhere), holds
 `OutRunners.ipa` (unsigned: your sideloading tool signs it), `README.txt`, `LICENSE.txt` and `licenses/`.
 
 Sideload it with a tool like AltStore, SideStore or Sideloadly. With a free Apple ID, the app runs for 7 days and

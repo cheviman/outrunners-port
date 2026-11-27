@@ -24,7 +24,7 @@
 # build needs: run as root). On a computer of another kind, the same system under QEMU: wsl.sh, beside this file,
 # makes it in WSL and runs this script in it. ORUNNERS_BUILD_DIR, ORUNNERS_DIST_DIR and ORUNNERS_JOBS say where the
 # build and the package go and how many compilers run at a time (by default build/raspberrypi, dist and every
-# processor); VERSION, the release's (the CI's: v1.4.0), is in the package's name, "dev" without one.
+# processor); VERSION, the release's (the CI's: v1.4.1), is in the package's name, "dev" without one.
 set -e
 
 if [ "$1" = "--tools" ]; then

@@ -912,6 +912,8 @@ merged here; this repository adds console/, the ports and their documents.
   (727-982, 1105-1182, 1265-1302; the state while the sprite list keeps the version's letters, to 1568), the sound
   the same; every target with no warnings. Not tried: the pointer under Batocera on a Pi, nor live on Windows (the
   mouse is the player's).
+- 1.4.1: the version (CMakeLists.txt; the examples of the packages' names), docs/releases/v1.4.1.md: issues 30,
+  60, 61 and 62. The assets are 1.4.0's (the extraction's layout unchanged): the devices' games of 1.4.0 are taken.
 
 ## To do
 

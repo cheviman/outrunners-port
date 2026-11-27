@@ -27,7 +27,7 @@ on:
     branches: [main]
   workflow_dispatch:
 
-# The packages' names carry the release's version, the tag (outrunners-v1.4.0-windows-x64.zip), or "dev" on
+# The packages' names carry the release's version, the tag (outrunners-v1.4.1-windows-x64.zip), or "dev" on
 # the other builds: one file a system, its name the same way every time (RecompLauncher's Recomp Standards)
 env:
   VERSION: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'dev' }}
