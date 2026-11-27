@@ -374,17 +374,26 @@ if(ORUNNERS_DECOMPILED AND ORUNNERS_SOUND_DECOMPILED)
 			set(ORUNNERS_PC_PICTURE ${CMAKE_SOURCE_DIR}/local/icon_pc.png)
 		endif()
 		set(ORUNNERS_ICON_RC ${CMAKE_SOURCE_DIR}/ports/sdl/icon/outrunners.rc)
-		if(WIN32 AND ORUNNERS_PC_PICTURE AND Python3_FOUND)
-			# (made as CMake configures, once for both: again when the picture changes)
+		if(WIN32 AND ORUNNERS_PC_PICTURE)
+			# (made as CMake configures, once for both: again when the picture changes). Where it cannot be made
+			# the configuration stops: the project's icon is never put in the player's own picture's place
+			# unsaid (Sebas, 26-11-2026: a Python 3.14 whose Pillow does not load had made it so for a month)
+			if(NOT Python3_FOUND)
+				message(FATAL_ERROR "The executables' icon, ${ORUNNERS_PC_PICTURE}, needs Python 3 with Pillow and "
+					"numpy (tools/make_icon.py): none was found (-DPython3_EXECUTABLE=... names one)")
+			endif()
 			set(ORUNNERS_OWN_ICON ${CMAKE_BINARY_DIR}/icon)
 			execute_process(COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/make_icon.py --ico
 				${ORUNNERS_PC_PICTURE} ${ORUNNERS_OWN_ICON}/outrunners.ico RESULT_VARIABLE ORUNNERS_OWN_ICON_MADE)
 			set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${ORUNNERS_PC_PICTURE})
-			if(ORUNNERS_OWN_ICON_MADE EQUAL 0)
-				file(WRITE ${ORUNNERS_OWN_ICON}/outrunners.rc "// the player's own picture (CMakeLists.txt)\n1 ICON \"outrunners.ico\"\n")
-				set(ORUNNERS_ICON_RC ${ORUNNERS_OWN_ICON}/outrunners.rc)
-				message(STATUS "The executables' icon: ${ORUNNERS_PC_PICTURE}")
+			if(NOT ORUNNERS_OWN_ICON_MADE EQUAL 0)
+				message(FATAL_ERROR "The executables' icon, ${ORUNNERS_PC_PICTURE}, could not be made with "
+					"${Python3_EXECUTABLE} (tools/make_icon.py: ${ORUNNERS_OWN_ICON_MADE}): it needs Pillow and numpy "
+					"(-DPython3_EXECUTABLE=... names another Python)")
 			endif()
+			file(WRITE ${ORUNNERS_OWN_ICON}/outrunners.rc "// the player's own picture (CMakeLists.txt)\n1 ICON \"outrunners.ico\"\n")
+			set(ORUNNERS_ICON_RC ${ORUNNERS_OWN_ICON}/outrunners.rc)
+			message(STATUS "The executables' icon: ${ORUNNERS_PC_PICTURE}")
 		endif()
 		foreach(game orunners outrunners)
 			if(WIN32)

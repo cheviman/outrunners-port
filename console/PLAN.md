@@ -914,6 +914,13 @@ merged here; this repository adds console/, the ports and their documents.
   mouse is the player's).
 - 1.4.1: the version (CMakeLists.txt; the examples of the packages' names), docs/releases/v1.4.1.md: issues 30,
   60, 61 and 62. The assets are 1.4.0's (the extraction's layout unchanged): the devices' games of 1.4.0 are taken.
+- The computers' executables' icon is Sebas's car alone, see-through around it, not on the sunset's plate (Sebas:
+  his car, never the made one): tools/make_icon.py writes ports/sdl/icon's outrunners.ico as a picture of the
+  player's own is made (--ico, the same file to the byte as local/icon_pc.png's), outrunners.png and .icns the
+  car's pixels enlarged 4 times; the devices' (Switch, iOS, Android) keep the plate, which their systems want
+  opaque to the edges, the same to the byte. And a picture of the player's own that cannot be made an icon stops
+  CMake's configuration: build/static had been configured with a Python 3.14 whose Pillow does not load, and the
+  executables had the made icon in its place, unsaid.
 
 ## To do
 

@@ -1,9 +1,10 @@
 """
 Name:        make_icon.py
-Description: makes the project's icon: Sebas's car (ports/sdl/icon/car.png) on a plate in a sunset's colours
-Version:     0.3.0
+Description: makes the project's icon: Sebas's car (ports/sdl/icon/car.png), alone on the computers and on a plate in
+             a sunset's colours on the devices
+Version:     0.4.0
 Created:     30-10-2026
-Modified:    25-11-2026
+Modified:    26-11-2026
 Author:      Sebastian Toyos
 
 Usage: python tools/make_icon.py
@@ -14,12 +15,13 @@ As SegaSonic's: the icon of the Switch's build (ports/switch/icon.jpg, 256 x 256
 which the HOME menu rounds itself), of the Android app (ports/android/res/mipmap-xxxhdpi: an adaptive icon's
 two layers, the plate to the edges and the car in the middle 66 of its 108, which the launcher shapes and
 moves itself; the icon whole for the launchers before Android 8; and the picture the APK shows in a player's
-own picture's place until one is put there, ic_launcher_art.png) and of the computers' executables
-(ports/sdl/icon: outrunners.png, 1024 x 1024, outrunners.ico and outrunners.icns) and of the iOS app
-(ports/ios/Assets.xcassets: icon_1024.png, the plate to the edges with no see-through: iOS rounds it itself).
-The plate is drawn at twice
-the size and scaled down, so its edges are smooth; the car, a picture of pixels, is enlarged a whole number of
-times, its pixels kept square (Sebas: the car he chose, from a Steam page that offers it free to use).
+own picture's place until one is put there, ic_launcher_art.png) and of the iOS app (ports/ios/Assets.xcassets:
+icon_1024.png, the plate to the edges with no see-through: iOS rounds it itself). The computers' executables'
+(ports/sdl/icon: outrunners.png, 1024 x 1024, outrunners.ico and outrunners.icns) are the car alone, see-through
+around it, as a picture of the player's own is made (--ico; Sebas, 26-11-2026: his car, not the plate). The plate
+is drawn at twice the size and scaled down, so its edges are smooth; the car, a picture of pixels, is enlarged a
+whole number of times, its pixels kept square (Sebas: the car he chose, from a Steam page that offers it free to
+use).
 
 --ico makes the Windows executables' icon of a picture of the player's own instead (CMakeLists.txt, with
 local/icon_pc.png or ORUNNERS_PC_ICON): square, the picture whole in the middle of it, see-through around.
@@ -98,13 +100,24 @@ def nothing():
     return Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
 
 
+def car_alone():
+    """The car picture whole, its pixels enlarged a whole number of times to SIZE (see-through around it)."""
+    car = Image.open(CAR).convert("RGBA")
+    times = max(1, SIZE // max(car.size))
+    car = car.resize((car.width * times, car.height * times), Image.NEAREST)
+    image = nothing()
+    image.alpha_composite(car, ((SIZE - car.width) // 2, (SIZE - car.height) // 2))
+    return image
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
-    icon = with_car(plate())
-    icon.save(OUT / "outrunners.png")
-    icon.save(OUT / "outrunners.ico", sizes=[(side, side) for side in ICO_SIZES])
-    icon.save(OUT / "outrunners.icns")
+    computers = car_alone()
+    computers.save(OUT / "outrunners.png")
+    picture_ico(CAR, OUT / "outrunners.ico")    # (as CMakeLists.txt makes a player's own: the same .ico)
+    computers.save(OUT / "outrunners.icns")
     print(f"written: outrunners.png, outrunners.ico, outrunners.icns in {OUT.relative_to(ROOT)}")
+    icon = with_car(plate())
     whole = with_car(plate(margin=0, radius=0)).convert("RGB")
     SWITCH.parent.mkdir(parents=True, exist_ok=True)
     whole.resize((256, 256), Image.LANCZOS).save(SWITCH, quality=95)
