@@ -82,7 +82,8 @@ What a tool makes has the game's data in it: it is yours alone, never share it.
   T300RS) is set up once in OPTIONS > STEERING > SET UP WHEEL: turn the wheel left, press the gas, the brake, and
   the buttons it asks for; pedals and a shifter plugged in on their own are taken as they are pressed. Also in
   STEERING: WHEEL ROTATION (your wheel's range: 900 on a G29), CENTRING (the cabinet's spring, on a wheel with
-  force feedback), VIBRATION (the cabinet's wheel shaking in a crash and off the road, or a controller's rumble)
+  force feedback), VIBRATION (the cabinet's wheel shaking in a crash and off the road, or a controller's rumble),
+  TYRE SLIP (a lighter shake and a lighter wheel while the tyres slide in a bend, the port's own; 0% turns it off)
   and INPUT TEST.
 - **Android**: touch controls on the screen, or a controller. With the touch controls the phone itself vibrates
   in a crash and off the road, at VIBRATION's strength; STEERING > PHONE VIBRATION turns it off.

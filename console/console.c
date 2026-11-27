@@ -694,6 +694,13 @@ bool console_manual_gears(int player)
 		&& CAR(seat + SCREEN_CAR)->transmission == TRANSMISSION_MANUAL;
 }
 
+bool console_tyres_sliding(int player)
+{
+	const uint32_t seat = player == 0 ? SCREEN_1 : SCREEN_2;
+
+	return SCREEN(seat)->game_mode == GAME_MODE_PLAY && racing(seat) && CAR(seat + SCREEN_CAR)->skidding != 0u;
+}
+
 void console_quit_game(void)
 {
 	console.quit_seats = 3u;

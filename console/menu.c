@@ -172,7 +172,7 @@ enum { STEERING_DEAD_ZONE, STEERING_SENSITIVITY, STEERING_ROTATION,
 #ifndef ORUNNERS_HANDHELD
 	STEERING_CENTRING,
 #endif
-	STEERING_SPEED, STEERING_VIBRATION,
+	STEERING_SPEED, STEERING_VIBRATION, STEERING_TYRE_SLIP,
 #ifdef ORUNNERS_TOUCH
 	STEERING_PHONE_VIBRATION,
 #endif
@@ -205,7 +205,8 @@ static struct
 console_window console_window_settings = { .window_scale = 2, .pixels = PIXELS_SHARP, .volume = 5, .music_volume = 5,
 	.effects_volume = 5, .voice_volume = 5, .name = "PLAYER",
 	.dead_zone = DEAD_ZONE_NORMAL, .sensitivity = STEERING_NORMAL, .wheel_rotation = WHEEL_ROTATION_GAME,
-	.steering_speed = STEERING_NORMAL, .centring = CENTRING_NORMAL, .vibration = VIBRATION_NORMAL, .vsync = true,
+	.steering_speed = STEERING_NORMAL, .centring = CENTRING_NORMAL, .vibration = VIBRATION_NORMAL,
+	.tyre_slip = TYRE_SLIP_NORMAL, .vsync = true,
 	.phone_vibration = true, .wide = WIDE_AUTO };
 
 const int console_wheel_rotations[WHEEL_ROTATIONS] = { WHEEL_ROTATION_GAME, 360, 450, 540, 720, 900, 1080 };
@@ -664,6 +665,10 @@ static void steering_frame(uint32_t pressed)
 			window->vibration = step(window->vibration, by * FORCE_STEP, 0, 100);
 			window->changed = true;
 			break;
+		case STEERING_TYRE_SLIP:
+			window->tyre_slip = step(window->tyre_slip, by * FORCE_STEP, 0, 100);
+			window->changed = true;
+			break;
 #ifdef ORUNNERS_TOUCH
 		case STEERING_PHONE_VIBRATION:
 			window->phone_vibration = !window->phone_vibration;
@@ -709,6 +714,8 @@ static void steering_frame(uint32_t pressed)
 	line(STEERING_SPEED, "SPEED", value);
 	force_value(value, sizeof(value), window->vibration);
 	line(STEERING_VIBRATION, "VIBRATION", value);
+	force_value(value, sizeof(value), window->tyre_slip);
+	line(STEERING_TYRE_SLIP, "TYRE SLIP", value);
 #ifdef ORUNNERS_TOUCH
 	line(STEERING_PHONE_VIBRATION, "PHONE VIBRATION", window->phone_vibration ? "< ON >" : "< OFF >");
 #endif

@@ -19,9 +19,10 @@
 void forces_start(void);
 
 /* Once a frame, for each player: their game controller (or NULL), the spring that centres a racing wheel
-   ('centring', percent of the wheel's strongest: 0 none), and how hard it shakes or rumbles ('shake', percent:
-   0 never) while the cabinet's wheel motor runs ('motor': its seat's output port D bit 4) */
-void forces_frame(int player, SDL_Gamepad *pad, int centring, int shake, bool motor);
+   ('centring', percent of the wheel's strongest: 0 none), how hard it shakes or rumbles ('shake', percent:
+   0 never) while the cabinet's wheel motor runs ('motor': its seat's output port D bit 4), and how hard while
+   the car's tyres slide ('slip', percent: 0 never, nor the spring eased then; 'sliding': console_tyres_sliding) */
+void forces_frame(int player, SDL_Gamepad *pad, int centring, int shake, bool motor, int slip, bool sliding);
 
 /* Once a frame: the device's own vibrator (a phone's), for the players with no game controller (the touch
    controls): it vibrates at 'shake' percent while 'motor' (one of those players' seats' wheel motor) runs */

@@ -164,9 +164,13 @@ static void android_multicast_lock(bool wanted);
 #ifdef ORUNNERS_CONSOLE
 #define CENTRING            console_window_settings.centring     /* OPTIONS > STEERING's */
 #define VIBRATION           console_window_settings.vibration
+#define TYRE_SLIP           console_window_settings.tyre_slip    /* (issue 48) */
+#define TYRES_SLIDING(player) console_tyres_sliding(player)
 #else
 #define CENTRING            50         /* a racing wheel's spring, as the cabinet's: half its strongest */
 #define VIBRATION           50
+#define TYRE_SLIP           0          /* (the cabinet's: no force of the tyres) */
+#define TYRES_SLIDING(player) false
 #endif
 #if defined(ORUNNERS_HANDHELD)
 #define VSYNC               false      /* (a device's screen as its SDL shows it: Anbernic's 2.0.12 has no
@@ -1209,12 +1213,13 @@ static void save_window_settings(void)
 	fprintf(output, "window_scale=%d\nfull_screen=%d\npixels=%s\nwide=%d\nvsync=%d\ntwo_players=%s\nvolume=%d\n"
 		"music_volume=%d\neffects_volume=%d\nvoice_volume=%d\n"
 		"name=%s\nfps=%d\ndead_zone=%d\nsensitivity=%d\nwheel_rotation=%d\nsteering_speed=%d\ncentring=%d\n"
-		"vibration=%d\nphone_vibration=%d\nboth_radios=%d\nall_songs=%d\n",
+		"vibration=%d\ntyre_slip=%d\nphone_vibration=%d\nboth_radios=%d\nall_songs=%d\n",
 		settings->window_scale, settings->full_screen, pixel_names[settings->pixels], settings->wide, settings->vsync,
 		settings->vertical ? "vertical" : "horizontal", settings->volume, settings->music_volume,
 		settings->effects_volume, settings->voice_volume, settings->name, settings->fps,
 		settings->dead_zone, settings->sensitivity, settings->wheel_rotation, settings->steering_speed,
-		settings->centring, settings->vibration, settings->phone_vibration, settings->both_radios, settings->all_songs);
+		settings->centring, settings->vibration, settings->tyre_slip, settings->phone_vibration, settings->both_radios,
+		settings->all_songs);
 	fclose(output);
 }
 
@@ -1282,6 +1287,8 @@ static void load_window_settings(void)
 			settings->phone_vibration = number != 0;
 		else if (sscanf(line, "vibration=%d", &number) == 1 && number >= 0 && number <= 100)
 			settings->vibration = number / FORCE_STEP * FORCE_STEP;
+		else if (sscanf(line, "tyre_slip=%d", &number) == 1 && number >= 0 && number <= 100)
+			settings->tyre_slip = number / FORCE_STEP * FORCE_STEP;
 		else if (sscanf(line, "wheel_rotation=%d", &number) == 1)
 		{
 			for (int rotation = 0; rotation < WHEEL_ROTATIONS; rotation++)
@@ -2290,11 +2297,11 @@ static void on_frame_done(void)
 	if (script && s32_script_frames(script) && program_frames() >= s32_script_frames(script))
 		program_stop();
 
-	/* the controllers' forces: a racing wheel's spring, and the cabinet's wheel motor as each seat's output port
-	   D has it (forces.c) */
+	/* the controllers' forces: a racing wheel's spring, the cabinet's wheel motor as each seat's output port D has
+	   it, and the console's tyres sliding (forces.c) */
 	for (int player = 0; player < PLAYERS; player++)
 		forces_frame(player, controllers[player], CENTRING, VIBRATION,
-			(s32_board.outputs[player][0] & WHEEL_MOTOR) != 0);
+			(s32_board.outputs[player][0] & WHEEL_MOTOR) != 0, TYRE_SLIP, TYRES_SLIDING(player));
 #ifdef ORUNNERS_TOUCH
 	{
 		/* the phone itself, for the players on its touch controls (no game controller of theirs): STEERING's

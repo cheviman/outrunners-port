@@ -61,6 +61,10 @@ void console_restart_game(void);
    choice): the touch controls' gear buttons are shown then alone */
 bool console_manual_gears(int player);
 
+/* True while player 'player''s seat (0 the left) races with its car's tyres sliding past their grip (car skidding,
+   which player_car_drive sets with the tyres' noise and smoke): STEERING's TYRE SLIP then (issue 48) */
+bool console_tyres_sliding(int player);
+
 /* The radio's MUSIC, << and >> of player 'player''s seat, held this frame, before they go to the board. MUSIC is
    the cabinet's, from the car's song to the station and back to it (SOUND's MUSIC BUTTON: ARCADE, issue 61), or
    goes round it all (ALL SONGS, Sebas's: one button for the songs, as the space bar is): on a song it is >>, on the
@@ -210,6 +214,7 @@ extern const int console_wheel_rotations[WHEEL_ROTATIONS];    /* WHEEL_ROTATION_
 #define FORCE_STEP          10
 #define CENTRING_NORMAL     50
 #define VIBRATION_NORMAL    50
+#define TYRE_SLIP_NORMAL    20    /* (STEERING's TYRE SLIP, issue 48: a light shake, under the crashes') */
 
 typedef struct
 {
@@ -234,6 +239,8 @@ typedef struct
 	int steering_speed;    /* STEERING: the keys' and pads', STEERING_LEVELS or STEERING_SPEED_INSTANT */
 	int centring;          /* STEERING: a racing wheel's spring, percent (FORCE_STEP) */
 	int vibration;         /* STEERING: the wheel motor's shake or rumble, percent (FORCE_STEP) */
+	int tyre_slip;         /* STEERING: the shake or rumble while the tyres slide past their grip, percent (FORCE_STEP),
+	                          and a racing wheel's spring eased then (0: neither; issue 48) */
 	bool phone_vibration;  /* STEERING (Android's): the phone itself vibrates too, for its touch controls */
 	bool changed;
 } console_window;

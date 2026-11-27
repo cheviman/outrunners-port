@@ -921,6 +921,20 @@ merged here; this repository adds console/, the ports and their documents.
   opaque to the edges, the same to the byte. And a picture of the player's own that cannot be made an icon stops
   CMake's configuration: build/static had been configured with a Python 3.14 whose Pillow does not load, and the
   executables had the made icon in its place, unsaid.
+- STEERING > TYRE SLIP (issue 48, antonioneves69: Cannonball-DX's tyre slip for OutRun): while the car's tyres
+  slide past their grip (car skidding, which player_car_drive sets with the tyres' noise 3 and the smoke), a racing
+  wheel shakes at TYRE SLIP's percent (the motor's sine, SHAKE_PERIOD; the motor's own shake goes first) and its
+  spring eases to 67% (Cannonball-DX's "sliding"), and a game controller rumbles as for the motor; 20% by default,
+  0% neither, tyre_slip in outrunners.ini. console_tyres_sliding says it for a seat; forces.c holds a slide 8
+  frames from its last (SLIP_HOLD), so a car at the edge of its grip does not start and stop the effects each
+  frame. The arcade build has none (TYRE_SLIP 0: the cabinet's forces alone). Checked: CLASSIC on the console's
+  headless game with --autopilot, the seat's slides as console_tyres_sliding has them: 2525-2534, 3499-3544,
+  3911-4010, 4411-4500 (whole, not frame by frame); forces.c built with SDL 3's headers and stubs of SDL's
+  functions (a wheel with a spring and a sine, a game controller with rumble alone), five cases: the spring
+  eased and the sine at 20% while sliding and 7 frames after, then both as before; the motor's 50% over the
+  slide's and back to 20%; TYRE SLIP 0 changing nothing; the controller's rumble at 20% and stopped after the
+  hold; nothing at all opened with every force at 0 (the same test fails with no hold and with no easing); the
+  STEERING page with its line; every target with no warnings. Not tried: a racing wheel or a controller.
 
 ## To do
 

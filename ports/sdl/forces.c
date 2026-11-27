@@ -1,10 +1,11 @@
 /**
  *    Name:        forces.c
  *    Description: the forces the controllers give back: a racing wheel's centring spring, and the cabinet's
- *                 wheel motor as a wheel's shake, a game controller's rumble or a phone's vibration
- *    Version:     0.1.2
+ *                 wheel motor as a wheel's shake, a game controller's rumble or a phone's vibration; and the
+ *                 tyres sliding as a lighter shake and an eased spring
+ *    Version:     0.2.0
  *    Created:     06-11-2026
- *    Modified:    19-11-2026
+ *    Modified:    26-11-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
@@ -32,6 +33,12 @@
  *    playing (SDL_HAPTIC_STATUS), and every SPRING_RENEW frames whatever it says, it is run again, as after the
  *    game was held (the frames here stop then).
  *
+ *    The port's own, none of the cabinet's (issue 48, as Cannonball-DX does for OutRun): while the car's tyres
+ *    slide past their grip (car skidding: the tyres' noise and smoke) the same shake at 'slip' percent, under the
+ *    motor's (which goes first), and the spring eased to SLIP_SPRING percent of it, as a wheel goes light when
+ *    the tyres let go. A slide is held SLIP_HOLD frames past its end, so a car at the edge of its grip, sliding
+ *    every other frame, does not start and stop the effects each frame.
+ *
  *    A player with no game controller plays on the device itself (a phone's touch controls): the device's own
  *    vibrator, which SDL lists on Android as a haptic of its own named VIBRATOR_SERVICE (rumble only), vibrates
  *    while the motor runs. Android starts a vibration again at each call (vibrate), so it is asked for a span
@@ -51,6 +58,8 @@
 #define VIBRATOR_NAME  "VIBRATOR_SERVICE"    /* the device's own, as SDL's Android haptics name it */
 #define VIBRATOR_SPAN  250    /* ms: a phone's vibration asked for at once... */
 #define VIBRATOR_RENEW 10     /* ...and again after this many frames (167 ms), before it ends */
+#define SLIP_HOLD      8      /* frames: a slide felt past its end (133 ms) */
+#define SLIP_SPRING    67     /* percent: the spring's strength while the tyres slide (Cannonball-DX's) */
 
 typedef struct
 {
@@ -66,6 +75,7 @@ typedef struct
 	int shake;               /* its strength (percent), as asked of the haptic */
 	bool shaking;            /* the shake running */
 	bool rumbling;           /* a rumble asked for, not yet stopped */
+	int slip_frames;         /* the slide still felt for this many frames (SLIP_HOLD from its last) */
 } player_forces;
 
 static player_forces players[FORCES_PLAYERS];
@@ -94,6 +104,7 @@ static void forget(player_forces *forces)
 	forces->shake = 0;
 	forces->shaking = false;
 	forces->rumbling = false;
+	forces->slip_frames = 0;
 }
 
 void forces_start(void)
@@ -278,11 +289,12 @@ static void let_go(player_forces *forces, SDL_Gamepad *pad)
 	forget(forces);
 }
 
-void forces_frame(int player, SDL_Gamepad *pad, int centring, int shake, bool motor)
+void forces_frame(int player, SDL_Gamepad *pad, int centring, int shake, bool motor, int slip, bool sliding)
 {
 	player_forces *forces;
 	SDL_Joystick *joystick = pad ? SDL_GetGamepadJoystick(pad) : NULL;
 	const SDL_JoystickID id = joystick ? SDL_GetJoystickID(joystick) : 0;
+	int felt;
 
 	if (player < 0 || player >= FORCES_PLAYERS)
 		return;
@@ -295,7 +307,15 @@ void forces_frame(int player, SDL_Gamepad *pad, int centring, int shake, bool mo
 	}
 	if (id == 0)
 		return;
-	if (centring == 0 && shake == 0)
+	if (sliding && slip > 0)
+		forces->slip_frames = SLIP_HOLD;
+	else if (forces->slip_frames > 0)
+		forces->slip_frames--;
+	if (forces->slip_frames > 0)
+		centring = centring * SLIP_SPRING / 100;    /* (the tyres let go: the wheel lighter) */
+	/* (the shake felt: the motor's, else the slide's) */
+	felt = motor && shake > 0 ? shake : (forces->slip_frames > 0 ? slip : 0);
+	if (centring == 0 && shake == 0 && slip == 0)
 	{
 		/* (nothing wanted: the device as its driver has it) */
 		if (forces->looked)
@@ -313,9 +333,9 @@ void forces_frame(int player, SDL_Gamepad *pad, int centring, int shake, bool mo
 		keep_spring(forces);
 	}
 	if (forces->haptic && (forces->kinds & SDL_HAPTIC_SINE))
-		shake_wheel(forces, shake, motor && shake > 0);
+		shake_wheel(forces, felt, felt > 0);
 	else
-		rumble(forces, pad, shake, motor && shake > 0);
+		rumble(forces, pad, felt, felt > 0);
 }
 
 /* The device's own vibrator, looked for once: a haptic of SDL's named VIBRATOR_NAME, able to rumble */
