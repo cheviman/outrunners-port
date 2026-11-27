@@ -1731,7 +1731,11 @@ static bool stick_wheel(int stick, int *position)
 	const int travel = stick < 0 ? -stick : stick;
 #ifdef ORUNNERS_CONSOLE
 	static const double curves[STEERING_LEVELS] = { 2.2, 1.9, 1.6, 1.3, 1.0, 0.85, 0.72, 0.6, 0.5 };
+#ifdef ORUNNERS_HANDHELD
+	const double reach = 32767.0;    /* (a device's: no WHEEL ROTATION, its sticks' travel the game's wheel's) */
+#else
 	const double reach = 32767.0 * WHEEL_ROTATION_GAME / console_window_settings.wheel_rotation;
+#endif
 	const int dead = (int)(console_window_settings.dead_zone * reach / 100);
 	double out;
 
@@ -2306,11 +2310,16 @@ static void on_frame_done(void)
 	{
 		/* the phone itself, for the players on its touch controls (no game controller of theirs): STEERING's
 		   PHONE VIBRATION */
-		bool motor = false;
+		bool motor = false, sliding = false;
 
 		for (int player = 0; player < TOUCH_PLAYERS && player < PLAYERS; player++)
-			motor = motor || (!controllers[player] && (s32_board.outputs[player][0] & WHEEL_MOTOR) != 0);
-		forces_device(console_window_settings.phone_vibration ? VIBRATION : 0, motor);
+			if (!controllers[player])
+			{
+				motor = motor || (s32_board.outputs[player][0] & WHEEL_MOTOR) != 0;
+				sliding = sliding || TYRES_SLIDING(player);    /* (and TYRE SLIP's, issue 48) */
+			}
+		forces_device(console_window_settings.phone_vibration ? VIBRATION : 0, motor,
+			console_window_settings.phone_vibration ? TYRE_SLIP : 0, sliding);
 	}
 #endif
 

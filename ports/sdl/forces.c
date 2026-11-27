@@ -3,9 +3,9 @@
  *    Description: the forces the controllers give back: a racing wheel's centring spring, and the cabinet's
  *                 wheel motor as a wheel's shake, a game controller's rumble or a phone's vibration; and the
  *                 tyres sliding as a lighter shake and an eased spring
- *    Version:     0.2.0
+ *    Version:     0.2.1
  *    Created:     06-11-2026
- *    Modified:    26-11-2026
+ *    Modified:    27-11-2026
  *    Author:      Sebastian Toyos
  *
  *    license:BSD-3-Clause
@@ -41,9 +41,10 @@
  *
  *    A player with no game controller plays on the device itself (a phone's touch controls): the device's own
  *    vibrator, which SDL lists on Android as a haptic of its own named VIBRATOR_SERVICE (rumble only), vibrates
- *    while the motor runs. Android starts a vibration again at each call (vibrate), so it is asked for a span
- *    longer than a few frames (VIBRATOR_SPAN) and again before it ends (VIBRATOR_RENEW frames), and stopped
- *    as the motor stops.
+ *    while the motor runs, and while the tyres slide as a controller rumbles (at 'slip', held SLIP_HOLD frames,
+ *    the motor's first). Android starts a vibration again at each call (vibrate), so it is asked for a span
+ *    longer than a few frames (VIBRATOR_SPAN) and again before it ends (VIBRATOR_RENEW frames) or as its
+ *    strength changes, and stopped as the motor and the slide stop.
  */
 #include "forces.h"
 
@@ -88,6 +89,8 @@ static struct
 	SDL_Haptic *haptic;
 	bool vibrating;
 	int frames;              /* since it was last asked to vibrate */
+	int strength;            /* percent, as last asked */
+	int slip_frames;         /* the slide still felt for this many frames (SLIP_HOLD from its last) */
 } vibrator;
 
 static void forget(player_forces *forces)
@@ -371,20 +374,29 @@ static void stop_vibrator(void)
 	vibrator.vibrating = false;
 }
 
-void forces_device(int shake, bool motor)
+void forces_device(int shake, bool motor, int slip, bool sliding)
 {
+	int felt;
+
 	if (!vibrator.looked)
 		look_for_vibrator();
 	if (!vibrator.haptic)
 		return;
-	if (!motor || shake <= 0)
+	if (sliding && slip > 0)
+		vibrator.slip_frames = SLIP_HOLD;
+	else if (vibrator.slip_frames > 0)
+		vibrator.slip_frames--;
+	/* (the vibration felt: the motor's, else the slide's) */
+	felt = motor && shake > 0 ? shake : (vibrator.slip_frames > 0 ? slip : 0);
+	if (felt <= 0)
 	{
 		stop_vibrator();
 		return;
 	}
-	if (!vibrator.vibrating || ++vibrator.frames >= VIBRATOR_RENEW)
+	if (!vibrator.vibrating || felt != vibrator.strength || ++vibrator.frames >= VIBRATOR_RENEW)
 	{
-		vibrator.vibrating = SDL_PlayHapticRumble(vibrator.haptic, (float)shake / 100.0f, VIBRATOR_SPAN);
+		vibrator.vibrating = SDL_PlayHapticRumble(vibrator.haptic, (float)felt / 100.0f, VIBRATOR_SPAN);
+		vibrator.strength = felt;
 		vibrator.frames = 0;
 	}
 }

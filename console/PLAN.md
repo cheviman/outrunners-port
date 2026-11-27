@@ -938,6 +938,18 @@ merged here; this repository adds console/, the ports and their documents.
 - 1.4.2: the version (CMakeLists.txt; the examples of the packages' names), docs/releases/v1.4.2.md: issue 48 and
   the computers' icon. The assets are 1.4.0's (the extraction's layout unchanged): the devices' games of 1.4.0 and
   1.4.1 are taken.
+- TYRE SLIP on the phone too (Sebas, trying it on Android: it vibrated off the road alone): forces_device takes
+  the slide as forces_frame does, for the players on the touch controls (PHONE VIBRATION off: neither), held
+  SLIP_HOLD frames, the motor's first, and a vibration asked again at once as its strength changes. And WHEEL
+  ROTATION is a computer's alone, beside CENTRING and SET UP WHEEL (Sebas: Android showed it, at 270): a
+  device's sticks turn the game's wheel all the way whatever the ini says (stick_wheel), as raising it there only
+  made them turn it less. Checked: forces.c's stub test with a phone's vibrator (SDL_GetHaptics' VIBRATOR_SERVICE),
+  P6: nothing before the slide, 20% while sliding, the motor's 50% over it and back to 20% at once, 7 frames held,
+  stopped on the 8th, nothing with PHONE VIBRATION off; it fails with the slide not felt on the phone, with no
+  hold and with no new vibration on a new strength; the Android build and every Windows target with no warnings
+  (MAME's gew.cpp's of the reference tools aside), the APK's game with TYRE SLIP and PHONE VIBRATION and without
+  WHEEL ROTATION and CENTRING; Sebas tried it on his phone, on the touch controls ("está perfecto"). Not tried: a
+  racing wheel or a game controller.
 
 ## To do
 

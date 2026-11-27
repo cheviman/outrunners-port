@@ -25,8 +25,9 @@ void forces_start(void);
 void forces_frame(int player, SDL_Gamepad *pad, int centring, int shake, bool motor, int slip, bool sliding);
 
 /* Once a frame: the device's own vibrator (a phone's), for the players with no game controller (the touch
-   controls): it vibrates at 'shake' percent while 'motor' (one of those players' seats' wheel motor) runs */
-void forces_device(int shake, bool motor);
+   controls): it vibrates at 'shake' percent while 'motor' (one of those players' seats' wheel motor) runs, and at
+   'slip' percent while 'sliding' (one of those players' cars' tyres, console_tyres_sliding) */
+void forces_device(int shake, bool motor, int slip, bool sliding);
 
 /* The game held (the pause, a network race waiting): the shakes and rumbles stopped, the springs kept */
 void forces_hold(void);

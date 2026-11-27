@@ -86,7 +86,8 @@ What a tool makes has the game's data in it: it is yours alone, never share it.
   TYRE SLIP (a lighter shake and a lighter wheel while the tyres slide in a bend, the port's own; 0% turns it off)
   and INPUT TEST.
 - **Android**: touch controls on the screen, or a controller. With the touch controls the phone itself vibrates
-  in a crash and off the road, at VIBRATION's strength; STEERING > PHONE VIBRATION turns it off.
+  in a crash and off the road, at VIBRATION's strength, and lighter while the tyres slide, at TYRE SLIP's;
+  STEERING > PHONE VIBRATION turns it off.
 
 ## NETWORK
 

@@ -35,7 +35,8 @@ Playing
 -------
 The console version, WIDE to the screen's shape, with touch controls (the wheel under your left thumb, GAS
 and BRAKE on the right, START at the top right), or a game controller: they hide when a controller is used.
-The phone vibrates in a crash (OPTIONS > STEERING > PHONE VIBRATION turns it off). NETWORK races up to four
+The phone vibrates in a crash, and lighter while the tyres slide in a bend (OPTIONS > STEERING: VIBRATION and
+TYRE SLIP its strengths, PHONE VIBRATION turns it off). NETWORK races up to four
 devices on the same local network (computers, phones and Switches alike). Android's back goes back in the
 menus.
 

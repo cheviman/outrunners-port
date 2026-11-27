@@ -166,11 +166,11 @@ enum { VIDEO_WINDOW, VIDEO_FULL_SCREEN, VIDEO_PIXELS, VIDEO_WIDE, VIDEO_VSYNC, V
    MUSIC BUTTON, the radio's (issue 61): ARCADE, the cabinet's, or ALL SONGS (console_radio_buttons) */
 enum { SOUND_VOLUME, SOUND_MUSIC, SOUND_EFFECTS, SOUND_VOICE, SOUND_MUSIC_BUTTON, SOUND_BACK, SOUND_ITEMS };
 static const char *const sound_items[SOUND_ITEMS] = { "VOLUME", "MUSIC", "EFFECTS", "VOICE", "MUSIC BUTTON", "BACK" };
-/* STEERING's lines: CENTRING and SET UP WHEEL a computer's (a racing wheel's; a device's controls are its
-   own), PHONE VIBRATION Android's (its touch controls') */
-enum { STEERING_DEAD_ZONE, STEERING_SENSITIVITY, STEERING_ROTATION,
+/* STEERING's lines: WHEEL ROTATION, CENTRING and SET UP WHEEL a computer's (a racing wheel's; a device's
+   controls are its own, its sticks' travel the game's wheel's), PHONE VIBRATION Android's (its touch controls') */
+enum { STEERING_DEAD_ZONE, STEERING_SENSITIVITY,
 #ifndef ORUNNERS_HANDHELD
-	STEERING_CENTRING,
+	STEERING_ROTATION, STEERING_CENTRING,
 #endif
 	STEERING_SPEED, STEERING_VIBRATION, STEERING_TYRE_SLIP,
 #ifdef ORUNNERS_TOUCH
@@ -633,10 +633,12 @@ static void steering_frame(uint32_t pressed)
 	console_window *window = &console_window_settings;
 	char value[16];
 	const int by = change(pressed);
+#ifndef ORUNNERS_HANDHELD
 	int rotation = 0;
 
 	while (rotation < WHEEL_ROTATIONS - 1 && console_wheel_rotations[rotation] != window->wheel_rotation)
 		rotation++;
+#endif
 	switch (by ? menu.choice : STEERING_ITEMS)
 	{
 		case STEERING_DEAD_ZONE:
@@ -647,15 +649,15 @@ static void steering_frame(uint32_t pressed)
 			window->sensitivity = step(window->sensitivity, by, 1, STEERING_LEVELS);
 			window->changed = true;
 			break;
-		case STEERING_ROTATION:
-			window->wheel_rotation = console_wheel_rotations[step(rotation, by, 0, WHEEL_ROTATIONS - 1)];
-			window->changed = true;
-			break;
 		case STEERING_SPEED:
 			window->steering_speed = step(window->steering_speed, by, 1, STEERING_SPEED_INSTANT);
 			window->changed = true;
 			break;
 #ifndef ORUNNERS_HANDHELD
+		case STEERING_ROTATION:
+			window->wheel_rotation = console_wheel_rotations[step(rotation, by, 0, WHEEL_ROTATIONS - 1)];
+			window->changed = true;
+			break;
 		case STEERING_CENTRING:
 			window->centring = step(window->centring, by * FORCE_STEP, 0, 100);
 			window->changed = true;
@@ -701,9 +703,9 @@ static void steering_frame(uint32_t pressed)
 	line(STEERING_DEAD_ZONE, "DEAD ZONE", value);
 	snprintf(value, sizeof(value), "< %d >", window->sensitivity);
 	line(STEERING_SENSITIVITY, "SENSITIVITY", value);
+#ifndef ORUNNERS_HANDHELD
 	snprintf(value, sizeof(value), "< %d >", window->wheel_rotation);
 	line(STEERING_ROTATION, "WHEEL ROTATION", value);
-#ifndef ORUNNERS_HANDHELD
 	force_value(value, sizeof(value), window->centring);
 	line(STEERING_CENTRING, "CENTRING", value);
 #endif
