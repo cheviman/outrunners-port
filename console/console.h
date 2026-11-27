@@ -61,12 +61,13 @@ void console_restart_game(void);
    choice): the touch controls' gear buttons are shown then alone */
 bool console_manual_gears(int player);
 
-/* The radio's MUSIC, << and >> of player 'player''s seat, held this frame, before they go to the board. MUSIC goes
-   round it all (Sebas's: one button for the songs, as the space bar is): on a song it is >>, on the last one the
-   game's own (the station, the DJ), and on the station the game's own too, back to the first song. Jingle Bell,
-   the radio's hidden song, which the game plays for both << and >> pressed together (a game controller's pad
-   cannot), is reached with >> past Last Wave and with << before Magical Sound Shower (the other one pressed with
-   it) */
+/* The radio's MUSIC, << and >> of player 'player''s seat, held this frame, before they go to the board. MUSIC is
+   the cabinet's, from the car's song to the station and back to it (SOUND's MUSIC BUTTON: ARCADE, issue 61), or
+   goes round it all (ALL SONGS, Sebas's: one button for the songs, as the space bar is): on a song it is >>, on the
+   last one the game's own (the station, the DJ), and on the station the game's own too, back to the first song.
+   Jingle Bell, the radio's hidden song, which the game plays for both << and >> pressed together (a game
+   controller's pad cannot), is reached with >> past Last Wave and with << before Magical Sound Shower (the other
+   one pressed with it) */
 void console_radio_buttons(int player, bool *music, bool *previous, bool *next);
 
 /* 2 PLAYERS in the title's menu where the build has none (a phone's): the port offers it each frame where it
@@ -222,6 +223,8 @@ typedef struct
 	int music_volume;      /* SOUND's MUSIC, EFFECTS and VOICE (issue 57): 0-10, 5 the game's own */
 	int effects_volume;
 	int voice_volume;
+	bool all_songs;        /* SOUND's MUSIC BUTTON: ALL SONGS, the radio's MUSIC goes round the songs and the station
+	                          (console_radio_buttons); false, ARCADE: the cabinet's, the car's song and the station */
 	char name[CONSOLE_NAME_LENGTH + 1];    /* the player's, as the network's rooms show it */
 	bool both_radios;      /* OPTIONS > 2P MUSIC: the right seat's radio heard too, as the cabinets' (false: the left one's alone) */
 	bool fps;              /* OPTIONS > FPS: the frames a second at the picture's top right, and in a window's title */
@@ -246,6 +249,13 @@ void console_sound_gains(double *fm, int32_t *pcm);
 /* WIDE draws the frames wider (s32_video_set_wide_side): the columns more at each side, or 0 (WIDE off, or
    2 PLAYERS, whose screens are both the board's) */
 int console_wide_side(void);
+
+/* The picture the window shows of a screen with WIDE 'wide' (WIDE_*), in the game's pixels: the board's 320 with
+   WIDE_OFF, and 16:10's and 16:9's a little less than their frames (the screen's shape at 224 rows: 358 of 384, 398
+   of 416), 20:9's and 21:9's whole; and the columns of it at each side of the board's 320, for what is put against
+   the picture's edge (the version in OPTIONS: issues 21 and 62), 0 where console_wide_side is */
+int console_wide_shown_width(int wide);
+int console_wide_shown_side(void);
 
 /* Each frame, before VBLANK's sprites and the frame: WIDE's side for the video (s32_video_set_wide_side) and for
    the game's edges (screen_more_left and screen_more_right, support.h's SCREEN_MORE_LEFT and SCREEN_MORE_RIGHT) */

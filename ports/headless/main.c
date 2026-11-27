@@ -72,7 +72,7 @@
 	" [--write-pack PACK.assets] [--workers N] [--screens 1|2] [--sound-wav FILE]" \
 	" (orunners_console_headless: [--actions FILE] [--wide | --wide-20-9 | --wide-21-9 | --wide-16-10] [--board-edges] [--autopilot]" \
 	" [--ghost-folder DIR] [--pause-dump N] [--side-map] [--real-time] [--name NAME] [--network-log FRAMES]" \
-	" [--restart N] [--quit N] [--sound-mix MUSIC,EFFECTS,VOICE])\n"
+	" [--restart N] [--quit N] [--sound-mix MUSIC,EFFECTS,VOICE] [--all-songs])\n"
 #define MAX_VIDEO_DUMPS 64
 #define CENSUS_SLOTS (1u << 22)     /* open addressing for the censuses' hashes */
 #define TILE_CENSUS_EVERY 30        /* the tilemaps are looked at every this many frames */
@@ -600,6 +600,8 @@ int main(int argc, char **argv)
 			board_edges = true;
 		else if (strcmp(argv[index], "--both-radios") == 0)
 			console_window_settings.both_radios = true;    /* (OPTIONS > 2P MUSIC: ARCADE) */
+		else if (strcmp(argv[index], "--all-songs") == 0)
+			console_window_settings.all_songs = true;    /* (OPTIONS > SOUND > MUSIC BUTTON: ALL SONGS) */
 		else if (strcmp(argv[index], "--sound-mix") == 0 && index + 1 < argc)
 		{
 			/* (OPTIONS > SOUND's MUSIC, EFFECTS and VOICE: three numbers, 0-10, 5 the game's own) */

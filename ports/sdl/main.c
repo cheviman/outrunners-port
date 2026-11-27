@@ -399,29 +399,17 @@ static bool screens_stacked(void)
 }
 
 /* The window's picture, in the game's pixels: its screens side by side, or one over the other */
-/* A screen's picture, in the game's pixels: 320, or with the console's WIDE 16:10, 16:9, 20:9 or 21:9 */
-#define WIDE_16_10_WIDTH 358   /* 16:10 at 224 rows (358.4): the video's 384 less 13 at each side */
-#define WIDE_16_9_WIDTH 398    /* 16:9 at 224 rows: the video's 416 less 9 at each side */
-#define WIDE_20_9_WIDTH 496    /* the video's 496, whole (20:9 is 498) */
-#define WIDE_21_9_WIDTH 536    /* the video's 536, whole (3440 x 1440 is 535, 2560 x 1080 is 531) */
-
+/* A screen's picture, in the game's pixels: 320, or with the console's WIDE 16:10, 16:9, 20:9 or 21:9 its width
+   as console_wide_shown_width has it (what is put against its edge is placed by the same) */
 static int screen_width(void)
 {
 #ifdef ORUNNERS_CONSOLE
 	/* (2 PLAYERS: each screen the board's 320, console_wide_side; as wide as WIDE's they sat between black bars,
 	   smaller than the window had room for: issue 44) */
-	const int wide = screens_shown() == 2 ? WIDE_OFF : console_wide_in_effect();
-
-	if (wide == WIDE_16_10)
-		return WIDE_16_10_WIDTH;
-	if (wide == WIDE_16_9)
-		return WIDE_16_9_WIDTH;
-	if (wide == WIDE_20_9)
-		return WIDE_20_9_WIDTH;
-	if (wide == WIDE_21_9)
-		return WIDE_21_9_WIDTH;
-#endif
+	return console_wide_shown_width(screens_shown() == 2 ? WIDE_OFF : console_wide_in_effect());
+#else
 	return 320;
+#endif
 }
 
 static void picture_size(int *width, int *height)
@@ -1221,12 +1209,12 @@ static void save_window_settings(void)
 	fprintf(output, "window_scale=%d\nfull_screen=%d\npixels=%s\nwide=%d\nvsync=%d\ntwo_players=%s\nvolume=%d\n"
 		"music_volume=%d\neffects_volume=%d\nvoice_volume=%d\n"
 		"name=%s\nfps=%d\ndead_zone=%d\nsensitivity=%d\nwheel_rotation=%d\nsteering_speed=%d\ncentring=%d\n"
-		"vibration=%d\nphone_vibration=%d\nboth_radios=%d\n",
+		"vibration=%d\nphone_vibration=%d\nboth_radios=%d\nall_songs=%d\n",
 		settings->window_scale, settings->full_screen, pixel_names[settings->pixels], settings->wide, settings->vsync,
 		settings->vertical ? "vertical" : "horizontal", settings->volume, settings->music_volume,
 		settings->effects_volume, settings->voice_volume, settings->name, settings->fps,
 		settings->dead_zone, settings->sensitivity, settings->wheel_rotation, settings->steering_speed,
-		settings->centring, settings->vibration, settings->phone_vibration, settings->both_radios);
+		settings->centring, settings->vibration, settings->phone_vibration, settings->both_radios, settings->all_songs);
 	fclose(output);
 }
 
@@ -1280,6 +1268,8 @@ static void load_window_settings(void)
 			settings->fps = number != 0;
 		else if (sscanf(line, "both_radios=%d", &number) == 1)
 			settings->both_radios = number != 0;
+		else if (sscanf(line, "all_songs=%d", &number) == 1)
+			settings->all_songs = number != 0;    /* (SOUND's MUSIC BUTTON: 1 ALL SONGS, 0 ARCADE) */
 		else if (sscanf(line, "dead_zone=%d", &number) == 1 && number >= 0 && number <= DEAD_ZONE_MOST)
 			settings->dead_zone = number / DEAD_ZONE_STEP * DEAD_ZONE_STEP;
 		else if (sscanf(line, "sensitivity=%d", &number) == 1 && number >= 1 && number <= STEERING_LEVELS)
@@ -1518,12 +1508,40 @@ static void wheel_set_up(SDL_JoystickID id)
 
 /* ---- the controls ---- */
 
+#ifndef ORUNNERS_HANDHELD
+/* The mouse's pointer, hidden over the game once it has stood still for two seconds, from the start too; moving it
+   shows it again (issue 60: a Raspberry Pi's, under Batocera, sat in the middle of the screen with no mouse to move
+   it; TMNT's port does the same) */
+#define POINTER_SHOWN_MS  2000u
+static Uint64 pointer_moved;
+
+static void pointer_event(const SDL_Event *event)
+{
+	if (event->type != SDL_EVENT_MOUSE_MOTION && event->type != SDL_EVENT_MOUSE_BUTTON_DOWN && event->type != SDL_EVENT_MOUSE_WHEEL)
+		return;
+	pointer_moved = SDL_GetTicks();
+	if (!SDL_CursorVisible())
+		SDL_ShowCursor();
+}
+
+static void pointer_frame(void)
+{
+	if (SDL_GetTicks() - pointer_moved >= POINTER_SHOWN_MS && SDL_CursorVisible())
+		SDL_HideCursor();
+}
+#else
+#define pointer_event(event)
+#define pointer_frame()
+#endif
+
 static void read_events(void)
 {
 	SDL_Event event;
 
+	pointer_frame();
 	while (SDL_PollEvent(&event))
 	{
+		pointer_event(&event);
 #ifdef ORUNNERS_TOUCH
 		touch_event(&event);
 #endif

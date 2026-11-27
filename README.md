@@ -59,11 +59,12 @@ What a tool makes has the game's data in it: it is yours alone, never share it.
   FULL (all 31 courses in one race), REVERSE (from a goal back to the start).
 - **OPTIONS**: controls, difficulty, time, video (window, full screen, sharp, smooth or CRT pixels, a wider
   picture: AUTO, the screen's shape, as a Steam Deck's in its hands, a TV's or an ultrawide monitor's, or
-  16:10, 16:9, 20:9 or 21:9; VSYNC), sound (the volume, and the music, the effects and the voices apart),
-  sound test, steering, FPS.
-- **The radio**: MUSIC goes round it all, one button: each song, then after Last Wave the station and its DJ,
-  then Magical Sound Shower again. << and >> go round the ten songs and Jingle Bell, the hidden one, between
-  Last Wave and Magical Sound Shower.
+  16:10, 16:9, 20:9 or 21:9; VSYNC), sound (the volume, and the music, the effects and the voices apart;
+  the radio's MUSIC button), sound test, steering, FPS.
+- **The radio**: << and >> go round the ten songs and Jingle Bell, the hidden one, between Last Wave and
+  Magical Sound Shower. MUSIC is the cabinet's, from the car's song to the station and its DJ and back
+  (OPTIONS > SOUND > MUSIC BUTTON: ARCADE), or goes round it all, one button (ALL SONGS): each song, then
+  after Last Wave the station, then Magical Sound Shower again.
 - **The pause** in a race: CONTINUE, RESTART, QUIT GAME.
 - **The picture**: the scenery the arcade draws every other frame to make it look faint (the spray of Niagara's
   falls, the pyramids) is drawn see-through instead, so it does not blink.

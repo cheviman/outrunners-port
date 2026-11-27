@@ -572,6 +572,23 @@ int console_wide_side(void)
 	}
 }
 
+int console_wide_shown_width(int wide)
+{
+	switch (wide)
+	{
+		case WIDE_16_10: return 358;    /* (16:10 at 224 rows, 358.4: the video's 384 less 13 at each side) */
+		case WIDE_16_9: return 398;     /* (16:9 at 224 rows: the video's 416 less 9 at each side) */
+		case WIDE_20_9: return 320 + 2 * S32_VIDEO_WIDE_SIDE_20_9;    /* (496, whole: 20:9 is 498) */
+		case WIDE_21_9: return 320 + 2 * S32_VIDEO_WIDE_SIDE_21_9;    /* (536, whole: 3440 x 1440 is 535, 2560 x 1080 531) */
+		default: return 320;
+	}
+}
+
+int console_wide_shown_side(void)
+{
+	return console_wide_side() == 0 ? 0 : (console_wide_shown_width(console_wide_in_effect()) - 320) / 2;
+}
+
 void console_set_sides(void)
 {
 	const int side = console_wide_side();
@@ -636,9 +653,10 @@ void console_radio_buttons(int player, bool *music, bool *previous, bool *next)
 
 	if (*music && !held[player][2])
 	{
-		/* (MUSIC newly pressed: on a song but the last, >> while it is held; on the station back to the first
-		   song, which any of its buttons goes back to, from the car's) */
-		const uint32_t radio = on_race ? seat_radio(seat) : 0u;
+		/* (MUSIC newly pressed, with ALL SONGS: on a song but the last, >> while it is held; on the station back to
+		   the first song, which any of its buttons goes back to, from the car's. With ARCADE, the cabinet's: the
+		   game's own, the station and back to the car's song, as it was: issue 61) */
+		const uint32_t radio = on_race && console_window_settings.all_songs ? seat_radio(seat) : 0u;
 
 		music_steps[player] = false;
 		if (radio && OBJECT(radio)->state <= RADIO_ON_SONGS)

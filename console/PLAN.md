@@ -891,6 +891,27 @@ merged here; this repository adds console/, the ports and their documents.
   with MSVC with no warnings, video.c and routes.c with clang for arm64 (-Wall -Wextra). A fade costs a draw
   of the tilemap and a second look down the layers at each pixel: CLASSIC with one on all the time, 6.5% more
   time a frame on one thread, 4% on four.
+- Three players' reports on 1.4.0 (issues 60, 61 and 62, nicolasbrut-cell). The mouse's pointer, hidden over the
+  window once it has stood still for two seconds, from the start too, and shown again as it moves (60: a Raspberry
+  Pi's under Batocera sat in the middle of the screen with no mouse to move it): pointer_event and pointer_frame in
+  ports/sdl/main.c, TMNT's, on every build but the devices' (ORUNNERS_HANDHELD). The radio's MUSIC the cabinet's
+  again by default (61: going round it all made the station a few presses away, and the cabinet's MUSIC comes back
+  to the car's song): OPTIONS > SOUND > MUSIC BUTTON, ARCADE (the game's own, from the car's song to the station and
+  back to it) or ALL SONGS (25-11's round: each song, the station after Last Wave, Magical Sound Shower again; for
+  the touch controls, which have no << and >>, or one key), all_songs in outrunners.ini and the console headless's
+  --all-songs. The version in OPTIONS at the right edge of the picture shown, not of the frame (62, and 21, closed
+  on 10-11 with no change made): WIDE 16:10's and 16:9's frames, 384 and 416 columns, are shown 358 and 398 wide,
+  and the version 3 columns from the frame's edge lost 10 and 6 of them; console_wide_shown_width has the widths
+  the window shows (ports/sdl's screen_width takes them from it) and console_wide_shown_side places the version.
+  Checked: the console's headless game, CLASSIC with MUSIC pressed every 300 frames, the car's song and the radio's
+  state at each change: ARCADE song 7, the station, 7, the station and so on; ALL SONGS 7, 8, 9, the station, 0, 1
+  and on, as 1.4.0; OPTIONS' picture at frame 890 of tests/console/menu.txt in OFF, 16:10, 16:9, 20:9 and 21:9, cut
+  to the window's width: the version whole, 3 columns from the edge, in each (in 16:10 and 16:9 it was cut, V1.4.);
+  tests/console's menu, CONTROLS, 2 PLAYERS, CLASSIC, TIME ATTACK and ARCADE's race to Niagara the same as the build
+  before (state, picture and sound), and the menu in WIDE 16:9 different in the picture only while OPTIONS shows
+  (727-982, 1105-1182, 1265-1302; the state while the sprite list keeps the version's letters, to 1568), the sound
+  the same; every target with no warnings. Not tried: the pointer under Batocera on a Pi, nor live on Windows (the
+  mouse is the player's).
 
 ## To do
 

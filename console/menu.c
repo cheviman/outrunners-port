@@ -162,9 +162,10 @@ enum { VIDEO_WINDOW, VIDEO_FULL_SCREEN, VIDEO_PIXELS, VIDEO_WIDE, VIDEO_VSYNC, V
 	VIDEO_ITEMS };
 /* SOUND's lines (issue 57: a player's, to hear the radio over the DJ): VOLUME, the whole sound, then MUSIC (the
    songs: the FM chips and the drums' and instruments' samples), EFFECTS (the engines, the tyres, the crashes, the
-   scenery) and VOICE (the DJ and the other voices), each 0 to 10, 5 the game's own (ports/sdl's sound mix) */
-enum { SOUND_VOLUME, SOUND_MUSIC, SOUND_EFFECTS, SOUND_VOICE, SOUND_BACK, SOUND_ITEMS };
-static const char *const sound_items[SOUND_ITEMS] = { "VOLUME", "MUSIC", "EFFECTS", "VOICE", "BACK" };
+   scenery) and VOICE (the DJ and the other voices), each 0 to 10, 5 the game's own (ports/sdl's sound mix); and
+   MUSIC BUTTON, the radio's (issue 61): ARCADE, the cabinet's, or ALL SONGS (console_radio_buttons) */
+enum { SOUND_VOLUME, SOUND_MUSIC, SOUND_EFFECTS, SOUND_VOICE, SOUND_MUSIC_BUTTON, SOUND_BACK, SOUND_ITEMS };
+static const char *const sound_items[SOUND_ITEMS] = { "VOLUME", "MUSIC", "EFFECTS", "VOICE", "MUSIC BUTTON", "BACK" };
 /* STEERING's lines: CENTRING and SET UP WHEEL a computer's (a racing wheel's; a device's controls are its
    own), PHONE VIBRATION Android's (its touch controls') */
 enum { STEERING_DEAD_ZONE, STEERING_SENSITIVITY, STEERING_ROTATION,
@@ -453,9 +454,10 @@ static void options_frame(uint32_t pressed)
 			shown = console_window_settings.both_radios ? "< ARCADE >" : "< PLAYER 1 >";
 		line(index, options_items[options_lines[index]], shown);
 	}
-	/* the game's version at the bottom right (of WIDE's wider screen too) */
-	console_text(SCREEN_WIDTH + console_wide_side() - VERSION_MARGIN - console_text_width("V" ORUNNERS_VERSION, 1), VERSION_Y, 1,
-		ITEM_COLOUR, "V" ORUNNERS_VERSION);
+	/* the game's version at the bottom right of the picture shown (WIDE 16:10's and 16:9's frames are wider than
+	   the window shows them: issues 21 and 62) */
+	console_text(SCREEN_WIDTH + console_wide_shown_side() - VERSION_MARGIN - console_text_width("V" ORUNNERS_VERSION, 1),
+		VERSION_Y, 1, ITEM_COLOUR, "V" ORUNNERS_VERSION);
 	darken_page();
 }
 
@@ -484,18 +486,23 @@ static void time_frame(uint32_t pressed)
 	darken_page();
 }
 
-/* SOUND: LEFT and RIGHT change VOLUME, MUSIC, EFFECTS and VOICE, 0 to 10 (5 the game's own), kept in
-   outrunners.ini */
+/* SOUND: LEFT and RIGHT change VOLUME, MUSIC, EFFECTS and VOICE, 0 to 10 (5 the game's own), and MUSIC BUTTON (ACCEPT
+   too), kept in outrunners.ini */
 static void sound_frame(uint32_t pressed)
 {
-	int *const values[SOUND_BACK] = { &console_window_settings.volume, &console_window_settings.music_volume,
+	int *const values[SOUND_MUSIC_BUTTON] = { &console_window_settings.volume, &console_window_settings.music_volume,
 		&console_window_settings.effects_volume, &console_window_settings.voice_volume };
 	const int by = change(pressed);
 	char value[16];
 
-	if (by && menu.choice < SOUND_BACK)
+	if (by && menu.choice < SOUND_MUSIC_BUTTON)
 	{
 		*values[menu.choice] = step(*values[menu.choice], by, 0, 10);
+		console_window_settings.changed = true;
+	}
+	if (menu.choice == SOUND_MUSIC_BUTTON && (by || (pressed & ACTION_BIT(ACTION_ACCEPT))))
+	{
+		console_window_settings.all_songs = !console_window_settings.all_songs;
 		console_window_settings.changed = true;
 	}
 	if ((pressed & ACTION_BIT(ACTION_ACCEPT)) && menu.choice == SOUND_BACK)
@@ -506,9 +513,16 @@ static void sound_frame(uint32_t pressed)
 	page_heading("SOUND");
 	for (int index = 0; index < SOUND_ITEMS; index++)
 	{
-		if (index < SOUND_BACK)
+		const char *shown = NULL;
+
+		if (index < SOUND_MUSIC_BUTTON)
+		{
 			snprintf(value, sizeof(value), "< %d >", *values[index]);
-		line(index, sound_items[index], index < SOUND_BACK ? value : NULL);
+			shown = value;
+		}
+		else if (index == SOUND_MUSIC_BUTTON)
+			shown = console_window_settings.all_songs ? "< ALL SONGS >" : "< ARCADE >";
+		line(index, sound_items[index], shown);
 	}
 	darken_page();
 }
